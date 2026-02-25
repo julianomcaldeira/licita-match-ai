@@ -1,57 +1,192 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Building2, MoreHorizontal, Users, Zap } from "lucide-react";
+import { Building2, MoreHorizontal, Users, Zap, Plus, Loader2, X } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
-const mockEmpresas = [
-  { id: 1, nome: "MedTech Equipamentos", cnpj: "12.345.678/0001-90", segmento: "Equipamentos Hospitalares", usuarios: 8, oportunidades: 47, scoreMedio: 78 },
-  { id: 2, nome: "DataSec Tecnologia", cnpj: "98.765.432/0001-10", segmento: "Segurança da Informação", usuarios: 5, oportunidades: 32, scoreMedio: 65 },
-  { id: 3, nome: "Construtora Horizonte", cnpj: "11.222.333/0001-44", segmento: "Engenharia Civil", usuarios: 12, oportunidades: 89, scoreMedio: 71 },
-];
+interface EmpresaForm {
+  nome: string;
+  cnpj: string;
+  descricao_atividade: string;
+  segmentos: string;
+  palavras_chave: string;
+  prompt_personalizado: string;
+}
+
+const emptyForm: EmpresaForm = {
+  nome: "",
+  cnpj: "",
+  descricao_atividade: "",
+  segmentos: "",
+  palavras_chave: "",
+  prompt_personalizado: "",
+};
 
 export default function EmpresasPage() {
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState<EmpresaForm>(emptyForm);
+  const { role } = useAuth();
+  const queryClient = useQueryClient();
+  const isAdmin = role === "admin_central";
+
+  const { data: empresas, isLoading } = useQuery({
+    queryKey: ["empresas"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("empresas_clientes")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (f: EmpresaForm) => {
+      const { error } = await supabase.from("empresas_clientes").insert({
+        nome: f.nome,
+        cnpj: f.cnpj || null,
+        descricao_atividade: f.descricao_atividade || null,
+        segmentos: f.segmentos ? f.segmentos.split(",").map((s) => s.trim()) : [],
+        palavras_chave: f.palavras_chave ? f.palavras_chave.split(",").map((s) => s.trim()) : [],
+        prompt_personalizado: f.prompt_personalizado || null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Empresa criada!");
+      setShowForm(false);
+      setForm(emptyForm);
+      queryClient.invalidateQueries({ queryKey: ["empresas"] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("empresas_clientes").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Empresa removida");
+      queryClient.invalidateQueries({ queryKey: ["empresas"] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-2xl font-bold text-foreground">Empresas</h1>
-          <p className="text-sm text-muted-foreground">Gestão de clientes da plataforma</p>
+          <p className="text-sm text-muted-foreground">
+            {empresas?.length ? `${empresas.length} empresas cadastradas` : "Gestão de clientes da plataforma"}
+          </p>
         </div>
-        <button className="flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow hover:opacity-90 transition">
-          <Building2 className="h-4 w-4" /> Nova Empresa
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow hover:opacity-90 transition"
+          >
+            {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            {showForm ? "Cancelar" : "Nova Empresa"}
+          </button>
+        )}
       </div>
 
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {mockEmpresas.map((emp, i) => (
-          <motion.div
-            key={emp.id}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.08 }}
-            className="rounded-xl border border-border bg-card p-6 shadow-sm"
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-                <Building2 className="h-6 w-6 text-primary" />
-              </div>
-              <button className="text-muted-foreground hover:text-foreground">
-                <MoreHorizontal className="h-5 w-5" />
-              </button>
+      {/* Create form */}
+      {showForm && (
+        <motion.form
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          onSubmit={(e) => { e.preventDefault(); createMutation.mutate(form); }}
+          className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-4"
+        >
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-foreground">Nome *</label>
+              <input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} required className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
             </div>
-            <h3 className="mt-4 font-display text-lg font-semibold text-foreground">{emp.nome}</h3>
-            <p className="text-xs text-muted-foreground font-mono">{emp.cnpj}</p>
-            <p className="mt-1 text-sm text-muted-foreground">{emp.segmento}</p>
-            <div className="mt-4 flex items-center gap-4 border-t border-border pt-4 text-sm">
-              <div className="flex items-center gap-1 text-muted-foreground">
-                <Users className="h-4 w-4" /> {emp.usuarios}
-              </div>
-              <div className="flex items-center gap-1 text-muted-foreground">
-                <Zap className="h-4 w-4" /> {emp.oportunidades} oport.
-              </div>
-              <div className="ml-auto font-display font-bold text-primary">{emp.scoreMedio}%</div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-foreground">CNPJ</label>
+              <input value={form.cnpj} onChange={(e) => setForm({ ...form, cnpj: e.target.value })} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
             </div>
-          </motion.div>
-        ))}
-      </motion.div>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-foreground">Descrição da Atividade</label>
+            <textarea value={form.descricao_atividade} onChange={(e) => setForm({ ...form, descricao_atividade: e.target.value })} rows={2} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-foreground">Segmentos (separados por vírgula)</label>
+              <input value={form.segmentos} onChange={(e) => setForm({ ...form, segmentos: e.target.value })} placeholder="Ex: Equipamentos, Saúde" className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-foreground">Palavras-chave (separadas por vírgula)</label>
+              <input value={form.palavras_chave} onChange={(e) => setForm({ ...form, palavras_chave: e.target.value })} placeholder="Ex: tomógrafo, ressonância" className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-foreground">Prompt Personalizado para IA</label>
+            <textarea value={form.prompt_personalizado} onChange={(e) => setForm({ ...form, prompt_personalizado: e.target.value })} rows={3} placeholder="Descreva o escopo da empresa para análise de IA..." className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+          </div>
+          <button type="submit" disabled={createMutation.isPending} className="flex h-10 items-center gap-2 rounded-lg bg-primary px-6 text-sm font-medium text-primary-foreground shadow hover:opacity-90 transition disabled:opacity-50">
+            {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Building2 className="h-4 w-4" />}
+            Criar Empresa
+          </button>
+        </motion.form>
+      )}
+
+      {/* Cards */}
+      {isLoading ? (
+        <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+      ) : !empresas?.length ? (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center py-20">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10"><Building2 className="h-8 w-8 text-primary" /></div>
+          <h2 className="mt-4 font-display text-lg font-semibold text-foreground">Nenhuma empresa cadastrada</h2>
+          <p className="mt-2 text-sm text-muted-foreground">Clique em "Nova Empresa" para começar.</p>
+        </motion.div>
+      ) : (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {empresas.map((emp, i) => (
+            <motion.div
+              key={emp.id}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.08 }}
+              className="rounded-xl border border-border bg-card p-6 shadow-sm"
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+                  <Building2 className="h-6 w-6 text-primary" />
+                </div>
+                {isAdmin && (
+                  <button onClick={() => deleteMutation.mutate(emp.id)} className="text-muted-foreground hover:text-destructive transition" title="Remover">
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              <h3 className="mt-4 font-display text-lg font-semibold text-foreground">{emp.nome}</h3>
+              {emp.cnpj && <p className="text-xs text-muted-foreground font-mono">{emp.cnpj}</p>}
+              {emp.descricao_atividade && <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{emp.descricao_atividade}</p>}
+              {emp.palavras_chave && emp.palavras_chave.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1">
+                  {emp.palavras_chave.slice(0, 5).map((kw: string) => (
+                    <span key={kw} className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">{kw}</span>
+                  ))}
+                </div>
+              )}
+              {emp.segmentos && emp.segmentos.length > 0 && (
+                <div className="mt-3 flex items-center gap-1 text-sm text-muted-foreground">
+                  <Zap className="h-3.5 w-3.5" /> {emp.segmentos.join(", ")}
+                </div>
+              )}
+            </motion.div>
+          ))}
+        </motion.div>
+      )}
     </div>
   );
 }
