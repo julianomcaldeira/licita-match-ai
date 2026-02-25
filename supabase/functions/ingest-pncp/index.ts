@@ -7,14 +7,13 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const PNCP_BASE_URL = "https://pncp.gov.br/api/consulta/v1";
-const PNCP_DATA_URL = "https://pncp.gov.br/api/pncp/v1"; // For orgaos/compras/itens/resultados
-const PAGE_SIZE = 50; // PNCP max is 50
+const PNCP_CONSULTA_URL = "https://pncp.gov.br/api/consulta/v1";
+const PNCP_DATA_URL = "https://pncp.gov.br/api/pncp/v1";
+const PAGE_SIZE = 50;
 
 interface PNCPContratacao {
   numeroControlePNCP?: string;
   orgaoEntidade?: { razaoSocial?: string; cnpj?: string };
-  orgaoSubRogado?: { razaoSocial?: string; cnpj?: string };
   modalidadeId?: number;
   modalidadeNome?: string;
   objetoCompra?: string;
@@ -49,97 +48,29 @@ async function fetchWithRetry(url: string, retries = 3, delayMs = 2000): Promise
   throw new Error("Max retries reached");
 }
 
-// Parse numeroControlePNCP to extract cnpj, ano, sequencial
-// Format examples: "00394460000141-1-000037/2024" or similar
-function parseNumeroControle(numero: string): { cnpj: string; ano: string; sequencial: string } | null {
+function safeParseJSON(text: string): any {
+  if (!text || !text.trim()) return [];
   try {
-    // Common format: CNPJ-ANO-SEQ or variations
-    // Try pattern: {14-digit-cnpj}-{ano}-{sequencial}/{ano2}
-    const parts = numero.split("-");
-    if (parts.length >= 3) {
-      const cnpj = parts[0];
-      const ano = parts[1];
-      // sequencial may contain /year suffix, clean it
-      const seq = parts.slice(2).join("-").split("/")[0];
-      return { cnpj, ano, sequencial: seq };
-    }
-    return null;
+    return JSON.parse(text);
   } catch {
+    const lastBrace = text.lastIndexOf("}");
+    if (lastBrace > 0) {
+      try {
+        return JSON.parse(text.substring(0, lastBrace + 1) + "]");
+      } catch { /* fall through */ }
+    }
     return null;
   }
-}
-
-// Fetch winners for a contratação via the itens + resultados endpoints
-async function fetchVencedores(
-  cnpj: string,
-  ano: string,
-  sequencial: string
-): Promise<Array<{ numeroItem: number; razaoSocial: string; cnpjVencedor: string | null; valorFinal: number | null; descricao: string }>> {
-  const winners: Array<{ numeroItem: number; razaoSocial: string; cnpjVencedor: string | null; valorFinal: number | null; descricao: string }> = [];
-
-  try {
-    // First get the items
-    const itensUrl = `${PNCP_DATA_URL}/orgaos/${cnpj}/compras/${ano}/${sequencial}/itens`;
-    console.log("Fetching itens:", itensUrl);
-    const itensResp = await fetch(itensUrl, { headers: { Accept: "application/json" } });
-    if (!itensResp.ok) {
-      const errText = await itensResp.text();
-      console.warn(`Itens error ${itensResp.status} for ${cnpj}/${ano}/${sequencial}: ${errText.slice(0, 200)}`);
-      return winners;
-    }
-
-    const itens = await itensResp.json();
-    console.log(`Found ${Array.isArray(itens) ? itens.length : 'non-array'} itens for ${cnpj}/${ano}/${sequencial}`);
-    if (!Array.isArray(itens)) return winners;
-
-    // For each item, try to get the resultado
-    for (const item of itens.slice(0, 10)) { // Limit to first 10 items to avoid timeout
-      const seqItem = item.numeroItem || item.sequencialItem;
-      if (!seqItem) continue;
-
-      try {
-        const resultUrl = `${PNCP_DATA_URL}/orgaos/${cnpj}/compras/${ano}/${sequencial}/itens/${seqItem}/resultados`;
-        const resultResp = await fetch(resultUrl, { headers: { Accept: "application/json" } });
-        if (!resultResp.ok) {
-          await resultResp.text();
-          continue;
-        }
-
-        const resultados = await resultResp.json();
-        const resultList = Array.isArray(resultados) ? resultados : [resultados];
-
-        for (const r of resultList) {
-          if (r?.nomeRazaoSocialFornecedor || r?.niFornecedor) {
-            winners.push({
-              numeroItem: seqItem,
-              razaoSocial: r.nomeRazaoSocialFornecedor || r.niFornecedor || "Não informado",
-              cnpjVencedor: r.niFornecedor || null,
-              valorFinal: r.valorTotalHomologado || r.valorUnitarioHomologado || null,
-              descricao: item.descricao || item.materialOuServico || "Item",
-            });
-            break; // Only first winner per item
-          }
-        }
-      } catch {
-        // Skip this item
-      }
-    }
-  } catch (e) {
-    console.warn("Error fetching vencedores:", e);
-  }
-
-  return winners;
 }
 
 /**
- * Resumable ingestion: processes ONE modalidade + ONE page per call.
+ * Two modes:
  * 
- * Body params:
- *  - dataInicial: YYYYMMDD
- *  - dataFinal: YYYYMMDD
- *  - modalidade: number
- *  - pagina: number (default 1)
- *  - fetchWinners: boolean (default false)
+ * MODE 1 - "ingest" (default): Fast bulk ingestion of licitações
+ *   Body: { dataInicial, dataFinal, modalidade, pagina }
+ * 
+ * MODE 2 - "winners": Fetch winners for licitações that don't have them yet
+ *   Body: { mode: "winners", limit?: number }
  */
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -151,186 +82,232 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   const body = await req.json().catch(() => ({}));
-
-  const today = new Date().toISOString().split("T")[0].replace(/-/g, "");
-  const dataInicial: string = body.dataInicial || "20230101";
-  const dataFinal: string = body.dataFinal || today;
-  const modalidade: number = body.modalidade || 4;
-  const pagina: number = body.pagina || 1;
-  const fetchWinners: boolean = body.fetchWinners ?? false;
-
-  let totalProcessed = 0;
-  let winnersFound = 0;
+  const mode = body.mode || "ingest";
 
   try {
-    const url = `${PNCP_BASE_URL}/contratacoes/publicacao?dataInicial=${dataInicial}&dataFinal=${dataFinal}&codigoModalidadeContratacao=${modalidade}&pagina=${pagina}&tamanhoPagina=${PAGE_SIZE}`;
-    console.log("Fetching:", url);
-
-    const response = await fetchWithRetry(url);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.warn(`PNCP mod ${modalidade} pag ${pagina} error ${response.status}: ${errorText}`);
-      return new Response(
-        JSON.stringify({ success: true, totalProcessed: 0, hasMore: false, modalidade, pagina }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (mode === "winners") {
+      return await handleWinners(supabase, body);
     }
-
-    const responseText = await response.text();
-    
-    let data: any;
-    try {
-      data = responseText.trim() ? JSON.parse(responseText) : [];
-    } catch {
-      // Try to recover truncated JSON array
-      const lastBrace = responseText.lastIndexOf("}");
-      if (lastBrace > 0) {
-        try {
-          data = JSON.parse(responseText.substring(0, lastBrace + 1) + "]");
-          console.warn(`Recovered truncated JSON for mod ${modalidade} pag ${pagina}`);
-        } catch {
-          console.warn(`Unparseable response for mod ${modalidade} pag ${pagina}, skipping`);
-          return new Response(
-            JSON.stringify({ success: true, totalProcessed: 0, hasMore: false, modalidade, pagina }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-      } else {
-        console.warn(`Empty/invalid response for mod ${modalidade} pag ${pagina}, skipping`);
-        return new Response(
-          JSON.stringify({ success: true, totalProcessed: 0, hasMore: false, modalidade, pagina }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-    }
-
-    const contratacoes: PNCPContratacao[] = data.data || (Array.isArray(data) ? data : []);
-    const hasMore = contratacoes.length >= PAGE_SIZE;
-
-    console.log(`Mod ${modalidade} pag ${pagina}: ${contratacoes.length} contratações`);
-
-    // Batch upsert licitacoes
-    const licitacoesRows = [];
-    for (const c of contratacoes) {
-      const idOrigem = c.numeroControlePNCP || `pncp-${Date.now()}-${Math.random()}`;
-      licitacoesRows.push({
-        id_origem: idOrigem,
-        fonte: "PNCP",
-        orgao: c.orgaoEntidade?.razaoSocial || "Não informado",
-        modalidade: c.modalidadeNome || null,
-        objeto: c.objetoCompra || "Sem descrição",
-        data_publicacao: c.dataPublicacaoPncp ? c.dataPublicacaoPncp.split("T")[0] : null,
-        data_resultado: c.dataResultadoCompra ? c.dataResultadoCompra.split("T")[0] : null,
-        valor_estimado: c.valorTotalEstimado || null,
-        valor_homologado: c.valorTotalHomologado || null,
-        situacao: c.situacaoCompraNome || null,
-        numero_controle_pncp: c.numeroControlePNCP || null,
-        uf: c.unidadeOrgao?.ufSigla || null,
-        municipio: c.unidadeOrgao?.municipioNome || null,
-        raw_json: c as unknown as Record<string, unknown>,
-      });
-    }
-
-    for (let i = 0; i < licitacoesRows.length; i += 50) {
-      const batch = licitacoesRows.slice(i, i + 50);
-      const { error: upsertError } = await supabase
-        .from("licitacoes")
-        .upsert(batch, { onConflict: "id_origem,fonte" });
-      if (upsertError) {
-        console.error("Batch upsert error:", upsertError.message);
-      } else {
-        totalProcessed += batch.length;
-      }
-    }
-
-    // Fetch winners for contratações that have anoCompra and sequencialCompra
-    if (fetchWinners) {
-      const withData = contratacoes.filter(
-        (c) => c.numeroControlePNCP && (c.orgaoEntidade?.cnpj || c.unidadeOrgao?.cnpj) && c.anoCompra && c.sequencialCompra
-      );
-
-      for (const c of withData.slice(0, 15)) { // Limit per call to avoid timeout
-        const cnpj = c.orgaoEntidade?.cnpj || c.unidadeOrgao?.cnpj || "";
-        const ano = String(c.anoCompra);
-        const sequencial = String(c.sequencialCompra);
-
-        const vencedores = await fetchVencedores(cnpj, ano, sequencial);
-        if (vencedores.length === 0) continue;
-
-        // Get the licitacao id
-        const { data: lic } = await supabase
-          .from("licitacoes")
-          .select("id")
-          .eq("id_origem", c.numeroControlePNCP!)
-          .eq("fonte", "PNCP")
-          .limit(1)
-          .single();
-
-        if (!lic) continue;
-
-        for (const v of vencedores) {
-          // Upsert item
-          const { data: item, error: itemErr } = await supabase
-            .from("licitacao_itens")
-            .upsert(
-              {
-                licitacao_id: lic.id,
-                descricao: v.descricao,
-                numero_item: v.numeroItem,
-                valor_unitario_final: v.valorFinal,
-              },
-              { onConflict: "licitacao_id,numero_item" }
-            )
-            .select("id")
-            .single();
-
-          if (itemErr || !item) {
-            console.warn("Item upsert error:", itemErr?.message);
-            continue;
-          }
-
-          // Upsert winner
-          const { error: winErr } = await supabase
-            .from("licitacao_vencedores")
-            .upsert(
-              {
-                item_id: item.id,
-                razao_social: v.razaoSocial,
-                cnpj: v.cnpjVencedor,
-                valor_final: v.valorFinal,
-              },
-              { onConflict: "item_id" }
-            );
-
-          if (!winErr) winnersFound++;
-        }
-      }
-    }
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        totalProcessed,
-        winnersFound,
-        hasMore,
-        modalidade,
-        pagina,
-        dataInicial,
-        dataFinal,
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return await handleIngest(supabase, body);
   } catch (error) {
-    console.error("Ingestion error:", error);
+    console.error("Error:", error);
     return new Response(
-      JSON.stringify({
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-        modalidade,
-        pagina,
-      }),
+      JSON.stringify({ success: false, error: error instanceof Error ? error.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
+
+async function handleIngest(supabase: any, body: any) {
+  const today = new Date().toISOString().split("T")[0].replace(/-/g, "");
+  const dataInicial: string = body.dataInicial || "20230101";
+  const dataFinal: string = body.dataFinal || today;
+  const modalidade: number = body.modalidade || 6;
+  const pagina: number = body.pagina || 1;
+
+  const url = `${PNCP_CONSULTA_URL}/contratacoes/publicacao?dataInicial=${dataInicial}&dataFinal=${dataFinal}&codigoModalidadeContratacao=${modalidade}&pagina=${pagina}&tamanhoPagina=${PAGE_SIZE}`;
+  console.log("Fetching:", url);
+
+  const response = await fetchWithRetry(url);
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.warn(`Mod ${modalidade} pag ${pagina} error ${response.status}: ${errorText.slice(0, 200)}`);
+    return new Response(
+      JSON.stringify({ success: true, totalProcessed: 0, hasMore: false, modalidade, pagina }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  const responseText = await response.text();
+  const data = safeParseJSON(responseText);
+  if (data === null) {
+    console.warn(`Unparseable response mod ${modalidade} pag ${pagina}`);
+    return new Response(
+      JSON.stringify({ success: true, totalProcessed: 0, hasMore: false, modalidade, pagina }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  const contratacoes: PNCPContratacao[] = data.data || (Array.isArray(data) ? data : []);
+  const hasMore = contratacoes.length >= PAGE_SIZE;
+  let totalProcessed = 0;
+
+  console.log(`Mod ${modalidade} pag ${pagina}: ${contratacoes.length} contratações`);
+
+  const licitacoesRows = contratacoes.map((c) => ({
+    id_origem: c.numeroControlePNCP || `pncp-${Date.now()}-${Math.random()}`,
+    fonte: "PNCP",
+    orgao: c.orgaoEntidade?.razaoSocial || "Não informado",
+    modalidade: c.modalidadeNome || null,
+    objeto: c.objetoCompra || "Sem descrição",
+    data_publicacao: c.dataPublicacaoPncp ? c.dataPublicacaoPncp.split("T")[0] : null,
+    data_resultado: c.dataResultadoCompra ? c.dataResultadoCompra.split("T")[0] : null,
+    valor_estimado: c.valorTotalEstimado || null,
+    valor_homologado: c.valorTotalHomologado || null,
+    situacao: c.situacaoCompraNome || null,
+    numero_controle_pncp: c.numeroControlePNCP || null,
+    uf: c.unidadeOrgao?.ufSigla || null,
+    municipio: c.unidadeOrgao?.municipioNome || null,
+    raw_json: c as unknown as Record<string, unknown>,
+  }));
+
+  for (let i = 0; i < licitacoesRows.length; i += 50) {
+    const batch = licitacoesRows.slice(i, i + 50);
+    const { error } = await supabase.from("licitacoes").upsert(batch, { onConflict: "id_origem,fonte" });
+    if (error) {
+      console.error("Upsert error:", error.message);
+    } else {
+      totalProcessed += batch.length;
+    }
+  }
+
+  return new Response(
+    JSON.stringify({ success: true, totalProcessed, hasMore, modalidade, pagina }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
+async function handleWinners(supabase: any, body: any) {
+  const batchSize = body.limit || 30;
+
+  // Get licitações that have NO items yet (thus no winners)
+  const { data: licitacoes, error: queryErr } = await supabase
+    .from("licitacoes")
+    .select("id, numero_controle_pncp, raw_json")
+    .not("numero_controle_pncp", "is", null)
+    .order("created_at", { ascending: true })
+    .limit(batchSize);
+
+  if (queryErr || !licitacoes || licitacoes.length === 0) {
+    return new Response(
+      JSON.stringify({ success: true, winnersFound: 0, processed: 0, hasMore: false }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  // Filter to those without existing items
+  const ids = licitacoes.map((l: any) => l.id);
+  const { data: existingItems } = await supabase
+    .from("licitacao_itens")
+    .select("licitacao_id")
+    .in("licitacao_id", ids);
+
+  const hasItemsSet = new Set((existingItems || []).map((i: any) => i.licitacao_id));
+  const toProcess = licitacoes.filter((l: any) => !hasItemsSet.has(l.id));
+
+  let winnersFound = 0;
+  let processed = 0;
+
+  for (const lic of toProcess.slice(0, 20)) { // Process up to 20 per call
+    const raw = lic.raw_json;
+    const cnpj = raw?.orgaoEntidade?.cnpj || raw?.unidadeOrgao?.cnpj;
+    const ano = raw?.anoCompra;
+    const seq = raw?.sequencialCompra;
+
+    if (!cnpj || !ano || !seq) {
+      // Mark as processed by inserting a placeholder item
+      await supabase.from("licitacao_itens").insert({
+        licitacao_id: lic.id,
+        descricao: raw?.objetoCompra || "Item geral",
+        numero_item: 0,
+      });
+      processed++;
+      continue;
+    }
+
+    try {
+      const itensUrl = `${PNCP_DATA_URL}/orgaos/${cnpj}/compras/${ano}/${seq}/itens`;
+      const itensResp = await fetch(itensUrl, { headers: { Accept: "application/json" } });
+
+      if (!itensResp.ok) {
+        await itensResp.text();
+        // Insert placeholder so we don't retry
+        await supabase.from("licitacao_itens").insert({
+          licitacao_id: lic.id,
+          descricao: raw?.objetoCompra || "Item geral",
+          numero_item: 0,
+        });
+        processed++;
+        continue;
+      }
+
+      const itens = await itensResp.json();
+      if (!Array.isArray(itens) || itens.length === 0) {
+        await supabase.from("licitacao_itens").insert({
+          licitacao_id: lic.id,
+          descricao: raw?.objetoCompra || "Item geral",
+          numero_item: 0,
+        });
+        processed++;
+        continue;
+      }
+
+      // Process up to 5 items per licitação to avoid timeout
+      for (const item of itens.slice(0, 5)) {
+        const seqItem = item.numeroItem || item.sequencialItem;
+        if (!seqItem) continue;
+
+        // Upsert the item
+        const { data: dbItem } = await supabase
+          .from("licitacao_itens")
+          .upsert({
+            licitacao_id: lic.id,
+            descricao: item.descricao || item.materialOuServico || "Item",
+            numero_item: seqItem,
+            quantidade: item.quantidade || null,
+            unidade: item.unidadeMedida || null,
+            valor_unitario_estimado: item.valorUnitarioEstimado || null,
+          }, { onConflict: "licitacao_id,numero_item" })
+          .select("id")
+          .single();
+
+        if (!dbItem) continue;
+
+        // Check if item has results
+        if (item.temResultado) {
+          try {
+            const resultUrl = `${PNCP_DATA_URL}/orgaos/${cnpj}/compras/${ano}/${seq}/itens/${seqItem}/resultados`;
+            const resultResp = await fetch(resultUrl, { headers: { Accept: "application/json" } });
+            if (resultResp.ok) {
+              const resultados = await resultResp.json();
+              const resultList = Array.isArray(resultados) ? resultados : [resultados];
+              for (const r of resultList) {
+                if (r?.nomeRazaoSocialFornecedor || r?.niFornecedor) {
+                  const { error: winErr } = await supabase
+                    .from("licitacao_vencedores")
+                    .upsert({
+                      item_id: dbItem.id,
+                      razao_social: r.nomeRazaoSocialFornecedor || "Não informado",
+                      cnpj: r.niFornecedor || null,
+                      valor_final: r.valorTotalHomologado || r.valorUnitarioHomologado || null,
+                      percentual_desconto: r.percentualDesconto || null,
+                    }, { onConflict: "item_id" });
+                  if (!winErr) winnersFound++;
+                  break; // Only first winner per item
+                }
+              }
+            } else {
+              await resultResp.text();
+            }
+          } catch { /* skip */ }
+        }
+      }
+      processed++;
+    } catch (e) {
+      console.warn(`Error fetching winners for ${lic.numero_controle_pncp}:`, e);
+      processed++;
+    }
+  }
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      winnersFound,
+      processed,
+      remaining: toProcess.length - Math.min(20, toProcess.length),
+      hasMore: toProcess.length > 20,
+    }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
