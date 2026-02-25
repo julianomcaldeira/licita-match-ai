@@ -100,55 +100,63 @@ serve(async (req) => {
 
   let totalProcessed = 0;
 
+  // PNCP requires codigoModalidadeContratacao. Common codes:
+  // 1=Leilão, 2=Diálogo Competitivo, 3=Concurso, 4=Concorrência, 5=Pregão,
+  // 6=Dispensa, 7=Inexigibilidade, 8=Pregão Eletrônico, 9=Credenciamento,
+  // 12=Compra Direta, 13=Manifestação de Interesse
+  const modalidades = [4, 5, 6, 7, 8, 12];
+
   try {
-    // Fetch contratações from PNCP
-    const url = `${PNCP_BASE_URL}/contratacoes/publicacao?dataInicial=${dataInicial}&dataFinal=${dataFinal}&pagina=${pagina}&tamanhoPagina=${tamanhoPagina}`;
-    console.log("Fetching:", url);
+    for (const modalidade of modalidades) {
+      const url = `${PNCP_BASE_URL}/contratacoes/publicacao?dataInicial=${dataInicial}&dataFinal=${dataFinal}&codigoModalidadeContratacao=${modalidade}&pagina=${pagina}&tamanhoPagina=${tamanhoPagina}`;
+      console.log("Fetching:", url);
 
-    const response = await fetchWithRetry(url);
+      const response = await fetchWithRetry(url);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`PNCP API error ${response.status}: ${errorText}`);
-    }
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.warn(`PNCP modalidade ${modalidade} error ${response.status}: ${errorText}`);
+        continue;
+      }
 
-    const data = await response.json();
-    const contratacoes: PNCPContratacao[] = data.data || data || [];
+      const data = await response.json();
+      const contratacoes: PNCPContratacao[] = data.data || data || [];
 
-    console.log(`Received ${contratacoes.length} contratações`);
+      console.log(`Modalidade ${modalidade}: ${contratacoes.length} contratações`);
 
-    for (const c of contratacoes) {
-      const idOrigem = c.numeroControlePNCP || `pncp-${Date.now()}-${Math.random()}`;
+      for (const c of contratacoes) {
+        const idOrigem = c.numeroControlePNCP || `pncp-${Date.now()}-${Math.random()}`;
 
-      const licitacao = {
-        id_origem: idOrigem,
-        fonte: "PNCP",
-        orgao: c.orgaoEntidade?.razaoSocial || "Não informado",
-        modalidade: c.modalidadeNome || null,
-        objeto: c.objetoCompra || "Sem descrição",
-        data_publicacao: c.dataPublicacaoPncp
-          ? c.dataPublicacaoPncp.split("T")[0]
-          : null,
-        data_resultado: c.dataResultadoCompra
-          ? c.dataResultadoCompra.split("T")[0]
-          : null,
-        valor_estimado: c.valorTotalEstimado || null,
-        valor_homologado: c.valorTotalHomologado || null,
-        situacao: c.situacaoCompraNome || null,
-        numero_controle_pncp: c.numeroControlePNCP || null,
-        uf: c.unidadeOrgao?.ufSigla || null,
-        municipio: c.unidadeOrgao?.municipioNome || null,
-        raw_json: c as unknown as Record<string, unknown>,
-      };
+        const licitacao = {
+          id_origem: idOrigem,
+          fonte: "PNCP",
+          orgao: c.orgaoEntidade?.razaoSocial || "Não informado",
+          modalidade: c.modalidadeNome || null,
+          objeto: c.objetoCompra || "Sem descrição",
+          data_publicacao: c.dataPublicacaoPncp
+            ? c.dataPublicacaoPncp.split("T")[0]
+            : null,
+          data_resultado: c.dataResultadoCompra
+            ? c.dataResultadoCompra.split("T")[0]
+            : null,
+          valor_estimado: c.valorTotalEstimado || null,
+          valor_homologado: c.valorTotalHomologado || null,
+          situacao: c.situacaoCompraNome || null,
+          numero_controle_pncp: c.numeroControlePNCP || null,
+          uf: c.unidadeOrgao?.ufSigla || null,
+          municipio: c.unidadeOrgao?.municipioNome || null,
+          raw_json: c as unknown as Record<string, unknown>,
+        };
 
-      const { error: upsertError } = await supabase
-        .from("licitacoes")
-        .upsert(licitacao, { onConflict: "id_origem,fonte" });
+        const { error: upsertError } = await supabase
+          .from("licitacoes")
+          .upsert(licitacao, { onConflict: "id_origem,fonte" });
 
-      if (upsertError) {
-        console.error(`Error upserting ${idOrigem}:`, upsertError.message);
-      } else {
-        totalProcessed++;
+        if (upsertError) {
+          console.error(`Error upserting ${idOrigem}:`, upsertError.message);
+        } else {
+          totalProcessed++;
+        }
       }
     }
 
