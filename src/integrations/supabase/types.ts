@@ -367,6 +367,20 @@ export type Database = {
           raw_json: Json
         }[]
       }
+      match_licitacoes_por_keywords: {
+        Args: { p_empresa_id: string; p_limit?: number }
+        Returns: {
+          keywords_matched: string[]
+          licitacao_id: string
+          match_count: number
+          modalidade: string
+          objeto: string
+          orgao: string
+          situacao: string
+          uf: string
+          valor_estimado: number
+        }[]
+      }
     }
     Enums: {
       app_role: "admin_central" | "admin_empresa" | "usuario_empresa"

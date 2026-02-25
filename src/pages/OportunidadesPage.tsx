@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Zap, ArrowRight, Star, Loader2, Brain } from "lucide-react";
+import { ArrowRight, Star, Loader2, Brain, Search, Filter } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,10 +16,19 @@ function ScoreBadge({ score }: { score: number }) {
   );
 }
 
+function KeywordBadge({ keyword }: { keyword: string }) {
+  return (
+    <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+      {keyword}
+    </span>
+  );
+}
+
 export default function OportunidadesPage() {
   const { role } = useAuth();
   const queryClient = useQueryClient();
   const [selectedEmpresa, setSelectedEmpresa] = useState<string>("");
+  const [showPreview, setShowPreview] = useState(false);
   const isAdmin = role === "admin_central";
 
   const { data: empresas } = useQuery({
@@ -29,6 +38,21 @@ export default function OportunidadesPage() {
       if (error) throw error;
       return data;
     },
+  });
+
+  // Preview: keyword pre-filter results (before AI)
+  const { data: previewData, isLoading: previewLoading, refetch: refetchPreview } = useQuery({
+    queryKey: ["keyword-preview", selectedEmpresa],
+    queryFn: async () => {
+      if (!selectedEmpresa) return null;
+      const { data, error } = await supabase.rpc("match_licitacoes_por_keywords", {
+        p_empresa_id: selectedEmpresa,
+        p_limit: 50,
+      });
+      if (error) throw error;
+      return data;
+    },
+    enabled: false,
   });
 
   const { data: oportunidades, isLoading } = useQuery({
@@ -54,7 +78,7 @@ export default function OportunidadesPage() {
     mutationFn: async () => {
       if (!selectedEmpresa) throw new Error("Selecione uma empresa");
       const { data, error } = await supabase.functions.invoke("match-ia", {
-        body: { empresa_id: selectedEmpresa, limit: 20 },
+        body: { empresa_id: selectedEmpresa, limit: 50 },
       });
       if (error) throw error;
       return data;
@@ -62,21 +86,27 @@ export default function OportunidadesPage() {
     onSuccess: (data) => {
       toast.success(data?.message || "Análise concluída!");
       queryClient.invalidateQueries({ queryKey: ["oportunidades"] });
+      setShowPreview(false);
     },
     onError: (e) => toast.error(e.message),
   });
+
+  const handlePreview = () => {
+    setShowPreview(true);
+    refetchPreview();
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-2xl font-bold text-foreground">Oportunidades</h1>
-          <p className="text-sm text-muted-foreground">Ranking de licitações por score de aderência (IA)</p>
+          <p className="text-sm text-muted-foreground">Pré-filtro por palavras-chave + refinamento por IA</p>
         </div>
         <div className="flex items-center gap-3">
           <select
             value={selectedEmpresa}
-            onChange={(e) => setSelectedEmpresa(e.target.value)}
+            onChange={(e) => { setSelectedEmpresa(e.target.value); setShowPreview(false); }}
             className="h-10 rounded-lg border border-input bg-card px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           >
             <option value="">Todas as empresas</option>
@@ -85,18 +115,64 @@ export default function OportunidadesPage() {
             ))}
           </select>
           {isAdmin && selectedEmpresa && (
-            <button
-              onClick={() => matchMutation.mutate()}
-              disabled={matchMutation.isPending}
-              className="flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow hover:opacity-90 transition disabled:opacity-50"
-            >
-              {matchMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
-              {matchMutation.isPending ? "Analisando..." : "Analisar com IA"}
-            </button>
+            <>
+              <button
+                onClick={handlePreview}
+                disabled={previewLoading}
+                className="flex h-10 items-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-medium text-foreground shadow-sm hover:bg-muted transition disabled:opacity-50"
+              >
+                {previewLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                Pré-filtrar
+              </button>
+              <button
+                onClick={() => matchMutation.mutate()}
+                disabled={matchMutation.isPending}
+                className="flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow hover:opacity-90 transition disabled:opacity-50"
+              >
+                {matchMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
+                {matchMutation.isPending ? "Analisando..." : "Analisar com IA"}
+              </button>
+            </>
           )}
         </div>
       </div>
 
+      {/* Keyword pre-filter preview */}
+      {showPreview && previewData && (
+        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Filter className="h-4 w-4 text-primary" />
+            <h3 className="font-medium text-foreground">Pré-filtro por palavras-chave: {previewData.length} licitações encontradas</h3>
+          </div>
+          <p className="text-sm text-muted-foreground mb-3">
+            Estas licitações contêm termos do cadastro da empresa. Clique em "Analisar com IA" para gerar scores detalhados.
+          </p>
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {previewData.map((item: any) => (
+              <div key={item.licitacao_id} className="flex items-start gap-3 rounded-lg bg-card p-3 border border-border text-sm">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-foreground truncate">{item.objeto}</p>
+                  <p className="text-muted-foreground text-xs">{item.orgao}</p>
+                </div>
+                <div className="flex flex-wrap gap-1 shrink-0">
+                  {item.keywords_matched?.map((kw: string, i: number) => (
+                    <KeywordBadge key={i} keyword={kw} />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {showPreview && previewData?.length === 0 && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-xl border border-warning/20 bg-warning/5 p-4 text-center">
+          <p className="text-sm text-warning font-medium">Nenhuma licitação encontrada com as palavras-chave desta empresa.</p>
+          <p className="text-xs text-muted-foreground mt-1">Verifique os termos configurados no cadastro da empresa (palavras-chave e segmentos).</p>
+        </motion.div>
+      )}
+
+      {/* AI-analyzed results */}
       {isLoading ? (
         <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
       ) : !oportunidades?.length ? (
@@ -105,8 +181,8 @@ export default function OportunidadesPage() {
           <h2 className="mt-4 font-display text-lg font-semibold text-foreground">Nenhuma oportunidade analisada</h2>
           <p className="mt-2 text-sm text-muted-foreground max-w-md text-center">
             {selectedEmpresa
-              ? 'Clique em "Analisar com IA" para processar licitações para esta empresa.'
-              : "Selecione uma empresa e clique em 'Analisar com IA' para começar."}
+              ? 'Use "Pré-filtrar" para ver licitações relevantes e depois "Analisar com IA" para gerar scores.'
+              : "Selecione uma empresa para começar."}
           </p>
         </motion.div>
       ) : (
