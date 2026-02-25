@@ -1,19 +1,28 @@
 import { useState, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
-import { Search, Filter, Calendar, RefreshCw, Loader2, Database, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { Search, Filter, Calendar, RefreshCw, Loader2, Database, ChevronLeft, ChevronRight, X, Trophy } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 const PAGE_SIZE = 20;
-const MODALIDADES = [4, 5, 6, 7, 8, 12];
+
+// All PNCP modalidade codes
+const MODALIDADES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
 const MODALIDADE_NAMES: Record<number, string> = {
+  1: "Leilão",
+  2: "Diálogo Competitivo",
+  3: "Concurso",
   4: "Concorrência",
   5: "Pregão",
   6: "Dispensa",
   7: "Inexigibilidade",
-  8: "Pregão Eletrônico",
-  12: "Compra Direta",
+  8: "Pregão Presencial",
+  9: "Concorrência Presencial",
+  10: "Manifestação Interesse",
+  11: "Pré-qualificação",
+  12: "Credenciamento",
+  13: "Outros",
 };
 
 function formatCurrency(value: number | null) {
@@ -36,7 +45,6 @@ function StatusBadge({ situacao }: { situacao: string | null }) {
   );
 }
 
-// Generate monthly date chunks from startDate to endDate (YYYYMMDD format)
 function generateMonthlyChunks(startDate: string, endDate: string) {
   const chunks: { dataInicial: string; dataFinal: string }[] = [];
   const start = new Date(
@@ -53,7 +61,6 @@ function generateMonthlyChunks(startDate: string, endDate: string) {
   let cursor = new Date(start);
   while (cursor <= end) {
     const chunkStart = new Date(cursor);
-    // End of month or endDate, whichever is earlier
     const monthEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
     const chunkEnd = monthEnd > end ? end : monthEnd;
 
@@ -61,8 +68,6 @@ function generateMonthlyChunks(startDate: string, endDate: string) {
       `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
 
     chunks.push({ dataInicial: fmt(chunkStart), dataFinal: fmt(chunkEnd) });
-
-    // Move to first day of next month
     cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
   }
   return chunks;
@@ -74,6 +79,8 @@ interface IngestProgress {
   currentModalidade: string;
   currentPage: number;
   isRunning: boolean;
+  phase: "ingest" | "winners";
+  winnersFound?: number;
 }
 
 export default function LicitacoesPage() {
@@ -127,7 +134,9 @@ export default function LicitacoesPage() {
 
   const startBulkIngestion = useCallback(async () => {
     abortRef.current = false;
-    const chunks = generateMonthlyChunks("20230101", "20260224");
+    const today = new Date();
+    const endDate = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`;
+    const chunks = generateMonthlyChunks("20230101", endDate);
     let grandTotal = 0;
 
     setProgress({
@@ -136,8 +145,10 @@ export default function LicitacoesPage() {
       currentModalidade: "",
       currentPage: 1,
       isRunning: true,
+      phase: "ingest",
     });
 
+    // Phase 1: Fast bulk ingestion (no winner fetching)
     for (const chunk of chunks) {
       if (abortRef.current) break;
 
@@ -146,8 +157,9 @@ export default function LicitacoesPage() {
 
         let pagina = 1;
         let hasMore = true;
+        let consecutiveErrors = 0;
 
-        while (hasMore && !abortRef.current) {
+        while (hasMore && !abortRef.current && consecutiveErrors < 3) {
           const chunkLabel = `${chunk.dataInicial.slice(0, 4)}-${chunk.dataInicial.slice(4, 6)}`;
           setProgress({
             totalProcessed: grandTotal,
@@ -155,6 +167,7 @@ export default function LicitacoesPage() {
             currentModalidade: MODALIDADE_NAMES[modalidade] || String(modalidade),
             currentPage: pagina,
             isRunning: true,
+            phase: "ingest",
           });
 
           try {
@@ -164,28 +177,36 @@ export default function LicitacoesPage() {
                 dataFinal: chunk.dataFinal,
                 modalidade,
                 pagina,
-                fetchWinners: true,
               },
             });
 
             if (error) {
               console.warn(`Error chunk ${chunkLabel} mod ${modalidade} pag ${pagina}:`, error);
-              hasMore = false;
-              continue;
+              consecutiveErrors++;
+              if (consecutiveErrors >= 3) {
+                hasMore = false;
+              } else {
+                // Wait before retry
+                await new Promise((r) => setTimeout(r, 1000));
+                continue;
+              }
+            } else {
+              consecutiveErrors = 0;
+              grandTotal += data?.totalProcessed || 0;
+              hasMore = data?.hasMore || false;
+              pagina++;
             }
 
-            grandTotal += data?.totalProcessed || 0;
-            hasMore = data?.hasMore || false;
-            pagina++;
-
             // Refresh table periodically
-            if (grandTotal % 500 < 100) {
+            if (grandTotal % 500 < 50) {
               queryClient.invalidateQueries({ queryKey: ["licitacoes"] });
               queryClient.invalidateQueries({ queryKey: ["licitacoes-count"] });
             }
           } catch (err) {
             console.warn(`Exception:`, err);
-            hasMore = false;
+            consecutiveErrors++;
+            if (consecutiveErrors >= 3) hasMore = false;
+            await new Promise((r) => setTimeout(r, 1000));
           }
         }
       }
@@ -194,12 +215,69 @@ export default function LicitacoesPage() {
     setProgress((p) => (p ? { ...p, isRunning: false } : null));
     queryClient.invalidateQueries({ queryKey: ["licitacoes"] });
     queryClient.invalidateQueries({ queryKey: ["licitacoes-count"] });
-    toast.success(`Ingestão concluída! ${grandTotal} registros processados.`);
+    toast.success(`Ingestão concluída! ${grandTotal.toLocaleString("pt-BR")} registros processados.`);
+  }, [queryClient]);
+
+  const startWinnerFetching = useCallback(async () => {
+    abortRef.current = false;
+    let totalWinners = 0;
+    let totalProcessed = 0;
+    let hasMore = true;
+
+    setProgress({
+      totalProcessed: 0,
+      currentChunk: "",
+      currentModalidade: "",
+      currentPage: 0,
+      isRunning: true,
+      phase: "winners",
+      winnersFound: 0,
+    });
+
+    while (hasMore && !abortRef.current) {
+      try {
+        const { data, error } = await supabase.functions.invoke("ingest-pncp", {
+          body: { mode: "winners", limit: 30 },
+        });
+
+        if (error) {
+          console.warn("Winner fetch error:", error);
+          await new Promise((r) => setTimeout(r, 2000));
+          continue;
+        }
+
+        totalWinners += data?.winnersFound || 0;
+        totalProcessed += data?.processed || 0;
+        hasMore = data?.hasMore || false;
+
+        setProgress({
+          totalProcessed,
+          currentChunk: "",
+          currentModalidade: "",
+          currentPage: 0,
+          isRunning: true,
+          phase: "winners",
+          winnersFound: totalWinners,
+        });
+
+        // Refresh table periodically
+        if (totalProcessed % 100 < 30) {
+          queryClient.invalidateQueries({ queryKey: ["licitacoes"] });
+        }
+      } catch (err) {
+        console.warn("Winner exception:", err);
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+    }
+
+    setProgress((p) => (p ? { ...p, isRunning: false } : null));
+    queryClient.invalidateQueries({ queryKey: ["licitacoes"] });
+    toast.success(`Vencedores: ${totalWinners.toLocaleString("pt-BR")} encontrados em ${totalProcessed.toLocaleString("pt-BR")} licitações.`);
   }, [queryClient]);
 
   const cancelIngestion = () => {
     abortRef.current = true;
-    toast.info("Cancelando ingestão...");
+    toast.info("Cancelando...");
   };
 
   const total = totalCount ?? 0;
@@ -244,16 +322,28 @@ export default function LicitacoesPage() {
             </button>
           )}
           <button
+            onClick={startWinnerFetching}
+            disabled={progress?.isRunning}
+            className="flex h-10 items-center gap-2 rounded-lg border border-input bg-card px-4 text-sm font-medium text-foreground hover:bg-secondary transition disabled:opacity-50"
+          >
+            {progress?.isRunning && progress.phase === "winners" ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Trophy className="h-4 w-4" />
+            )}
+            Buscar Vencedores
+          </button>
+          <button
             onClick={startBulkIngestion}
             disabled={progress?.isRunning}
             className="flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow hover:opacity-90 transition disabled:opacity-50"
           >
-            {progress?.isRunning ? (
+            {progress?.isRunning && progress.phase === "ingest" ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <RefreshCw className="h-4 w-4" />
             )}
-            {progress?.isRunning ? "Ingerindo..." : "Ingerir PNCP (2023–2026)"}
+            {progress?.isRunning && progress.phase === "ingest" ? "Ingerindo..." : "Ingerir PNCP (2023–Hoje)"}
           </button>
         </div>
       </div>
@@ -267,13 +357,21 @@ export default function LicitacoesPage() {
         >
           <div className="flex items-center justify-between text-sm">
             <span className="font-medium text-foreground">
-              {progress.isRunning ? "Ingestão em andamento..." : "Ingestão concluída"}
+              {progress.isRunning
+                ? progress.phase === "ingest"
+                  ? "Ingestão em andamento..."
+                  : "Buscando vencedores..."
+                : progress.phase === "ingest"
+                ? "Ingestão concluída"
+                : "Busca de vencedores concluída"}
             </span>
             <span className="font-mono text-primary font-bold">
-              {progress.totalProcessed.toLocaleString("pt-BR")} registros
+              {progress.phase === "winners"
+                ? `${(progress.winnersFound || 0).toLocaleString("pt-BR")} vencedores / ${progress.totalProcessed.toLocaleString("pt-BR")} processados`
+                : `${progress.totalProcessed.toLocaleString("pt-BR")} registros`}
             </span>
           </div>
-          {progress.isRunning && (
+          {progress.isRunning && progress.phase === "ingest" && (
             <div className="flex items-center gap-4 text-xs text-muted-foreground">
               <span>Período: {progress.currentChunk}</span>
               <span>Modalidade: {progress.currentModalidade}</span>
@@ -327,7 +425,7 @@ export default function LicitacoesPage() {
           </div>
           <h2 className="mt-4 font-display text-lg font-semibold text-foreground">Nenhuma licitação encontrada</h2>
           <p className="mt-2 text-sm text-muted-foreground max-w-md text-center">
-            Clique em "Ingerir PNCP (2023–2026)" para buscar dados reais de licitações do Portal Nacional de Contratações Públicas.
+            Clique em "Ingerir PNCP" para buscar dados reais de licitações do Portal Nacional de Contratações Públicas.
           </p>
         </motion.div>
       ) : (
