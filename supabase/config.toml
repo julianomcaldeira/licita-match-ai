@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.match-ia]
 verify_jwt = false
+
+[functions.auto-analysis]
+verify_jwt = false
