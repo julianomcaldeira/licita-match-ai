@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Search, Filter, Calendar, RefreshCw, Loader2, Database } from "lucide-react";
+import { Search, Filter, Calendar, RefreshCw, Loader2, Database, ChevronLeft, ChevronRight } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+
+const PAGE_SIZE = 20;
 
 function formatCurrency(value: number | null) {
   if (!value) return "—";
@@ -27,16 +29,47 @@ function StatusBadge({ situacao }: { situacao: string | null }) {
 
 export default function LicitacoesPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [page, setPage] = useState(0);
   const queryClient = useQueryClient();
 
-  const { data: licitacoes, isLoading } = useQuery({
-    queryKey: ["licitacoes", searchTerm],
+  // Count total for pagination
+  const { data: totalCount } = useQuery({
+    queryKey: ["licitacoes-count", searchTerm],
     queryFn: async () => {
       let query = supabase
         .from("licitacoes")
-        .select("*")
+        .select("*", { count: "exact", head: true });
+
+      if (searchTerm.trim()) {
+        query = query.or(`objeto.ilike.%${searchTerm}%,orgao.ilike.%${searchTerm}%`);
+      }
+
+      const { count, error } = await query;
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+
+  const { data: licitacoes, isLoading } = useQuery({
+    queryKey: ["licitacoes", searchTerm, page],
+    queryFn: async () => {
+      const from = page * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
+      // Fetch licitacoes with vencedores via joins
+      let query = supabase
+        .from("licitacoes")
+        .select(`
+          *,
+          licitacao_itens (
+            id,
+            licitacao_vencedores (
+              razao_social
+            )
+          )
+        `)
         .order("data_publicacao", { ascending: false })
-        .limit(100);
+        .range(from, to);
 
       if (searchTerm.trim()) {
         query = query.or(`objeto.ilike.%${searchTerm}%,orgao.ilike.%${searchTerm}%`);
@@ -59,13 +92,34 @@ export default function LicitacoesPage() {
     onSuccess: (data) => {
       toast.success(data?.message || "Ingestão concluída!");
       queryClient.invalidateQueries({ queryKey: ["licitacoes"] });
+      queryClient.invalidateQueries({ queryKey: ["licitacoes-count"] });
     },
     onError: (error) => {
       toast.error(`Erro na ingestão: ${error.message}`);
     },
   });
 
-  const totalRows = licitacoes?.length ?? 0;
+  const total = totalCount ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  // Extract first winner name from nested joins
+  function getVencedor(row: any): string {
+    const itens = row.licitacao_itens;
+    if (!itens || !Array.isArray(itens)) return "—";
+    for (const item of itens) {
+      const vencedores = item.licitacao_vencedores;
+      if (vencedores && Array.isArray(vencedores) && vencedores.length > 0) {
+        return vencedores[0].razao_social || "—";
+      }
+    }
+    return "—";
+  }
+
+  // Reset page when search changes
+  const handleSearch = (value: string) => {
+    setSearchTerm(value);
+    setPage(0);
+  };
 
   return (
     <div className="space-y-6">
@@ -73,8 +127,8 @@ export default function LicitacoesPage() {
         <div>
           <h1 className="font-display text-2xl font-bold text-foreground">Licitações</h1>
           <p className="text-sm text-muted-foreground">
-            {totalRows > 0
-              ? `${totalRows} registros do PNCP`
+            {total > 0
+              ? `${total} registros do PNCP`
               : "Dados ingeridos do PNCP e Portal da Transparência"}
           </p>
         </div>
@@ -98,7 +152,7 @@ export default function LicitacoesPage() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => handleSearch(e.target.value)}
             placeholder="Buscar por objeto, órgão..."
             className="h-10 w-full rounded-lg border border-input bg-card pl-10 pr-4 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           />
@@ -116,7 +170,7 @@ export default function LicitacoesPage() {
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      ) : totalRows === 0 ? (
+      ) : total === 0 ? (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -131,44 +185,74 @@ export default function LicitacoesPage() {
           </p>
         </motion.div>
       ) : (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="overflow-hidden rounded-xl border border-border bg-card shadow-sm"
-        >
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-secondary/50">
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">ID</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Órgão</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Objeto</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Modalidade</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Valor Est.</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Data</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">UF</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Situação</th>
-                </tr>
-              </thead>
-              <tbody>
-                {licitacoes?.map((row) => (
-                  <tr key={row.id} className="border-b border-border last:border-0 transition hover:bg-secondary/30 cursor-pointer">
-                    <td className="px-4 py-3 font-mono text-xs text-primary max-w-[140px] truncate">{row.id_origem}</td>
-                    <td className="px-4 py-3 font-medium text-foreground max-w-[180px] truncate">{row.orgao}</td>
-                    <td className="px-4 py-3 max-w-xs truncate text-foreground">{row.objeto}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{row.modalidade || "—"}</td>
-                    <td className="px-4 py-3 font-medium text-foreground">{formatCurrency(row.valor_estimado)}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{row.data_publicacao || "—"}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{row.uf || "—"}</td>
-                    <td className="px-4 py-3">
-                      <StatusBadge situacao={row.situacao} />
-                    </td>
+        <>
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="overflow-hidden rounded-xl border border-border bg-card shadow-sm"
+          >
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-secondary/50">
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">ID</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Órgão</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Objeto</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Modalidade</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Valor Est.</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Vencedor</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Data</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">UF</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Situação</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {licitacoes?.map((row) => (
+                    <tr key={row.id} className="border-b border-border last:border-0 transition hover:bg-secondary/30 cursor-pointer">
+                      <td className="px-4 py-3 font-mono text-xs text-primary max-w-[140px] truncate">{row.id_origem}</td>
+                      <td className="px-4 py-3 font-medium text-foreground max-w-[180px] truncate">{row.orgao}</td>
+                      <td className="px-4 py-3 max-w-xs truncate text-foreground">{row.objeto}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{row.modalidade || "—"}</td>
+                      <td className="px-4 py-3 font-medium text-foreground">{formatCurrency(row.valor_estimado)}</td>
+                      <td className="px-4 py-3 text-foreground max-w-[180px] truncate">{getVencedor(row)}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{row.data_publicacao || "—"}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{row.uf || "—"}</td>
+                      <td className="px-4 py-3">
+                        <StatusBadge situacao={row.situacao} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+
+          {/* Pagination */}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Mostrando {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} de {total}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={page === 0}
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-input bg-card text-muted-foreground hover:bg-secondary disabled:opacity-40"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="text-sm font-medium text-foreground">
+                {page + 1} / {totalPages}
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                disabled={page >= totalPages - 1}
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-input bg-card text-muted-foreground hover:bg-secondary disabled:opacity-40"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
           </div>
-        </motion.div>
+        </>
       )}
     </div>
   );
