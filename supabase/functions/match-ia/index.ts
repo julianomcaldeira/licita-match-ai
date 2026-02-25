@@ -28,7 +28,7 @@ serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     const empresaId = body.empresa_id;
-    const limit = body.limit || 20;
+    const limit = body.limit || 50;
 
     if (!empresaId) {
       return new Response(JSON.stringify({ error: "empresa_id é obrigatório" }), {
@@ -51,35 +51,40 @@ serve(async (req) => {
       });
     }
 
-    // Fetch licitacoes not yet analyzed for this empresa
-    const { data: licitacoes, error: licError } = await supabase
-      .from("licitacoes")
-      .select("id, objeto, orgao, modalidade, valor_estimado, situacao, uf")
-      .order("data_publicacao", { ascending: false })
-      .limit(limit);
+    // Step 1: Pre-filter using keyword matching (SQL - fast, no AI cost)
+    const { data: preFiltered, error: matchError } = await supabase
+      .rpc("match_licitacoes_por_keywords", {
+        p_empresa_id: empresaId,
+        p_limit: limit,
+      });
 
-    if (licError || !licitacoes?.length) {
-      return new Response(JSON.stringify({ error: "Nenhuma licitação para analisar", processed: 0 }), {
+    if (matchError) {
+      console.error("Keyword match error:", matchError.message);
+      return new Response(JSON.stringify({ error: "Erro no filtro por palavras-chave: " + matchError.message }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!preFiltered?.length) {
+      return new Response(JSON.stringify({
+        success: true,
+        processed: 0,
+        pre_filtered: 0,
+        message: `Nenhuma licitação encontrada com as palavras-chave de ${empresa.nome}. Verifique os termos configurados no cadastro da empresa.`,
+      }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    console.log(`Pre-filtered ${preFiltered.length} licitações by keywords for ${empresa.nome}`);
+
+    // Step 2: AI refinement only on pre-filtered results
     let processed = 0;
+    const systemPrompt = `Você é um analista especializado em licitações públicas brasileiras. Analise a aderência entre uma licitação e o perfil de uma empresa. A licitação já passou por um filtro de palavras-chave, então há alguma relação textual. Sua tarefa é avaliar a relevância real e profundidade dessa relação.`;
 
-    for (const lic of licitacoes) {
-      // Check if already analyzed
-      const { data: existing } = await supabase
-        .from("oportunidades")
-        .select("id")
-        .eq("licitacao_id", lic.id)
-        .eq("empresa_id", empresaId)
-        .maybeSingle();
-
-      if (existing) continue;
-
-      const systemPrompt = `Você é um analista especializado em licitações públicas brasileiras. Analise a aderência entre uma licitação e o perfil de uma empresa.`;
-
+    for (const lic of preFiltered) {
       const userPrompt = `
 ## Empresa
 - Nome: ${empresa.nome}
@@ -88,7 +93,7 @@ serve(async (req) => {
 - Palavras-chave: ${empresa.palavras_chave?.join(", ") || "Não informadas"}
 - Prompt personalizado: ${empresa.prompt_personalizado || "Nenhum"}
 
-## Licitação
+## Licitação (pré-filtrada por keywords: ${lic.keywords_matched?.join(", ") || "N/A"})
 - Objeto: ${lic.objeto}
 - Órgão: ${lic.orgao}
 - Modalidade: ${lic.modalidade || "Não informada"}
@@ -185,7 +190,7 @@ serve(async (req) => {
 
         const { error: insertError } = await supabase.from("oportunidades").upsert(
           {
-            licitacao_id: lic.id,
+            licitacao_id: lic.licitacao_id,
             empresa_id: empresaId,
             score_aderencia: Math.min(100, Math.max(0, result.score_aderencia)),
             justificativa_tecnica: result.justificativa_tecnica,
@@ -213,8 +218,9 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
+        pre_filtered: preFiltered.length,
         processed,
-        message: `Análise concluída: ${processed} licitações analisadas para ${empresa.nome}`,
+        message: `Pré-filtro encontrou ${preFiltered.length} licitações relevantes. IA analisou ${processed} para ${empresa.nome}.`,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
