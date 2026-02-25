@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      empresas_clientes: {
+        Row: {
+          cnpj: string | null
+          created_at: string
+          descricao_atividade: string | null
+          id: string
+          nome: string
+          palavras_chave: string[] | null
+          prompt_personalizado: string | null
+          segmentos: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          cnpj?: string | null
+          created_at?: string
+          descricao_atividade?: string | null
+          id?: string
+          nome: string
+          palavras_chave?: string[] | null
+          prompt_personalizado?: string | null
+          segmentos?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          cnpj?: string | null
+          created_at?: string
+          descricao_atividade?: string | null
+          id?: string
+          nome?: string
+          palavras_chave?: string[] | null
+          prompt_personalizado?: string | null
+          segmentos?: string[] | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ingestao_logs: {
         Row: {
           created_at: string
@@ -247,7 +283,15 @@ export type Database = {
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_user_roles_empresa"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas_clientes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
