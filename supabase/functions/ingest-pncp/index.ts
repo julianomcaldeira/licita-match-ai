@@ -177,8 +177,35 @@ serve(async (req) => {
       );
     }
 
-    const data = await response.json();
-    const contratacoes: PNCPContratacao[] = data.data || data || [];
+    const responseText = await response.text();
+    
+    let data: any;
+    try {
+      data = responseText.trim() ? JSON.parse(responseText) : [];
+    } catch {
+      // Try to recover truncated JSON array
+      const lastBrace = responseText.lastIndexOf("}");
+      if (lastBrace > 0) {
+        try {
+          data = JSON.parse(responseText.substring(0, lastBrace + 1) + "]");
+          console.warn(`Recovered truncated JSON for mod ${modalidade} pag ${pagina}`);
+        } catch {
+          console.warn(`Unparseable response for mod ${modalidade} pag ${pagina}, skipping`);
+          return new Response(
+            JSON.stringify({ success: true, totalProcessed: 0, hasMore: false, modalidade, pagina }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      } else {
+        console.warn(`Empty/invalid response for mod ${modalidade} pag ${pagina}, skipping`);
+        return new Response(
+          JSON.stringify({ success: true, totalProcessed: 0, hasMore: false, modalidade, pagina }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    const contratacoes: PNCPContratacao[] = data.data || (Array.isArray(data) ? data : []);
     const hasMore = contratacoes.length >= PAGE_SIZE;
 
     console.log(`Mod ${modalidade} pag ${pagina}: ${contratacoes.length} contratações`);
