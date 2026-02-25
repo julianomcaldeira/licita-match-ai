@@ -8,6 +8,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 
 const PAGE_SIZE = 20;
@@ -626,15 +627,33 @@ export default function LicitacoesPage() {
                     }
                     return (
                       <tr key={row.id} className="border-b border-border last:border-0 transition hover:bg-secondary/30">
-                        <td className="px-4 py-3 font-medium text-foreground max-w-[220px] truncate">
-                          {pncpLink ? (
-                            <a href={pncpLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary hover:underline">
-                              {row.orgao}
-                              <ExternalLink className="h-3 w-3 shrink-0" />
-                            </a>
-                          ) : row.orgao}
+                        <td className="px-4 py-3 font-medium text-foreground max-w-[220px]">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="block truncate">
+                                {pncpLink ? (
+                                  <a href={pncpLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary hover:underline">
+                                    {row.orgao}
+                                    <ExternalLink className="h-3 w-3 shrink-0" />
+                                  </a>
+                                ) : row.orgao}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="max-w-sm">
+                              <p>{row.orgao}</p>
+                            </TooltipContent>
+                          </Tooltip>
                         </td>
-                        <td className="px-4 py-3 max-w-xs truncate text-foreground">{row.objeto}</td>
+                        <td className="px-4 py-3 max-w-xs">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="block truncate text-foreground">{row.objeto}</span>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="max-w-md">
+                              <p className="text-xs leading-relaxed">{row.objeto}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </td>
                         <td className="px-4 py-3 text-muted-foreground">{row.modalidade || "—"}</td>
                         <td className="px-4 py-3 font-medium text-foreground">{formatCurrency(row.valor_estimado)}</td>
                         <td className="px-4 py-3 text-foreground max-w-[180px] truncate">{getVencedor(row)}</td>
