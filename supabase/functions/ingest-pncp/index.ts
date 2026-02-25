@@ -171,30 +171,20 @@ async function handleIngest(supabase: any, body: any) {
 async function handleWinners(supabase: any, body: any) {
   const batchSize = body.limit || 30;
 
-  // Get licitações that have NO items yet (thus no winners)
+  // Use DB function to get licitações without items (efficient LEFT JOIN)
   const { data: licitacoes, error: queryErr } = await supabase
-    .from("licitacoes")
-    .select("id, numero_controle_pncp, raw_json")
-    .not("numero_controle_pncp", "is", null)
-    .order("created_at", { ascending: true })
-    .limit(batchSize);
+    .rpc("licitacoes_sem_itens", { lim: batchSize });
 
   if (queryErr || !licitacoes || licitacoes.length === 0) {
+    console.log("No more licitações without items:", queryErr?.message || "all processed");
     return new Response(
       JSON.stringify({ success: true, winnersFound: 0, processed: 0, hasMore: false }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 
-  // Filter to those without existing items
-  const ids = licitacoes.map((l: any) => l.id);
-  const { data: existingItems } = await supabase
-    .from("licitacao_itens")
-    .select("licitacao_id")
-    .in("licitacao_id", ids);
-
-  const hasItemsSet = new Set((existingItems || []).map((i: any) => i.licitacao_id));
-  const toProcess = licitacoes.filter((l: any) => !hasItemsSet.has(l.id));
+  console.log(`Processing ${licitacoes.length} licitações for winners`);
+  const toProcess = licitacoes;
 
   let winnersFound = 0;
   let processed = 0;
@@ -305,8 +295,8 @@ async function handleWinners(supabase: any, body: any) {
       success: true,
       winnersFound,
       processed,
-      remaining: toProcess.length - Math.min(20, toProcess.length),
-      hasMore: toProcess.length > 20,
+      remaining: toProcess.length - processed,
+      hasMore: toProcess.length >= batchSize, // If we got a full batch, there are likely more
     }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
