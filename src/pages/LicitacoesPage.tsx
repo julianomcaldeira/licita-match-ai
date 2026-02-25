@@ -450,9 +450,14 @@ export default function LicitacoesPage() {
                 </thead>
                 <tbody>
                   {licitacoes?.map((row) => {
-                    const pncpLink = row.numero_controle_pncp
-                      ? `https://pncp.gov.br/app/editais/${row.numero_controle_pncp}`
-                      : null;
+                    // numero_controle_pncp format: "CNPJ-X-SEQ/ANO" e.g. "00394452000103-1-001857/2023"
+                    let pncpLink: string | null = null;
+                    if (row.numero_controle_pncp) {
+                      const match = row.numero_controle_pncp.match(/^(\d+)-\d+-(\d+)\/(\d+)$/);
+                      if (match) {
+                        pncpLink = `https://pncp.gov.br/app/editais/${match[1]}/${match[3]}/${parseInt(match[2])}`;
+                      }
+                    }
                     return (
                       <tr key={row.id} className="border-b border-border last:border-0 transition hover:bg-secondary/30">
                         <td className="px-4 py-3 font-medium text-foreground max-w-[220px] truncate">
