@@ -231,6 +231,60 @@ export type Database = {
         }
         Relationships: []
       }
+      oportunidades: {
+        Row: {
+          created_at: string
+          empresa_id: string
+          id: string
+          justificativa_tecnica: string | null
+          licitacao_id: string
+          motivo_recomendacao: string | null
+          nivel_risco: string | null
+          score_aderencia: number
+          tipo_oportunidade: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          empresa_id: string
+          id?: string
+          justificativa_tecnica?: string | null
+          licitacao_id: string
+          motivo_recomendacao?: string | null
+          nivel_risco?: string | null
+          score_aderencia?: number
+          tipo_oportunidade?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          justificativa_tecnica?: string | null
+          licitacao_id?: string
+          motivo_recomendacao?: string | null
+          nivel_risco?: string | null
+          score_aderencia?: number
+          tipo_oportunidade?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oportunidades_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas_clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oportunidades_licitacao_id_fkey"
+            columns: ["licitacao_id"]
+            isOneToOne: false
+            referencedRelation: "licitacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
