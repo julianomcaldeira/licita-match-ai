@@ -1,6 +1,11 @@
-import { Bell, Search, User } from "lucide-react";
+import { Bell, Search, User, LogOut } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function TopBar() {
+  const { user, role, signOut } = useAuth();
+
+  const roleName = role === "admin_central" ? "Admin Central" : role === "admin_empresa" ? "Admin Empresa" : "Usuário";
+
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card px-6">
       <div className="flex items-center gap-4">
@@ -25,9 +30,16 @@ export default function TopBar() {
             <User className="h-4 w-4" />
           </div>
           <div className="text-left">
-            <p className="text-sm font-medium text-foreground">Admin Central</p>
-            <p className="text-xs text-muted-foreground">admin@licitamatch.ai</p>
+            <p className="text-sm font-medium text-foreground">{user?.user_metadata?.display_name || user?.email?.split("@")[0] || "Usuário"}</p>
+            <p className="text-xs text-muted-foreground">{roleName}</p>
           </div>
+          <button
+            onClick={signOut}
+            className="ml-2 flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-background hover:text-destructive transition"
+            title="Sair"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
         </div>
       </div>
     </header>
