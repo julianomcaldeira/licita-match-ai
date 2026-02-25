@@ -1,1 +1,4 @@
 project_id = "eiksdfobghixofsxskke"
+
+[functions.ingest-pncp]
+verify_jwt = false
