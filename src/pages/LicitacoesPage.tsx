@@ -1,11 +1,20 @@
-import { useState } from "react";
+import { useState, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
-import { Search, Filter, Calendar, RefreshCw, Loader2, Database, ChevronLeft, ChevronRight } from "lucide-react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Search, Filter, Calendar, RefreshCw, Loader2, Database, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 const PAGE_SIZE = 20;
+const MODALIDADES = [4, 5, 6, 7, 8, 12];
+const MODALIDADE_NAMES: Record<number, string> = {
+  4: "Concorrência",
+  5: "Pregão",
+  6: "Dispensa",
+  7: "Inexigibilidade",
+  8: "Pregão Eletrônico",
+  12: "Compra Direta",
+};
 
 function formatCurrency(value: number | null) {
   if (!value) return "—";
@@ -27,23 +36,62 @@ function StatusBadge({ situacao }: { situacao: string | null }) {
   );
 }
 
+// Generate monthly date chunks from startDate to endDate (YYYYMMDD format)
+function generateMonthlyChunks(startDate: string, endDate: string) {
+  const chunks: { dataInicial: string; dataFinal: string }[] = [];
+  const start = new Date(
+    parseInt(startDate.slice(0, 4)),
+    parseInt(startDate.slice(4, 6)) - 1,
+    parseInt(startDate.slice(6, 8))
+  );
+  const end = new Date(
+    parseInt(endDate.slice(0, 4)),
+    parseInt(endDate.slice(4, 6)) - 1,
+    parseInt(endDate.slice(6, 8))
+  );
+
+  let cursor = new Date(start);
+  while (cursor <= end) {
+    const chunkStart = new Date(cursor);
+    // End of month or endDate, whichever is earlier
+    const monthEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
+    const chunkEnd = monthEnd > end ? end : monthEnd;
+
+    const fmt = (d: Date) =>
+      `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+
+    chunks.push({ dataInicial: fmt(chunkStart), dataFinal: fmt(chunkEnd) });
+
+    // Move to first day of next month
+    cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+  }
+  return chunks;
+}
+
+interface IngestProgress {
+  totalProcessed: number;
+  currentChunk: string;
+  currentModalidade: string;
+  currentPage: number;
+  isRunning: boolean;
+}
+
 export default function LicitacoesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(0);
+  const [progress, setProgress] = useState<IngestProgress | null>(null);
+  const abortRef = useRef(false);
   const queryClient = useQueryClient();
 
-  // Count total for pagination
   const { data: totalCount } = useQuery({
     queryKey: ["licitacoes-count", searchTerm],
     queryFn: async () => {
       let query = supabase
         .from("licitacoes")
         .select("*", { count: "exact", head: true });
-
       if (searchTerm.trim()) {
         query = query.or(`objeto.ilike.%${searchTerm}%,orgao.ilike.%${searchTerm}%`);
       }
-
       const { count, error } = await query;
       if (error) throw error;
       return count ?? 0;
@@ -55,8 +103,6 @@ export default function LicitacoesPage() {
     queryFn: async () => {
       const from = page * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
-
-      // Fetch licitacoes with vencedores via joins
       let query = supabase
         .from("licitacoes")
         .select(`
@@ -70,39 +116,94 @@ export default function LicitacoesPage() {
         `)
         .order("data_publicacao", { ascending: false })
         .range(from, to);
-
       if (searchTerm.trim()) {
         query = query.or(`objeto.ilike.%${searchTerm}%,orgao.ilike.%${searchTerm}%`);
       }
-
       const { data, error } = await query;
       if (error) throw error;
       return data;
     },
   });
 
-  const ingestMutation = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke("ingest-pncp", {
-        body: {},
-      });
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (data) => {
-      toast.success(data?.message || "Ingestão concluída!");
-      queryClient.invalidateQueries({ queryKey: ["licitacoes"] });
-      queryClient.invalidateQueries({ queryKey: ["licitacoes-count"] });
-    },
-    onError: (error) => {
-      toast.error(`Erro na ingestão: ${error.message}`);
-    },
-  });
+  const startBulkIngestion = useCallback(async () => {
+    abortRef.current = false;
+    const chunks = generateMonthlyChunks("20230101", "20260224");
+    let grandTotal = 0;
+
+    setProgress({
+      totalProcessed: 0,
+      currentChunk: "",
+      currentModalidade: "",
+      currentPage: 1,
+      isRunning: true,
+    });
+
+    for (const chunk of chunks) {
+      if (abortRef.current) break;
+
+      for (const modalidade of MODALIDADES) {
+        if (abortRef.current) break;
+
+        let pagina = 1;
+        let hasMore = true;
+
+        while (hasMore && !abortRef.current) {
+          const chunkLabel = `${chunk.dataInicial.slice(0, 4)}-${chunk.dataInicial.slice(4, 6)}`;
+          setProgress({
+            totalProcessed: grandTotal,
+            currentChunk: chunkLabel,
+            currentModalidade: MODALIDADE_NAMES[modalidade] || String(modalidade),
+            currentPage: pagina,
+            isRunning: true,
+          });
+
+          try {
+            const { data, error } = await supabase.functions.invoke("ingest-pncp", {
+              body: {
+                dataInicial: chunk.dataInicial,
+                dataFinal: chunk.dataFinal,
+                modalidade,
+                pagina,
+              },
+            });
+
+            if (error) {
+              console.warn(`Error chunk ${chunkLabel} mod ${modalidade} pag ${pagina}:`, error);
+              hasMore = false;
+              continue;
+            }
+
+            grandTotal += data?.totalProcessed || 0;
+            hasMore = data?.hasMore || false;
+            pagina++;
+
+            // Refresh table periodically
+            if (grandTotal % 500 < 100) {
+              queryClient.invalidateQueries({ queryKey: ["licitacoes"] });
+              queryClient.invalidateQueries({ queryKey: ["licitacoes-count"] });
+            }
+          } catch (err) {
+            console.warn(`Exception:`, err);
+            hasMore = false;
+          }
+        }
+      }
+    }
+
+    setProgress((p) => (p ? { ...p, isRunning: false } : null));
+    queryClient.invalidateQueries({ queryKey: ["licitacoes"] });
+    queryClient.invalidateQueries({ queryKey: ["licitacoes-count"] });
+    toast.success(`Ingestão concluída! ${grandTotal} registros processados.`);
+  }, [queryClient]);
+
+  const cancelIngestion = () => {
+    abortRef.current = true;
+    toast.info("Cancelando ingestão...");
+  };
 
   const total = totalCount ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  // Extract first winner name from nested joins
   function getVencedor(row: any): string {
     const itens = row.licitacao_itens;
     if (!itens || !Array.isArray(itens)) return "—";
@@ -115,7 +216,6 @@ export default function LicitacoesPage() {
     return "—";
   }
 
-  // Reset page when search changes
   const handleSearch = (value: string) => {
     setSearchTerm(value);
     setPage(0);
@@ -128,23 +228,68 @@ export default function LicitacoesPage() {
           <h1 className="font-display text-2xl font-bold text-foreground">Licitações</h1>
           <p className="text-sm text-muted-foreground">
             {total > 0
-              ? `${total} registros do PNCP`
+              ? `${total.toLocaleString("pt-BR")} registros do PNCP`
               : "Dados ingeridos do PNCP e Portal da Transparência"}
           </p>
         </div>
-        <button
-          onClick={() => ingestMutation.mutate()}
-          disabled={ingestMutation.isPending}
-          className="flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow hover:opacity-90 transition disabled:opacity-50"
-        >
-          {ingestMutation.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4" />
+        <div className="flex items-center gap-2">
+          {progress?.isRunning && (
+            <button
+              onClick={cancelIngestion}
+              className="flex h-10 items-center gap-2 rounded-lg border border-destructive px-4 text-sm font-medium text-destructive hover:bg-destructive/10 transition"
+            >
+              <X className="h-4 w-4" />
+              Cancelar
+            </button>
           )}
-          {ingestMutation.isPending ? "Ingerindo..." : "Ingerir PNCP"}
-        </button>
+          <button
+            onClick={startBulkIngestion}
+            disabled={progress?.isRunning}
+            className="flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow hover:opacity-90 transition disabled:opacity-50"
+          >
+            {progress?.isRunning ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            {progress?.isRunning ? "Ingerindo..." : "Ingerir PNCP (2023–2026)"}
+          </button>
+        </div>
       </div>
+
+      {/* Progress bar */}
+      {progress && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl border border-border bg-card p-4 space-y-2"
+        >
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-medium text-foreground">
+              {progress.isRunning ? "Ingestão em andamento..." : "Ingestão concluída"}
+            </span>
+            <span className="font-mono text-primary font-bold">
+              {progress.totalProcessed.toLocaleString("pt-BR")} registros
+            </span>
+          </div>
+          {progress.isRunning && (
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+              <span>Período: {progress.currentChunk}</span>
+              <span>Modalidade: {progress.currentModalidade}</span>
+              <span>Página: {progress.currentPage}</span>
+            </div>
+          )}
+          {progress.isRunning && (
+            <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
+              <motion.div
+                className="h-full rounded-full bg-primary"
+                animate={{ width: ["0%", "100%"] }}
+                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+              />
+            </div>
+          )}
+        </motion.div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
@@ -181,7 +326,7 @@ export default function LicitacoesPage() {
           </div>
           <h2 className="mt-4 font-display text-lg font-semibold text-foreground">Nenhuma licitação encontrada</h2>
           <p className="mt-2 text-sm text-muted-foreground max-w-md text-center">
-            Clique em "Ingerir PNCP" para buscar dados reais de licitações do Portal Nacional de Contratações Públicas.
+            Clique em "Ingerir PNCP (2023–2026)" para buscar dados reais de licitações do Portal Nacional de Contratações Públicas.
           </p>
         </motion.div>
       ) : (
@@ -230,7 +375,7 @@ export default function LicitacoesPage() {
           {/* Pagination */}
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
-              Mostrando {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} de {total}
+              Mostrando {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} de {total.toLocaleString("pt-BR")}
             </p>
             <div className="flex items-center gap-2">
               <button
@@ -241,7 +386,7 @@ export default function LicitacoesPage() {
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <span className="text-sm font-medium text-foreground">
-                {page + 1} / {totalPages}
+                {page + 1} / {totalPages.toLocaleString("pt-BR")}
               </span>
               <button
                 onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
