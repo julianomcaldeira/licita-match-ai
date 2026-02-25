@@ -164,6 +164,7 @@ export default function LicitacoesPage() {
                 dataFinal: chunk.dataFinal,
                 modalidade,
                 pagina,
+                fetchWinners: true,
               },
             });
 
