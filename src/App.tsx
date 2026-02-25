@@ -11,6 +11,7 @@ import Dashboard from "@/pages/Dashboard";
 import LicitacoesPage from "@/pages/LicitacoesPage";
 import OportunidadesPage from "@/pages/OportunidadesPage";
 import EmpresasPage from "@/pages/EmpresasPage";
+import IngestaoMonitorPage from "@/pages/IngestaoMonitorPage";
 import PlaceholderPage from "@/components/PlaceholderPage";
 import NotFound from "@/pages/NotFound";
 import { Users, Brain, FileText, BarChart3, Bell, Shield, Settings } from "lucide-react";
@@ -37,6 +38,7 @@ const App = () => (
               <Route path="/analytics" element={<PlaceholderPage title="Analytics" description="Métricas globais, consumo de tokens e atividade por empresa" icon={BarChart3} />} />
               <Route path="/notificacoes" element={<PlaceholderPage title="Notificações" description="Alertas por e-mail para oportunidades com score acima de 80%" icon={Bell} />} />
               <Route path="/auditoria" element={<PlaceholderPage title="Auditoria" description="Logs de acesso, segurança e controle de permissões" icon={Shield} />} />
+              <Route path="/monitor-ingestao" element={<IngestaoMonitorPage />} />
               <Route path="/configuracoes" element={<PlaceholderPage title="Configurações" description="Parâmetros gerais do sistema e integrações" icon={Settings} />} />
             </Route>
             <Route path="*" element={<NotFound />} />
