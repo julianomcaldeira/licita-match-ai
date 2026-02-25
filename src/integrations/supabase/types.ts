@@ -359,6 +359,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      licitacoes_sem_itens: {
+        Args: { lim?: number }
+        Returns: {
+          id: string
+          numero_controle_pncp: string
+          raw_json: Json
+        }[]
+      }
     }
     Enums: {
       app_role: "admin_central" | "admin_empresa" | "usuario_empresa"
