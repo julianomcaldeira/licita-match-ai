@@ -1,9 +1,14 @@
 import { useState, useCallback, useRef } from "react";
-import { motion } from "framer-motion";
-import { Search, Filter, Calendar, RefreshCw, Loader2, Database, ChevronLeft, ChevronRight, X, Trophy, ExternalLink } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Search, Filter, Calendar, RefreshCw, Loader2, Database, ChevronLeft, ChevronRight, X, Trophy, ExternalLink, ChevronDown } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 
 const PAGE_SIZE = 20;
 
@@ -90,15 +95,41 @@ export default function LicitacoesPage() {
   const abortRef = useRef(false);
   const queryClient = useQueryClient();
 
+  const [filterModalidade, setFilterModalidade] = useState<string>("");
+  const [filterUf, setFilterUf] = useState<string>("");
+  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateTo, setDateTo] = useState<Date | undefined>();
+  const [showFilters, setShowFilters] = useState(false);
+
+  const activeFilterCount = [filterModalidade, filterUf, dateFrom, dateTo].filter(Boolean).length;
+
+  const buildQuery = (base: any) => {
+    let q = base;
+    if (searchTerm.trim()) {
+      q = q.or(`objeto.ilike.%${searchTerm}%,orgao.ilike.%${searchTerm}%`);
+    }
+    if (filterModalidade) {
+      q = q.eq("modalidade", filterModalidade);
+    }
+    if (filterUf) {
+      q = q.eq("uf", filterUf);
+    }
+    if (dateFrom) {
+      q = q.gte("data_publicacao", format(dateFrom, "yyyy-MM-dd"));
+    }
+    if (dateTo) {
+      q = q.lte("data_publicacao", format(dateTo, "yyyy-MM-dd"));
+    }
+    return q;
+  };
+
   const { data: totalCount } = useQuery({
-    queryKey: ["licitacoes-count", searchTerm],
+    queryKey: ["licitacoes-count", searchTerm, filterModalidade, filterUf, dateFrom?.toISOString(), dateTo?.toISOString()],
     queryFn: async () => {
       let query = supabase
         .from("licitacoes")
         .select("*", { count: "exact", head: true });
-      if (searchTerm.trim()) {
-        query = query.or(`objeto.ilike.%${searchTerm}%,orgao.ilike.%${searchTerm}%`);
-      }
+      query = buildQuery(query);
       const { count, error } = await query;
       if (error) throw error;
       return count ?? 0;
@@ -106,7 +137,7 @@ export default function LicitacoesPage() {
   });
 
   const { data: licitacoes, isLoading } = useQuery({
-    queryKey: ["licitacoes", searchTerm, page],
+    queryKey: ["licitacoes", searchTerm, page, filterModalidade, filterUf, dateFrom?.toISOString(), dateTo?.toISOString()],
     queryFn: async () => {
       const from = page * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
@@ -123,9 +154,7 @@ export default function LicitacoesPage() {
         `)
         .order("data_publicacao", { ascending: false })
         .range(from, to);
-      if (searchTerm.trim()) {
-        query = query.or(`objeto.ilike.%${searchTerm}%,orgao.ilike.%${searchTerm}%`);
-      }
+      query = buildQuery(query);
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -391,22 +420,155 @@ export default function LicitacoesPage() {
       )}
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            value={searchTerm}
-            onChange={(e) => handleSearch(e.target.value)}
-            placeholder="Buscar por objeto, órgão..."
-            className="h-10 w-full rounded-lg border border-input bg-card pl-10 pr-4 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-          />
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={searchTerm}
+              onChange={(e) => handleSearch(e.target.value)}
+              placeholder="Buscar por objeto, órgão..."
+              className="h-10 w-full rounded-lg border border-input bg-card pl-10 pr-4 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={cn(
+              "flex h-10 items-center gap-2 rounded-lg border px-4 text-sm font-medium transition",
+              showFilters || activeFilterCount > 0
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-input bg-card text-muted-foreground hover:bg-secondary"
+            )}
+          >
+            <Filter className="h-4 w-4" />
+            Filtros
+            {activeFilterCount > 0 && (
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                {activeFilterCount}
+              </span>
+            )}
+            <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", showFilters && "rotate-180")} />
+          </button>
+          {activeFilterCount > 0 && (
+            <button
+              onClick={() => {
+                setFilterModalidade("");
+                setFilterUf("");
+                setDateFrom(undefined);
+                setDateTo(undefined);
+                setPage(0);
+              }}
+              className="flex h-10 items-center gap-1.5 rounded-lg border border-destructive/30 px-3 text-sm text-destructive hover:bg-destructive/10 transition"
+            >
+              <X className="h-3.5 w-3.5" />
+              Limpar filtros
+            </button>
+          )}
         </div>
-        <button className="flex h-10 items-center gap-2 rounded-lg border border-input bg-card px-4 text-sm text-muted-foreground hover:bg-secondary">
-          <Filter className="h-4 w-4" /> Filtros
-        </button>
-        <button className="flex h-10 items-center gap-2 rounded-lg border border-input bg-card px-4 text-sm text-muted-foreground hover:bg-secondary">
-          <Calendar className="h-4 w-4" /> Período
-        </button>
+
+        <AnimatePresence>
+          {showFilters && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card p-4">
+                {/* Modalidade */}
+                <div className="space-y-1.5 min-w-[180px]">
+                  <label className="text-xs font-medium text-muted-foreground">Modalidade</label>
+                  <select
+                    value={filterModalidade}
+                    onChange={(e) => { setFilterModalidade(e.target.value); setPage(0); }}
+                    className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="">Todas</option>
+                    <option value="Pregão - Eletrônico">Pregão - Eletrônico</option>
+                    <option value="Pregão - Presencial">Pregão - Presencial</option>
+                    <option value="Concorrência - Eletrônica">Concorrência - Eletrônica</option>
+                    <option value="Concorrência - Presencial">Concorrência - Presencial</option>
+                    <option value="Dispensa">Dispensa</option>
+                    <option value="Inexigibilidade">Inexigibilidade</option>
+                    <option value="Credenciamento">Credenciamento</option>
+                    <option value="Leilão - Eletrônico">Leilão - Eletrônico</option>
+                    <option value="Leilão - Presencial">Leilão - Presencial</option>
+                    <option value="Concurso">Concurso</option>
+                    <option value="Manifestação de Interesse">Manifestação de Interesse</option>
+                    <option value="Pré-qualificação">Pré-qualificação</option>
+                  </select>
+                </div>
+
+                {/* UF */}
+                <div className="space-y-1.5 min-w-[120px]">
+                  <label className="text-xs font-medium text-muted-foreground">UF</label>
+                  <select
+                    value={filterUf}
+                    onChange={(e) => { setFilterUf(e.target.value); setPage(0); }}
+                    className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="">Todas</option>
+                    {["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"].map(uf => (
+                      <option key={uf} value={uf}>{uf}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Date From */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Data inicial</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button className={cn(
+                        "flex h-9 items-center gap-2 rounded-lg border border-input bg-background px-3 text-sm",
+                        !dateFrom && "text-muted-foreground"
+                      )}>
+                        <Calendar className="h-3.5 w-3.5" />
+                        {dateFrom ? format(dateFrom, "dd/MM/yyyy") : "Selecionar"}
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={dateFrom}
+                        onSelect={(d) => { setDateFrom(d); setPage(0); }}
+                        locale={ptBR}
+                        initialFocus
+                        className="p-3 pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* Date To */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Data final</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button className={cn(
+                        "flex h-9 items-center gap-2 rounded-lg border border-input bg-background px-3 text-sm",
+                        !dateTo && "text-muted-foreground"
+                      )}>
+                        <Calendar className="h-3.5 w-3.5" />
+                        {dateTo ? format(dateTo, "dd/MM/yyyy") : "Selecionar"}
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={dateTo}
+                        onSelect={(d) => { setDateTo(d); setPage(0); }}
+                        locale={ptBR}
+                        initialFocus
+                        className="p-3 pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Table */}
