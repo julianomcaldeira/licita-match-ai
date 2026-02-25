@@ -7,6 +7,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   role: string | null;
+  empresaId: string | null;
   signOut: () => Promise<void>;
 }
 
@@ -15,6 +16,7 @@ const AuthContext = createContext<AuthContextType>({
   session: null,
   loading: true,
   role: null,
+  empresaId: null,
   signOut: async () => {},
 });
 
@@ -25,15 +27,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<string | null>(null);
+  const [empresaId, setEmpresaId] = useState<string | null>(null);
 
   const fetchRole = async (userId: string) => {
     const { data } = await supabase
       .from("user_roles")
-      .select("role")
+      .select("role, empresa_id")
       .eq("user_id", userId)
       .limit(1)
       .single();
     setRole(data?.role || null);
+    setEmpresaId(data?.empresa_id || null);
   };
 
   useEffect(() => {
@@ -45,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setTimeout(() => fetchRole(session.user.id), 0);
         } else {
           setRole(null);
+          setEmpresaId(null);
         }
         setLoading(false);
       }
@@ -67,10 +72,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setSession(null);
     setRole(null);
+    setEmpresaId(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, role, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, role, empresaId, signOut }}>
       {children}
     </AuthContext.Provider>
   );
