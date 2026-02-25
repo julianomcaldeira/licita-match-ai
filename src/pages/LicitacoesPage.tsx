@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
-import { Search, Filter, Calendar, RefreshCw, Loader2, Database, ChevronLeft, ChevronRight, X, Trophy } from "lucide-react";
+import { Search, Filter, Calendar, RefreshCw, Loader2, Database, ChevronLeft, ChevronRight, X, Trophy, ExternalLink } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -439,7 +439,6 @@ export default function LicitacoesPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-secondary/50">
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">ID</th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Órgão</th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Objeto</th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Modalidade</th>
@@ -447,25 +446,32 @@ export default function LicitacoesPage() {
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Vencedor</th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Data</th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">UF</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Situação</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {licitacoes?.map((row) => (
-                    <tr key={row.id} className="border-b border-border last:border-0 transition hover:bg-secondary/30 cursor-pointer">
-                      <td className="px-4 py-3 font-mono text-xs text-primary max-w-[140px] truncate">{row.id_origem}</td>
-                      <td className="px-4 py-3 font-medium text-foreground max-w-[180px] truncate">{row.orgao}</td>
-                      <td className="px-4 py-3 max-w-xs truncate text-foreground">{row.objeto}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{row.modalidade || "—"}</td>
-                      <td className="px-4 py-3 font-medium text-foreground">{formatCurrency(row.valor_estimado)}</td>
-                      <td className="px-4 py-3 text-foreground max-w-[180px] truncate">{getVencedor(row)}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{row.data_publicacao || "—"}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{row.uf || "—"}</td>
-                      <td className="px-4 py-3">
-                        <StatusBadge situacao={row.situacao} />
-                      </td>
-                    </tr>
-                  ))}
+                  {licitacoes?.map((row) => {
+                    const pncpLink = row.numero_controle_pncp
+                      ? `https://pncp.gov.br/app/editais/${row.numero_controle_pncp}`
+                      : null;
+                    return (
+                      <tr key={row.id} className="border-b border-border last:border-0 transition hover:bg-secondary/30">
+                        <td className="px-4 py-3 font-medium text-foreground max-w-[220px] truncate">
+                          {pncpLink ? (
+                            <a href={pncpLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary hover:underline">
+                              {row.orgao}
+                              <ExternalLink className="h-3 w-3 shrink-0" />
+                            </a>
+                          ) : row.orgao}
+                        </td>
+                        <td className="px-4 py-3 max-w-xs truncate text-foreground">{row.objeto}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{row.modalidade || "—"}</td>
+                        <td className="px-4 py-3 font-medium text-foreground">{formatCurrency(row.valor_estimado)}</td>
+                        <td className="px-4 py-3 text-foreground max-w-[180px] truncate">{getVencedor(row)}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{row.data_publicacao || "—"}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{row.uf || "—"}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

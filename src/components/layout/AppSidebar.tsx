@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Zap,
+  Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +28,7 @@ const navigation = [
   { name: "Relatórios", href: "/relatorios", icon: FileText },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
   { name: "Notificações", href: "/notificacoes", icon: Bell },
+  { name: "Monitor Ingestão", href: "/monitor-ingestao", icon: Activity },
   { name: "Auditoria", href: "/auditoria", icon: Shield },
   { name: "Configurações", href: "/configuracoes", icon: Settings },
 ];
