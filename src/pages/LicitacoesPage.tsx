@@ -131,7 +131,10 @@ export default function LicitacoesPage() {
         .select("*", { count: "exact", head: true });
       query = buildQuery(query);
       const { count, error } = await query;
-      if (error) throw error;
+      if (error) {
+        console.warn("Count query error (timeout?), ignoring:", error);
+        return null;
+      }
       return count ?? 0;
     },
   });
@@ -309,7 +312,8 @@ export default function LicitacoesPage() {
     toast.info("Cancelando...");
   };
 
-  const total = totalCount ?? 0;
+  const hasData = (licitacoes && licitacoes.length > 0);
+  const total = totalCount ?? (hasData ? licitacoes!.length : 0);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   function getVencedor(row: any): string {
@@ -576,7 +580,7 @@ export default function LicitacoesPage() {
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      ) : total === 0 ? (
+      ) : !hasData ? (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
