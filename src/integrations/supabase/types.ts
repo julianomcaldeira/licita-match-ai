@@ -14,7 +14,187 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      ingestao_logs: {
+        Row: {
+          created_at: string
+          data_fim: string | null
+          data_inicio: string | null
+          endpoint: string
+          erro: string | null
+          fonte: string
+          id: string
+          registros_processados: number | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          data_fim?: string | null
+          data_inicio?: string | null
+          endpoint: string
+          erro?: string | null
+          fonte: string
+          id?: string
+          registros_processados?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          data_fim?: string | null
+          data_inicio?: string | null
+          endpoint?: string
+          erro?: string | null
+          fonte?: string
+          id?: string
+          registros_processados?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      licitacao_itens: {
+        Row: {
+          created_at: string
+          descricao: string
+          id: string
+          licitacao_id: string
+          numero_item: number | null
+          quantidade: number | null
+          unidade: string | null
+          valor_unitario_estimado: number | null
+          valor_unitario_final: number | null
+        }
+        Insert: {
+          created_at?: string
+          descricao: string
+          id?: string
+          licitacao_id: string
+          numero_item?: number | null
+          quantidade?: number | null
+          unidade?: string | null
+          valor_unitario_estimado?: number | null
+          valor_unitario_final?: number | null
+        }
+        Update: {
+          created_at?: string
+          descricao?: string
+          id?: string
+          licitacao_id?: string
+          numero_item?: number | null
+          quantidade?: number | null
+          unidade?: string | null
+          valor_unitario_estimado?: number | null
+          valor_unitario_final?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "licitacao_itens_licitacao_id_fkey"
+            columns: ["licitacao_id"]
+            isOneToOne: false
+            referencedRelation: "licitacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      licitacao_vencedores: {
+        Row: {
+          cnpj: string | null
+          created_at: string
+          id: string
+          item_id: string
+          percentual_desconto: number | null
+          razao_social: string | null
+          valor_final: number | null
+        }
+        Insert: {
+          cnpj?: string | null
+          created_at?: string
+          id?: string
+          item_id: string
+          percentual_desconto?: number | null
+          razao_social?: string | null
+          valor_final?: number | null
+        }
+        Update: {
+          cnpj?: string | null
+          created_at?: string
+          id?: string
+          item_id?: string
+          percentual_desconto?: number | null
+          razao_social?: string | null
+          valor_final?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "licitacao_vencedores_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "licitacao_itens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      licitacoes: {
+        Row: {
+          created_at: string
+          data_publicacao: string | null
+          data_resultado: string | null
+          fonte: string
+          id: string
+          id_origem: string
+          modalidade: string | null
+          municipio: string | null
+          numero_controle_pncp: string | null
+          objeto: string
+          orgao: string
+          raw_json: Json | null
+          situacao: string | null
+          uf: string | null
+          updated_at: string
+          valor_estimado: number | null
+          valor_homologado: number | null
+        }
+        Insert: {
+          created_at?: string
+          data_publicacao?: string | null
+          data_resultado?: string | null
+          fonte?: string
+          id?: string
+          id_origem: string
+          modalidade?: string | null
+          municipio?: string | null
+          numero_controle_pncp?: string | null
+          objeto: string
+          orgao: string
+          raw_json?: Json | null
+          situacao?: string | null
+          uf?: string | null
+          updated_at?: string
+          valor_estimado?: number | null
+          valor_homologado?: number | null
+        }
+        Update: {
+          created_at?: string
+          data_publicacao?: string | null
+          data_resultado?: string | null
+          fonte?: string
+          id?: string
+          id_origem?: string
+          modalidade?: string | null
+          municipio?: string | null
+          numero_controle_pncp?: string | null
+          objeto?: string
+          orgao?: string
+          raw_json?: Json | null
+          situacao?: string | null
+          uf?: string | null
+          updated_at?: string
+          valor_estimado?: number | null
+          valor_homologado?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
