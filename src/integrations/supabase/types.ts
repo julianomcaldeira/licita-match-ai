@@ -315,6 +315,33 @@ export type Database = {
         }
         Relationships: []
       }
+      sync_status: {
+        Row: {
+          api_source: string
+          id: string
+          last_date_processed: string
+          modalidade: number
+          total_synced: number | null
+          updated_at: string
+        }
+        Insert: {
+          api_source?: string
+          id?: string
+          last_date_processed: string
+          modalidade: number
+          total_synced?: number | null
+          updated_at?: string
+        }
+        Update: {
+          api_source?: string
+          id?: string
+          last_date_processed?: string
+          modalidade?: number
+          total_synced?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
