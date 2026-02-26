@@ -17,9 +17,9 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 function StatusIcon({ status }: { status: string }) {
-  if (status === "sucesso")
+  if (status === "sucesso" || status === "completed")
     return <CheckCircle2 className="h-5 w-5 text-success" />;
-  if (status === "parcial")
+  if (status === "parcial" || status === "running")
     return <AlertTriangle className="h-5 w-5 text-warning" />;
   return <XCircle className="h-5 w-5 text-destructive" />;
 }
@@ -105,9 +105,9 @@ export default function IngestaoMonitorPage() {
     refetchInterval: 30000,
   });
 
-  const successCount = logs?.filter((l) => l.status === "sucesso").length ?? 0;
-  const errorCount = logs?.filter((l) => l.status !== "sucesso" && l.status !== "parcial").length ?? 0;
-  const parcialCount = logs?.filter((l) => l.status === "parcial").length ?? 0;
+  const successCount = logs?.filter((l) => l.status === "sucesso" || l.status === "completed").length ?? 0;
+  const errorCount = logs?.filter((l) => l.status !== "sucesso" && l.status !== "parcial" && l.status !== "completed" && l.status !== "running").length ?? 0;
+  const parcialCount = logs?.filter((l) => l.status === "parcial" || l.status === "running").length ?? 0;
 
   const summaryCards = [
     {
