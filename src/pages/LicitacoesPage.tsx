@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Filter, Calendar, RefreshCw, Loader2, Database, ChevronLeft, ChevronRight, X, Trophy, ExternalLink, ChevronDown } from "lucide-react";
+import { Search, Filter, Calendar, RefreshCw, Loader2, Database, ChevronLeft, ChevronRight, X, Trophy, ExternalLink, ChevronDown, FileSpreadsheet } from "lucide-react";
+import * as XLSX from "xlsx";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -334,6 +335,60 @@ export default function LicitacoesPage() {
     setPage(0);
   };
 
+  const [exporting, setExporting] = useState(false);
+
+  const exportToExcel = useCallback(async () => {
+    setExporting(true);
+    try {
+      // Fetch ALL matching records (not just current page), up to 10000
+      let allData: any[] = [];
+      let from = 0;
+      const batchSize = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        let query = supabase
+          .from("licitacoes")
+          .select(`*, licitacao_itens ( id, licitacao_vencedores ( razao_social ) )`)
+          .order("data_publicacao", { ascending: false })
+          .range(from, from + batchSize - 1);
+        query = buildQuery(query);
+        const { data, error } = await query;
+        if (error) throw error;
+        if (data && data.length > 0) {
+          allData = [...allData, ...data];
+          from += batchSize;
+          hasMore = data.length === batchSize && allData.length < 10000;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      const rows = allData.map((row) => ({
+        "Órgão": row.orgao,
+        "Objeto": row.objeto,
+        "Modalidade": row.modalidade || "",
+        "Valor Estimado": row.valor_estimado || "",
+        "Vencedor": getVencedor(row),
+        "Data Publicação": row.data_publicacao || "",
+        "UF": row.uf || "",
+        "Situação": row.situacao || "",
+        "Município": row.municipio || "",
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Licitações");
+      XLSX.writeFile(wb, `licitacoes_${format(new Date(), "yyyy-MM-dd_HHmm")}.xlsx`);
+      toast.success(`${rows.length.toLocaleString("pt-BR")} registros exportados com sucesso!`);
+    } catch (err) {
+      console.error("Export error:", err);
+      toast.error("Erro ao exportar dados.");
+    } finally {
+      setExporting(false);
+    }
+  }, [searchTerm, filterModalidade, filterUf, dateFrom, dateTo]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -453,6 +508,14 @@ export default function LicitacoesPage() {
               </span>
             )}
             <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", showFilters && "rotate-180")} />
+          </button>
+          <button
+            onClick={exportToExcel}
+            disabled={exporting || !hasData}
+            className="flex h-10 items-center gap-2 rounded-lg border border-input bg-card px-4 text-sm font-medium text-foreground hover:bg-secondary transition disabled:opacity-50"
+          >
+            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+            Exportar Excel
           </button>
           {activeFilterCount > 0 && (
             <button
