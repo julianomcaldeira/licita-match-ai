@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.auto-analysis]
 verify_jwt = false
+
+[functions.analyze-objeto]
+verify_jwt = false
