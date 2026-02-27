@@ -430,7 +430,7 @@ async function handleIngest(supabase: any, body: any) {
 }
 
 async function handleWinners(supabase: any, body: any) {
-  const batchSize = body.limit || 30;
+  const batchSize = body.limit || 50;
 
   const { data: licitacoes, error: queryErr } = await supabase
     .rpc("licitacoes_sem_itens", { lim: batchSize });
@@ -447,9 +447,17 @@ async function handleWinners(supabase: any, body: any) {
   let winnersFound = 0;
   let processed = 0;
 
-  for (const lic of licitacoes.slice(0, 20)) {
-    winnersFound += await processWinner(supabase, lic);
-    processed++;
+  // Process in parallel batches of 5 for speed
+  const PARALLEL = 5;
+  for (let i = 0; i < licitacoes.length; i += PARALLEL) {
+    const batch = licitacoes.slice(i, i + PARALLEL);
+    const results = await Promise.allSettled(
+      batch.map((lic: any) => processWinner(supabase, lic))
+    );
+    for (const r of results) {
+      if (r.status === "fulfilled") winnersFound += r.value;
+      processed++;
+    }
   }
 
   // Log
