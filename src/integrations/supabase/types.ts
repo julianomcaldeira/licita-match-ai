@@ -387,6 +387,21 @@ export type Database = {
           situacao: string
         }[]
       }
+      analytics_monthly_sales: {
+        Args: { p_date_from?: string; p_date_to?: string }
+        Returns: {
+          contract_count: number
+          month: string
+          total_valor: number
+        }[]
+      }
+      analytics_sales_totals: {
+        Args: { p_date_from?: string; p_date_to?: string }
+        Returns: {
+          total_contracts: number
+          total_sales: number
+        }[]
+      }
       analytics_top_buyers: {
         Args: { p_date_from?: string; p_date_to?: string; p_limit?: number }
         Returns: {
