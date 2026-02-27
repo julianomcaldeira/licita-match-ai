@@ -98,6 +98,7 @@ export default function LicitacoesPage() {
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
   const [showFilters, setShowFilters] = useState(false);
+  const [comVencedor, setComVencedor] = useState(true); // DEFAULT: only with winners
 
   // Detail modal state
   const [selectedLicitacao, setSelectedLicitacao] = useState<any | null>(null);
@@ -153,11 +154,12 @@ export default function LicitacoesPage() {
 
   // Use the optimized RPC for all queries
   const { data: queryResult, isLoading } = useQuery({
-    queryKey: ["licitacoes-rpc", debouncedSearch, page, filterModalidade, filterUf, filterSituacao, debouncedOrgao, debouncedVencedor, dateFrom?.toISOString(), dateTo?.toISOString()],
+    queryKey: ["licitacoes-rpc", debouncedSearch, page, filterModalidade, filterUf, filterSituacao, debouncedOrgao, debouncedVencedor, dateFrom?.toISOString(), dateTo?.toISOString(), comVencedor],
     queryFn: async () => {
       const params: any = {
         p_limit: PAGE_SIZE,
         p_offset: page * PAGE_SIZE,
+        p_com_vencedor: comVencedor,
       };
       if (debouncedSearch.trim()) params.p_search = debouncedSearch.trim();
       if (filterModalidade) params.p_modalidade = filterModalidade;
@@ -243,7 +245,7 @@ export default function LicitacoesPage() {
       const batchSize = 1000;
       let hasMore = true;
       while (hasMore && allData.length < 10000) {
-        const params: any = { p_limit: batchSize, p_offset: offset };
+        const params: any = { p_limit: batchSize, p_offset: offset, p_com_vencedor: comVencedor };
         if (debouncedSearch.trim()) params.p_search = debouncedSearch.trim();
         if (filterModalidade) params.p_modalidade = filterModalidade;
         if (filterUf) params.p_uf = filterUf;
@@ -284,7 +286,9 @@ export default function LicitacoesPage() {
         <div>
           <h1 className="font-display text-2xl font-bold text-foreground">Licitações</h1>
           <p className="text-sm text-muted-foreground">
-            {total > 0 ? `${total.toLocaleString("pt-BR")} registros do PNCP` : "Dados ingeridos do PNCP e Portal da Transparência"}
+            {total > 0
+              ? `${total.toLocaleString("pt-BR")} ${comVencedor ? "licitações com resultado" : "registros do PNCP"}`
+              : "Dados ingeridos do PNCP e Portal da Transparência"}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -333,6 +337,19 @@ export default function LicitacoesPage() {
       {/* Filters */}
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-3">
+          {/* Toggle: com vencedor */}
+          <button
+            onClick={() => { setComVencedor(!comVencedor); setPage(0); }}
+            className={cn(
+              "flex h-10 items-center gap-2 rounded-lg border px-4 text-sm font-medium transition",
+              comVencedor
+                ? "border-success bg-success/10 text-success"
+                : "border-input bg-card text-muted-foreground hover:bg-secondary"
+            )}
+          >
+            <Trophy className="h-4 w-4" />
+            {comVencedor ? "Com Vencedor" : "Todas"}
+          </button>
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
