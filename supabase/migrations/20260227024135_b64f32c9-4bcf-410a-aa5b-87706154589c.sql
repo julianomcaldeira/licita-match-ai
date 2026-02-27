@@ -1,0 +1,125 @@
+
+CREATE OR REPLACE FUNCTION public.search_licitacoes(
+  p_search TEXT DEFAULT NULL,
+  p_modalidade TEXT DEFAULT NULL,
+  p_uf TEXT DEFAULT NULL,
+  p_situacao TEXT DEFAULT NULL,
+  p_orgao TEXT DEFAULT NULL,
+  p_vencedor TEXT DEFAULT NULL,
+  p_date_from DATE DEFAULT NULL,
+  p_date_to DATE DEFAULT NULL,
+  p_limit INT DEFAULT 20,
+  p_offset INT DEFAULT 0
+)
+RETURNS TABLE (
+  id UUID,
+  orgao TEXT,
+  objeto TEXT,
+  modalidade TEXT,
+  valor_estimado NUMERIC,
+  data_publicacao DATE,
+  uf TEXT,
+  situacao TEXT,
+  municipio TEXT,
+  numero_controle_pncp TEXT,
+  vencedor_nome TEXT,
+  total_count BIGINT
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_count BIGINT;
+  has_filters BOOLEAN;
+BEGIN
+  has_filters := (p_search IS NOT NULL AND p_search != '')
+    OR (p_modalidade IS NOT NULL AND p_modalidade != '')
+    OR (p_uf IS NOT NULL AND p_uf != '')
+    OR (p_situacao IS NOT NULL AND p_situacao != '')
+    OR (p_orgao IS NOT NULL AND p_orgao != '')
+    OR (p_vencedor IS NOT NULL AND p_vencedor != '')
+    OR p_date_from IS NOT NULL
+    OR p_date_to IS NOT NULL;
+
+  IF p_vencedor IS NOT NULL AND p_vencedor != '' THEN
+    SELECT count(*) INTO v_count
+    FROM licitacoes l
+    JOIN licitacao_itens li ON li.licitacao_id = l.id
+    JOIN licitacao_vencedores lv ON lv.item_id = li.id
+    WHERE
+      (p_search IS NULL OR l.objeto ILIKE '%' || p_search || '%' OR l.orgao ILIKE '%' || p_search || '%')
+      AND (p_modalidade IS NULL OR l.modalidade = p_modalidade)
+      AND (p_uf IS NULL OR l.uf = p_uf)
+      AND (p_situacao IS NULL OR l.situacao = p_situacao)
+      AND (p_orgao IS NULL OR l.orgao ILIKE '%' || p_orgao || '%')
+      AND (p_date_from IS NULL OR l.data_publicacao >= p_date_from)
+      AND (p_date_to IS NULL OR l.data_publicacao <= p_date_to)
+      AND lv.razao_social ILIKE '%' || p_vencedor || '%';
+
+    RETURN QUERY
+    SELECT DISTINCT ON (l.id)
+      l.id, l.orgao, l.objeto, l.modalidade, l.valor_estimado,
+      l.data_publicacao, l.uf, l.situacao, l.municipio, l.numero_controle_pncp,
+      lv.razao_social,
+      v_count
+    FROM licitacoes l
+    JOIN licitacao_itens li ON li.licitacao_id = l.id
+    JOIN licitacao_vencedores lv ON lv.item_id = li.id
+    WHERE
+      (p_search IS NULL OR l.objeto ILIKE '%' || p_search || '%' OR l.orgao ILIKE '%' || p_search || '%')
+      AND (p_modalidade IS NULL OR l.modalidade = p_modalidade)
+      AND (p_uf IS NULL OR l.uf = p_uf)
+      AND (p_situacao IS NULL OR l.situacao = p_situacao)
+      AND (p_orgao IS NULL OR l.orgao ILIKE '%' || p_orgao || '%')
+      AND (p_date_from IS NULL OR l.data_publicacao >= p_date_from)
+      AND (p_date_to IS NULL OR l.data_publicacao <= p_date_to)
+      AND lv.razao_social ILIKE '%' || p_vencedor || '%'
+    ORDER BY l.id, l.data_publicacao DESC NULLS LAST
+    LIMIT p_limit OFFSET p_offset;
+  ELSE
+    -- Use estimated count for unfiltered queries (instant)
+    IF NOT has_filters THEN
+      SELECT reltuples::BIGINT INTO v_count
+      FROM pg_class WHERE relname = 'licitacoes';
+    ELSE
+      SELECT count(*) INTO v_count
+      FROM licitacoes l
+      WHERE
+        (p_search IS NULL OR l.objeto ILIKE '%' || p_search || '%' OR l.orgao ILIKE '%' || p_search || '%')
+        AND (p_modalidade IS NULL OR l.modalidade = p_modalidade)
+        AND (p_uf IS NULL OR l.uf = p_uf)
+        AND (p_situacao IS NULL OR l.situacao = p_situacao)
+        AND (p_orgao IS NULL OR l.orgao ILIKE '%' || p_orgao || '%')
+        AND (p_date_from IS NULL OR l.data_publicacao >= p_date_from)
+        AND (p_date_to IS NULL OR l.data_publicacao <= p_date_to);
+    END IF;
+
+    RETURN QUERY
+    SELECT
+      l.id, l.orgao, l.objeto, l.modalidade, l.valor_estimado,
+      l.data_publicacao, l.uf, l.situacao, l.municipio, l.numero_controle_pncp,
+      lv.razao_social,
+      v_count
+    FROM licitacoes l
+    LEFT JOIN LATERAL (
+      SELECT lv2.razao_social
+      FROM licitacao_itens li2
+      JOIN licitacao_vencedores lv2 ON lv2.item_id = li2.id
+      WHERE li2.licitacao_id = l.id
+      LIMIT 1
+    ) lv ON true
+    WHERE
+      (p_search IS NULL OR l.objeto ILIKE '%' || p_search || '%' OR l.orgao ILIKE '%' || p_search || '%')
+      AND (p_modalidade IS NULL OR l.modalidade = p_modalidade)
+      AND (p_uf IS NULL OR l.uf = p_uf)
+      AND (p_situacao IS NULL OR l.situacao = p_situacao)
+      AND (p_orgao IS NULL OR l.orgao ILIKE '%' || p_orgao || '%')
+      AND (p_date_from IS NULL OR l.data_publicacao >= p_date_from)
+      AND (p_date_to IS NULL OR l.data_publicacao <= p_date_to)
+    ORDER BY l.data_publicacao DESC NULLS LAST
+    LIMIT p_limit OFFSET p_offset;
+  END IF;
+END;
+$$;

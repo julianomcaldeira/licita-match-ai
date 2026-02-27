@@ -103,7 +103,7 @@ export default function LicitacoesPage() {
   const { data: situacoes } = useQuery({
     queryKey: ["situacoes-distintas"],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_distinct_situacoes");
+      const { data, error } = await (supabase as any).rpc("get_distinct_situacoes");
       if (error) { console.warn("Situacoes error:", error); return []; }
       return data as { situacao: string; count: number }[];
     },
@@ -127,7 +127,7 @@ export default function LicitacoesPage() {
       if (dateFrom) params.p_date_from = format(dateFrom, "yyyy-MM-dd");
       if (dateTo) params.p_date_to = format(dateTo, "yyyy-MM-dd");
 
-      const { data, error } = await supabase.rpc("search_licitacoes", params);
+      const { data, error } = await (supabase as any).rpc("search_licitacoes", params);
       if (error) throw error;
       return data as any[];
     },
@@ -211,7 +211,7 @@ export default function LicitacoesPage() {
         if (debouncedVencedor.trim()) params.p_vencedor = debouncedVencedor.trim();
         if (dateFrom) params.p_date_from = format(dateFrom, "yyyy-MM-dd");
         if (dateTo) params.p_date_to = format(dateTo, "yyyy-MM-dd");
-        const { data, error } = await supabase.rpc("search_licitacoes", params);
+        const { data, error } = await (supabase as any).rpc("search_licitacoes", params);
         if (error) throw error;
         if (data && data.length > 0) { allData = [...allData, ...data]; offset += batchSize; hasMore = data.length === batchSize; }
         else hasMore = false;
