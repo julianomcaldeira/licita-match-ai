@@ -284,7 +284,7 @@ async function processWinner(supabase: any, lic: any): Promise<number> {
       return 0;
     }
 
-    for (const item of itens.slice(0, 5)) {
+    for (const item of itens) {
       const seqItem = item.numeroItem || item.sequencialItem;
       if (!seqItem) continue;
 
