@@ -410,6 +410,22 @@ export type Database = {
           total_valor: number
         }[]
       }
+      analytics_top_winners: {
+        Args: { p_date_from?: string; p_date_to?: string; p_limit?: number }
+        Returns: {
+          cnpj: string
+          razao_social: string
+          total_valor: number
+          wins: number
+        }[]
+      }
+      analytics_totals: {
+        Args: { p_date_from?: string; p_date_to?: string }
+        Returns: {
+          total_empresas: number
+          total_orgaos: number
+        }[]
+      }
       get_distinct_situacoes: {
         Args: never
         Returns: {
