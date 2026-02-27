@@ -97,7 +97,16 @@ export default function DashboardAnalytics() {
     },
   });
 
-  const isLoading = l1 || l2 || l3 || l4 || l5;
+  const { data: totals, isLoading: l6 } = useQuery({
+    queryKey: ["analytics-totals", period],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("analytics_totals", { p_date_from: dateFrom, p_date_to: dateTo });
+      if (error) throw error;
+      return data?.[0] as { total_empresas: number; total_orgaos: number } | undefined;
+    },
+  });
+
+  const isLoading = l1 || l2 || l3 || l4 || l5 || l6;
 
   const totalLicitacoes = dailyStats?.daily.reduce((s, d) => s + d.total, 0) || 0;
 
@@ -126,13 +135,23 @@ export default function DashboardAnalytics() {
       {!isLoading && (
         <>
           {/* Summary cards */}
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border border-border bg-card p-5 shadow-sm">
               <span className="text-sm text-muted-foreground">Total Vendas (Período)</span>
               <p className="mt-1 font-display text-xl font-bold text-foreground">{formatCurrency(salesTotals?.total_sales || 0)}</p>
               <p className="text-xs text-muted-foreground">{(salesTotals?.total_contracts || 0).toLocaleString("pt-BR")} contratos</p>
             </motion.div>
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="rounded-xl border border-border bg-card p-5 shadow-sm">
+              <span className="text-sm text-muted-foreground">Empresas Participantes</span>
+              <p className="mt-1 font-display text-xl font-bold text-foreground">{(totals?.total_empresas || 0).toLocaleString("pt-BR")}</p>
+              <p className="text-xs text-muted-foreground">CNPJs distintos</p>
+            </motion.div>
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="rounded-xl border border-border bg-card p-5 shadow-sm">
+              <span className="text-sm text-muted-foreground">Órgãos Compradores</span>
+              <p className="mt-1 font-display text-xl font-bold text-foreground">{(totals?.total_orgaos || 0).toLocaleString("pt-BR")}</p>
+              <p className="text-xs text-muted-foreground">Órgãos distintos</p>
+            </motion.div>
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="rounded-xl border border-border bg-card p-5 shadow-sm">
               <span className="text-sm text-muted-foreground">Top Vencedor</span>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -146,7 +165,7 @@ export default function DashboardAnalytics() {
               </Tooltip>
               <p className="text-xs text-muted-foreground">{topWinners?.[0]?.wins || 0} vitórias</p>
             </motion.div>
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="rounded-xl border border-border bg-card p-5 shadow-sm">
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="rounded-xl border border-border bg-card p-5 shadow-sm">
               <span className="text-sm text-muted-foreground">Top Comprador</span>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -159,7 +178,7 @@ export default function DashboardAnalytics() {
               </Tooltip>
               <p className="text-xs text-muted-foreground">{topBuyers?.[0]?.purchases || 0} compras</p>
             </motion.div>
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="rounded-xl border border-border bg-card p-5 shadow-sm">
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="rounded-xl border border-border bg-card p-5 shadow-sm">
               <span className="text-sm text-muted-foreground">Licitações no Período</span>
               <p className="mt-1 font-display text-xl font-bold text-foreground">{totalLicitacoes.toLocaleString("pt-BR")}</p>
               <p className="text-xs text-muted-foreground">{dailyStats?.statuses.length || 0} status distintos</p>
