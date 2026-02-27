@@ -125,27 +125,32 @@ async function fetchAllPages(
       const rows = contratacoes.map(mapContratacao);
       for (let i = 0; i < rows.length; i += 50) {
         const batch = rows.slice(i, i + 50);
-        const { data: upserted, error } = await supabase
-          .from("licitacoes")
-          .upsert(batch, { onConflict: "id_origem,fonte" })
-          .select("id, numero_controle_pncp, raw_json");
-        if (error) {
-          errors.push(`Mod ${modalidade} pag ${pagina}: ${error.message}`);
-        } else {
-          total += batch.length;
-          // Fetch winners inline for each upserted record
-          if (fetchWinners && upserted) {
-            const PARALLEL = 5;
-            for (let j = 0; j < upserted.length; j += PARALLEL) {
-              const winBatch = upserted.slice(j, j + PARALLEL);
-              const results = await Promise.allSettled(
-                winBatch.map((lic: any) => processWinner(supabase, lic))
-              );
-              for (const r of results) {
-                if (r.status === "fulfilled") winnersFound += r.value;
+        if (fetchWinners) {
+          const { data: upserted, error } = await supabase
+            .from("licitacoes")
+            .upsert(batch, { onConflict: "id_origem,fonte" })
+            .select("id, numero_controle_pncp, raw_json");
+          if (error) {
+            errors.push(`Mod ${modalidade} pag ${pagina}: ${error.message}`);
+          } else {
+            total += batch.length;
+            if (upserted) {
+              const PARALLEL = 5;
+              for (let j = 0; j < upserted.length; j += PARALLEL) {
+                const winBatch = upserted.slice(j, j + PARALLEL);
+                const results = await Promise.allSettled(
+                  winBatch.map((lic: any) => processWinner(supabase, lic))
+                );
+                for (const r of results) {
+                  if (r.status === "fulfilled") winnersFound += r.value;
+                }
               }
             }
           }
+        } else {
+          const { error } = await supabase.from("licitacoes").upsert(batch, { onConflict: "id_origem,fonte" });
+          if (error) errors.push(`Mod ${modalidade} pag ${pagina}: ${error.message}`);
+          else total += batch.length;
         }
       }
 
@@ -386,7 +391,7 @@ async function handleIngest(supabase: any, body: any) {
 
   // Process one month at a time, stop after ~2 months to avoid timeout
   let monthsProcessed = 0;
-  const MAX_MONTHS_PER_CALL = 2;
+  const MAX_MONTHS_PER_CALL = 1;
 
   for (let y = startY; y <= endY; y++) {
     const mStart = (y === startY) ? startM : 1;
@@ -403,7 +408,7 @@ async function handleIngest(supabase: any, body: any) {
       if (monthEnd > dataFinal) monthEnd = dataFinal;
 
       console.log(`Mod ${modalidade}: fetching ${monthStart} → ${monthEnd}`);
-      const result = await fetchAllPages(supabase, modalidade, monthStart, monthEnd, true);
+      const result = await fetchAllPages(supabase, modalidade, monthStart, monthEnd, false);
       totalProcessed += result.total;
       allErrors.push(...result.errors);
       lastProcessedDate = monthEnd;
