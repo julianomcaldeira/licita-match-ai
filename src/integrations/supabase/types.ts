@@ -379,6 +379,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      analytics_daily_by_status: {
+        Args: { p_date_from?: string; p_date_to?: string }
+        Returns: {
+          count: number
+          pub_date: string
+          situacao: string
+        }[]
+      }
+      analytics_top_buyers: {
+        Args: { p_date_from?: string; p_date_to?: string; p_limit?: number }
+        Returns: {
+          orgao: string
+          purchases: number
+          total_valor: number
+        }[]
+      }
       get_distinct_situacoes: {
         Args: never
         Returns: {
