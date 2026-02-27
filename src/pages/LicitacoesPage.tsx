@@ -553,6 +553,7 @@ export default function LicitacoesPage() {
                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Objeto</th>
                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Modalidade</th>
                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Valor Est.</th>
+                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Val. Homologado</th>
                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Vencedor</th>
                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Data</th>
                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">UF</th>
@@ -599,8 +600,14 @@ export default function LicitacoesPage() {
                            </Tooltip>
                          </td>
                          <td className="px-4 py-3 text-muted-foreground">{row.modalidade || "—"}</td>
-                         <td className="px-4 py-3 font-medium text-foreground">{formatCurrency(row.valor_estimado)}</td>
-                         <td className="px-4 py-3 text-foreground max-w-[180px] truncate">{row.vencedor_nome || "—"}</td>
+                          <td className="px-4 py-3 font-medium text-foreground">{formatCurrency(row.valor_estimado)}</td>
+                          <td className="px-4 py-3 font-medium text-success">{row.valor_homologado ? formatCurrency(row.valor_homologado) : "—"}</td>
+                          <td className="px-4 py-3 text-foreground max-w-[180px]">
+                            <Tooltip>
+                              <TooltipTrigger asChild><span className="block truncate">{row.vencedor_nome || "—"}</span></TooltipTrigger>
+                              <TooltipContent side="bottom" className="max-w-sm"><p className="text-xs">{row.vencedor_nome || "Sem vencedor"}</p></TooltipContent>
+                            </Tooltip>
+                          </td>
                          <td className="px-4 py-3 text-muted-foreground">{formattedDate}</td>
                          <td className="px-4 py-3 text-muted-foreground">{row.uf || "—"}</td>
                        </tr>
@@ -774,8 +781,9 @@ export default function LicitacoesPage() {
                             <th className="px-3 py-2 text-left font-medium text-muted-foreground">Descrição</th>
                             <th className="px-3 py-2 text-right font-medium text-muted-foreground">Qtd</th>
                             <th className="px-3 py-2 text-left font-medium text-muted-foreground">Und</th>
-                            <th className="px-3 py-2 text-right font-medium text-muted-foreground">Val. Estimado</th>
-                            <th className="px-3 py-2 text-right font-medium text-muted-foreground">Val. Final</th>
+                             <th className="px-3 py-2 text-right font-medium text-muted-foreground">Val. Unit. Est.</th>
+                             <th className="px-3 py-2 text-right font-medium text-muted-foreground">Val. Final Item</th>
+                             <th className="px-3 py-2 text-left font-medium text-muted-foreground">Vencedor</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -791,7 +799,29 @@ export default function LicitacoesPage() {
                               <td className="px-3 py-2 text-right text-foreground">{item.quantidade?.toLocaleString("pt-BR") ?? "—"}</td>
                               <td className="px-3 py-2 text-muted-foreground">{item.unidade || "—"}</td>
                               <td className="px-3 py-2 text-right text-foreground">{formatCurrency(item.valor_unitario_estimado)}</td>
-                              <td className="px-3 py-2 text-right font-medium text-foreground">{formatCurrency(item.valor_unitario_final)}</td>
+                              <td className="px-3 py-2 text-right font-medium text-success">
+                                {(() => {
+                                  const venc = item.licitacao_vencedores;
+                                  const winner = Array.isArray(venc) ? venc[0] : venc;
+                                  return winner?.valor_final ? formatCurrency(winner.valor_final) : (item.valor_unitario_final ? formatCurrency(item.valor_unitario_final) : "—");
+                                })()}
+                              </td>
+                              <td className="px-3 py-2 text-foreground text-xs max-w-[150px]">
+                                {(() => {
+                                  const venc = item.licitacao_vencedores;
+                                  const winner = Array.isArray(venc) ? venc[0] : venc;
+                                  return winner?.razao_social ? (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild><span className="block truncate">{winner.razao_social}</span></TooltipTrigger>
+                                      <TooltipContent side="bottom" className="max-w-sm space-y-1">
+                                        <p className="font-medium">{winner.razao_social}</p>
+                                        {winner.cnpj && <p className="text-xs font-mono">CNPJ: {winner.cnpj}</p>}
+                                        {winner.percentual_desconto != null && <p className="text-xs">Desconto: {winner.percentual_desconto.toFixed(2)}%</p>}
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  ) : "—";
+                                })()}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
