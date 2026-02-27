@@ -379,6 +379,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_distinct_situacoes: {
+        Args: never
+        Returns: {
+          count: number
+          situacao: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -408,6 +415,36 @@ export type Database = {
           valor_estimado: number
         }[]
       }
+      search_licitacoes: {
+        Args: {
+          p_date_from?: string
+          p_date_to?: string
+          p_limit?: number
+          p_modalidade?: string
+          p_offset?: number
+          p_orgao?: string
+          p_search?: string
+          p_situacao?: string
+          p_uf?: string
+          p_vencedor?: string
+        }
+        Returns: {
+          data_publicacao: string
+          id: string
+          modalidade: string
+          municipio: string
+          numero_controle_pncp: string
+          objeto: string
+          orgao: string
+          situacao: string
+          total_count: number
+          uf: string
+          valor_estimado: number
+          vencedor_nome: string
+        }[]
+      }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
       app_role: "admin_central" | "admin_empresa" | "usuario_empresa"
