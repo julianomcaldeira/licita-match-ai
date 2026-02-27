@@ -98,11 +98,13 @@ async function fetchAllPages(
   supabase: any,
   modalidade: number,
   dataInicial: string,
-  dataFinal: string
-): Promise<{ total: number; errors: string[] }> {
+  dataFinal: string,
+  fetchWinners = false
+): Promise<{ total: number; winners: number; errors: string[] }> {
   let pagina = 1;
   let hasMore = true;
   let total = 0;
+  let winnersFound = 0;
   const errors: string[] = [];
 
   while (hasMore) {
@@ -123,9 +125,28 @@ async function fetchAllPages(
       const rows = contratacoes.map(mapContratacao);
       for (let i = 0; i < rows.length; i += 50) {
         const batch = rows.slice(i, i + 50);
-        const { error } = await supabase.from("licitacoes").upsert(batch, { onConflict: "id_origem,fonte" });
-        if (error) errors.push(`Mod ${modalidade} pag ${pagina}: ${error.message}`);
-        else total += batch.length;
+        const { data: upserted, error } = await supabase
+          .from("licitacoes")
+          .upsert(batch, { onConflict: "id_origem,fonte" })
+          .select("id, numero_controle_pncp, raw_json");
+        if (error) {
+          errors.push(`Mod ${modalidade} pag ${pagina}: ${error.message}`);
+        } else {
+          total += batch.length;
+          // Fetch winners inline for each upserted record
+          if (fetchWinners && upserted) {
+            const PARALLEL = 5;
+            for (let j = 0; j < upserted.length; j += PARALLEL) {
+              const winBatch = upserted.slice(j, j + PARALLEL);
+              const results = await Promise.allSettled(
+                winBatch.map((lic: any) => processWinner(supabase, lic))
+              );
+              for (const r of results) {
+                if (r.status === "fulfilled") winnersFound += r.value;
+              }
+            }
+          }
+        }
       }
 
       hasMore = contratacoes.length >= PAGE_SIZE;
@@ -136,7 +157,7 @@ async function fetchAllPages(
     }
   }
 
-  return { total, errors };
+  return { total, winners: winnersFound, errors };
 }
 
 /**
@@ -189,8 +210,9 @@ async function handleCron(supabase: any) {
     }
 
     console.log(`Mod ${mod}: fetching ${startDate} → ${yesterdayStr}`);
-    const result = await fetchAllPages(supabase, mod, startDate, yesterdayStr);
+    const result = await fetchAllPages(supabase, mod, startDate, yesterdayStr, true);
     totalIngested += result.total;
+    totalWinners += result.winners;
     errors.push(...result.errors);
 
     // Update sync_status
@@ -201,19 +223,6 @@ async function handleCron(supabase: any) {
       total_synced: (existing?.total_synced || 0) + result.total,
       updated_at: new Date().toISOString(),
     }, { onConflict: "api_source,modalidade" });
-  }
-
-  // Phase 2: Fetch winners for up to 20 licitações
-  try {
-    const { data: licitacoes } = await supabase.rpc("licitacoes_sem_itens", { lim: 20 });
-    if (licitacoes && licitacoes.length > 0) {
-      for (const lic of licitacoes) {
-        const w = await processWinner(supabase, lic);
-        totalWinners += w;
-      }
-    }
-  } catch (e) {
-    errors.push(`Winners: ${e instanceof Error ? e.message : "unknown"}`);
   }
 
   // Log the result
@@ -394,7 +403,7 @@ async function handleIngest(supabase: any, body: any) {
       if (monthEnd > dataFinal) monthEnd = dataFinal;
 
       console.log(`Mod ${modalidade}: fetching ${monthStart} → ${monthEnd}`);
-      const result = await fetchAllPages(supabase, modalidade, monthStart, monthEnd);
+      const result = await fetchAllPages(supabase, modalidade, monthStart, monthEnd, true);
       totalProcessed += result.total;
       allErrors.push(...result.errors);
       lastProcessedDate = monthEnd;
