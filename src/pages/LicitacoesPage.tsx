@@ -286,7 +286,9 @@ export default function LicitacoesPage() {
       }
       const rows = allData.map((row: any) => ({
         "Órgão": row.orgao, "Objeto": row.objeto, "Modalidade": row.modalidade || "",
-        "Valor Estimado": row.valor_estimado || "", "Vencedor": row.vencedor_nome || "—",
+        "Valor Estimado": row.valor_estimado || "", "Val. Homologado": row.valor_homologado || "",
+        "Economia": row.valor_estimado && row.valor_homologado ? row.valor_estimado - row.valor_homologado : "",
+        "Vencedor": row.vencedor_nome || "—",
         "Data Publicação": row.data_publicacao || "", "UF": row.uf || "",
         "Situação": row.situacao || "", "Município": row.municipio || "",
       }));
@@ -554,6 +556,7 @@ export default function LicitacoesPage() {
                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Modalidade</th>
                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Valor Est.</th>
                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Val. Homologado</th>
+                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Economia</th>
                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Vencedor</th>
                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Data</th>
                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">UF</th>
@@ -601,8 +604,15 @@ export default function LicitacoesPage() {
                          </td>
                          <td className="px-4 py-3 text-muted-foreground">{row.modalidade || "—"}</td>
                           <td className="px-4 py-3 font-medium text-foreground">{formatCurrency(row.valor_estimado)}</td>
-                          <td className="px-4 py-3 font-medium text-success">{row.valor_homologado ? formatCurrency(row.valor_homologado) : "—"}</td>
-                          <td className="px-4 py-3 text-foreground max-w-[180px]">
+                           <td className="px-4 py-3 font-medium text-success">{row.valor_homologado ? formatCurrency(row.valor_homologado) : "—"}</td>
+                           <td className="px-4 py-3 font-medium">
+                             {row.valor_estimado && row.valor_homologado ? (
+                               <span className={row.valor_estimado - row.valor_homologado > 0 ? "text-success" : "text-destructive"}>
+                                 {formatCurrency(row.valor_estimado - row.valor_homologado)}
+                               </span>
+                             ) : "—"}
+                           </td>
+                           <td className="px-4 py-3 text-foreground max-w-[180px]">
                             <Tooltip>
                               <TooltipTrigger asChild><span className="block truncate">{row.vencedor_nome || "—"}</span></TooltipTrigger>
                               <TooltipContent side="bottom" className="max-w-sm"><p className="text-xs">{row.vencedor_nome || "Sem vencedor"}</p></TooltipContent>
