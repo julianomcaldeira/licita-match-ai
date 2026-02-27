@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Filter, Calendar, RefreshCw, Loader2, Database, ChevronLeft, ChevronRight, X, Trophy, ExternalLink, ChevronDown, FileSpreadsheet, Building2, User, Eye, Package, Award, FileText, MapPin, Hash, DollarSign, Clock } from "lucide-react";
+import { Search, Filter, Calendar, RefreshCw, Loader2, Database, ChevronLeft, ChevronRight, X, Trophy, ExternalLink, ChevronDown, FileSpreadsheet, Building2, User, Eye, Package, Award, FileText, MapPin, Hash, DollarSign, Clock, Brain, Sparkles } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -96,7 +96,7 @@ export default function LicitacoesPage() {
   const [filterSituacao, setFilterSituacao] = useState<string>("");
   const [filterOrgao, setFilterOrgao] = useState<string>("");
   const [filterVencedor, setFilterVencedor] = useState<string>("");
-  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date(new Date().getFullYear(), 0, 1));
   const [dateTo, setDateTo] = useState<Date | undefined>();
   const [showFilters, setShowFilters] = useState(false);
   const [comVencedor, setComVencedor] = useState(true); // DEFAULT: only with winners
@@ -107,6 +107,8 @@ export default function LicitacoesPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailItems, setDetailItems] = useState<any[]>([]);
   const [detailWinners, setDetailWinners] = useState<any[]>([]);
+  const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
 
   const openDetail = async (row: any) => {
     setSelectedLicitacao(row);
@@ -114,6 +116,8 @@ export default function LicitacoesPage() {
     setDetailLoading(true);
     setDetailItems([]);
     setDetailWinners([]);
+    setAiAnalysis(null);
+    setAiLoading(false);
     try {
       const [itemsRes, fullRes] = await Promise.all([
         supabase.from("licitacao_itens").select("*, licitacao_vencedores(*)").eq("licitacao_id", row.id).order("numero_item"),
@@ -121,9 +125,12 @@ export default function LicitacoesPage() {
       ]);
       if (itemsRes.data) {
         setDetailItems(itemsRes.data);
-        const winners = itemsRes.data.flatMap((item: any) =>
-          (item.licitacao_vencedores || []).map((v: any) => ({ ...v, item_descricao: item.descricao, numero_item: item.numero_item }))
-        );
+        const winners = itemsRes.data.flatMap((item: any) => {
+          const venc = item.licitacao_vencedores;
+          if (!venc) return [];
+          const arr = Array.isArray(venc) ? venc : [venc];
+          return arr.map((v: any) => ({ ...v, item_descricao: item.descricao, numero_item: item.numero_item }));
+        });
         setDetailWinners(winners);
       }
       if (fullRes.data) {
@@ -133,6 +140,23 @@ export default function LicitacoesPage() {
       console.error("Error fetching detail:", e);
     } finally {
       setDetailLoading(false);
+    }
+  };
+
+  const runAiAnalysis = async (objeto: string, items: any[]) => {
+    setAiLoading(true);
+    setAiAnalysis(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("analyze-objeto", {
+        body: { objeto, itens: items.map(i => ({ numero_item: i.numero_item, descricao: i.descricao, quantidade: i.quantidade, unidade: i.unidade, valor_unitario_estimado: i.valor_unitario_estimado })) },
+      });
+      if (error) throw error;
+      setAiAnalysis(data.analysis || data.error || "Erro na análise.");
+    } catch (e: any) {
+      console.error("AI analysis error:", e);
+      setAiAnalysis("Não foi possível gerar a análise. Tente novamente.");
+    } finally {
+      setAiLoading(false);
     }
   };
 
@@ -626,7 +650,7 @@ export default function LicitacoesPage() {
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <StatusBadge situacao={selectedLicitacao.situacao} />
+                    <StatusBadge situacao={selectedLicitacao.situacao} hasWinner={detailWinners.length > 0} />
                     {selectedLicitacao.modalidade && <Badge variant="outline" className="text-xs">{selectedLicitacao.modalidade}</Badge>}
                     {selectedLicitacao.numero_controle_pncp && (
                       (() => {
@@ -640,6 +664,31 @@ export default function LicitacoesPage() {
                       })()
                     )}
                   </div>
+                </div>
+
+                {/* AI Analysis */}
+                <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                      <Sparkles className="h-4 w-4 text-primary" /> Análise IA do Objeto
+                    </h3>
+                    <button
+                      onClick={() => runAiAnalysis(selectedLicitacao.objeto, detailItems)}
+                      disabled={aiLoading}
+                      className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 transition disabled:opacity-50"
+                    >
+                      {aiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Brain className="h-3.5 w-3.5" />}
+                      {aiLoading ? "Analisando..." : aiAnalysis ? "Reanalisar" : "Analisar Objeto"}
+                    </button>
+                  </div>
+                  {aiAnalysis && (
+                    <div className="prose prose-sm max-w-none text-foreground [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_p]:text-sm [&_li]:text-sm [&_strong]:text-foreground">
+                      <div dangerouslySetInnerHTML={{ __html: aiAnalysis.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br/>').replace(/^- (.*)/gm, '• $1') }} />
+                    </div>
+                  )}
+                  {!aiAnalysis && !aiLoading && (
+                    <p className="text-xs text-muted-foreground">Clique em "Analisar Objeto" para a IA identificar os itens e serviços desta licitação.</p>
+                  )}
                 </div>
 
                 {/* Key metrics */}
