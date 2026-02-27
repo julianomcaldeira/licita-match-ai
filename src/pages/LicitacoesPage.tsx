@@ -271,7 +271,7 @@ export default function LicitacoesPage() {
     while (hasMore && !abortRef.current) {
       try {
         const { data, error } = await supabase.functions.invoke("ingest-pncp", {
-          body: { mode: "winners", limit: 30 },
+          body: { mode: "winners", limit: 50 },
         });
 
         if (error) {
