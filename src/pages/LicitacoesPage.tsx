@@ -1,6 +1,10 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Filter, Calendar, RefreshCw, Loader2, Database, ChevronLeft, ChevronRight, X, Trophy, ExternalLink, ChevronDown, FileSpreadsheet, Building2, User } from "lucide-react";
+import { Search, Filter, Calendar, RefreshCw, Loader2, Database, ChevronLeft, ChevronRight, X, Trophy, ExternalLink, ChevronDown, FileSpreadsheet, Building2, User, Eye, Package, Award, FileText, MapPin, Hash, DollarSign, Clock } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import * as XLSX from "xlsx";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -92,6 +96,41 @@ export default function LicitacoesPage() {
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
   const [showFilters, setShowFilters] = useState(false);
+
+  // Detail modal state
+  const [selectedLicitacao, setSelectedLicitacao] = useState<any | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailItems, setDetailItems] = useState<any[]>([]);
+  const [detailWinners, setDetailWinners] = useState<any[]>([]);
+
+  const openDetail = async (row: any) => {
+    setSelectedLicitacao(row);
+    setDetailOpen(true);
+    setDetailLoading(true);
+    setDetailItems([]);
+    setDetailWinners([]);
+    try {
+      const [itemsRes, fullRes] = await Promise.all([
+        supabase.from("licitacao_itens").select("*, licitacao_vencedores(*)").eq("licitacao_id", row.id).order("numero_item"),
+        supabase.from("licitacoes").select("*").eq("id", row.id).single(),
+      ]);
+      if (itemsRes.data) {
+        setDetailItems(itemsRes.data);
+        const winners = itemsRes.data.flatMap((item: any) =>
+          (item.licitacao_vencedores || []).map((v: any) => ({ ...v, item_descricao: item.descricao, numero_item: item.numero_item }))
+        );
+        setDetailWinners(winners);
+      }
+      if (fullRes.data) {
+        setSelectedLicitacao((prev: any) => ({ ...prev, ...fullRes.data }));
+      }
+    } catch (e) {
+      console.error("Error fetching detail:", e);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
 
   const debouncedSearch = useDebounce(searchTerm, 400);
   const debouncedOrgao = useDebounce(filterOrgao, 400);
@@ -453,7 +492,8 @@ export default function LicitacoesPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-secondary/50">
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Órgão</th>
+                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Ações</th>
+                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Órgão</th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Objeto</th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Modalidade</th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Valor Est.</th>
@@ -471,7 +511,12 @@ export default function LicitacoesPage() {
                       if (match) pncpLink = `https://pncp.gov.br/app/editais/${match[1]}/${match[3]}/${parseInt(match[2])}`;
                     }
                     return (
-                      <tr key={row.id} className="border-b border-border last:border-0 transition hover:bg-secondary/30">
+                       <tr key={row.id} className="border-b border-border last:border-0 transition hover:bg-secondary/30">
+                         <td className="px-4 py-3">
+                           <button onClick={() => openDetail(row)} className="flex h-8 items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-3 text-xs font-medium text-primary hover:bg-primary/10 transition">
+                             <Eye className="h-3.5 w-3.5" /> Ver
+                           </button>
+                         </td>
                         <td className="px-4 py-3 font-medium text-foreground max-w-[220px]">
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -523,6 +568,170 @@ export default function LicitacoesPage() {
           </div>
         </>
       )}
+
+      {/* Detail Modal */}
+      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] p-0 gap-0">
+          <DialogHeader className="px-6 pt-6 pb-4">
+            <DialogTitle className="font-display text-lg font-bold text-foreground">Detalhes da Licitação</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[calc(90vh-80px)]">
+            {selectedLicitacao && (
+              <div className="px-6 pb-6 space-y-6">
+                {/* Header info */}
+                <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                      <FileText className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="space-y-1 min-w-0">
+                      <p className="text-sm font-semibold text-foreground leading-tight">{selectedLicitacao.orgao}</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">{selectedLicitacao.objeto}</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <StatusBadge situacao={selectedLicitacao.situacao} />
+                    {selectedLicitacao.modalidade && <Badge variant="outline" className="text-xs">{selectedLicitacao.modalidade}</Badge>}
+                    {selectedLicitacao.numero_controle_pncp && (
+                      (() => {
+                        const match = selectedLicitacao.numero_controle_pncp.match(/^(\d+)-\d+-(\d+)\/(\d+)$/);
+                        const link = match ? `https://pncp.gov.br/app/editais/${match[1]}/${match[3]}/${parseInt(match[2])}` : null;
+                        return link ? (
+                          <a href={link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 px-2.5 py-0.5 text-xs font-medium text-primary hover:bg-primary/10 transition">
+                            <ExternalLink className="h-3 w-3" /> Ver no PNCP
+                          </a>
+                        ) : null;
+                      })()
+                    )}
+                  </div>
+                </div>
+
+                {/* Key metrics */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="rounded-lg border border-border bg-card p-3 space-y-1">
+                    <div className="flex items-center gap-1.5 text-muted-foreground"><DollarSign className="h-3.5 w-3.5" /><span className="text-[10px] font-medium uppercase">Valor Estimado</span></div>
+                    <p className="text-sm font-bold text-foreground">{formatCurrency(selectedLicitacao.valor_estimado)}</p>
+                  </div>
+                  <div className="rounded-lg border border-border bg-card p-3 space-y-1">
+                    <div className="flex items-center gap-1.5 text-muted-foreground"><DollarSign className="h-3.5 w-3.5" /><span className="text-[10px] font-medium uppercase">Valor Homologado</span></div>
+                    <p className="text-sm font-bold text-foreground">{formatCurrency(selectedLicitacao.valor_homologado)}</p>
+                  </div>
+                  <div className="rounded-lg border border-border bg-card p-3 space-y-1">
+                    <div className="flex items-center gap-1.5 text-muted-foreground"><MapPin className="h-3.5 w-3.5" /><span className="text-[10px] font-medium uppercase">Local</span></div>
+                    <p className="text-sm font-bold text-foreground">{[selectedLicitacao.municipio, selectedLicitacao.uf].filter(Boolean).join("/") || "—"}</p>
+                  </div>
+                  <div className="rounded-lg border border-border bg-card p-3 space-y-1">
+                    <div className="flex items-center gap-1.5 text-muted-foreground"><Clock className="h-3.5 w-3.5" /><span className="text-[10px] font-medium uppercase">Publicação</span></div>
+                    <p className="text-sm font-bold text-foreground">{selectedLicitacao.data_publicacao ? format(new Date(selectedLicitacao.data_publicacao + "T12:00:00"), "dd/MM/yyyy") : "—"}</p>
+                  </div>
+                </div>
+
+                {/* Additional info */}
+                {(selectedLicitacao.data_resultado || selectedLicitacao.id_origem || selectedLicitacao.fonte) && (
+                  <div className="rounded-lg border border-border bg-card p-4 space-y-2">
+                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Informações Adicionais</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                      {selectedLicitacao.data_resultado && (
+                        <div><span className="text-muted-foreground">Data Resultado:</span> <span className="font-medium text-foreground">{format(new Date(selectedLicitacao.data_resultado + "T12:00:00"), "dd/MM/yyyy")}</span></div>
+                      )}
+                      {selectedLicitacao.fonte && (
+                        <div><span className="text-muted-foreground">Fonte:</span> <span className="font-medium text-foreground">{selectedLicitacao.fonte}</span></div>
+                      )}
+                      {selectedLicitacao.id_origem && (
+                        <div><span className="text-muted-foreground">ID Origem:</span> <span className="font-medium text-foreground font-mono text-xs">{selectedLicitacao.id_origem}</span></div>
+                      )}
+                      {selectedLicitacao.numero_controle_pncp && (
+                        <div><span className="text-muted-foreground">Nº Controle:</span> <span className="font-medium text-foreground font-mono text-xs">{selectedLicitacao.numero_controle_pncp}</span></div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <Separator />
+
+                {/* Items */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Package className="h-4 w-4 text-primary" />
+                    <h3 className="text-sm font-semibold text-foreground">Itens da Licitação</h3>
+                    <Badge variant="secondary" className="text-[10px]">{detailItems.length}</Badge>
+                  </div>
+                  {detailLoading ? (
+                    <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
+                  ) : detailItems.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-4 text-center">Nenhum item encontrado para esta licitação.</p>
+                  ) : (
+                    <div className="rounded-lg border border-border overflow-hidden">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="bg-secondary/50 border-b border-border">
+                            <th className="px-3 py-2 text-left font-medium text-muted-foreground w-12">#</th>
+                            <th className="px-3 py-2 text-left font-medium text-muted-foreground">Descrição</th>
+                            <th className="px-3 py-2 text-right font-medium text-muted-foreground">Qtd</th>
+                            <th className="px-3 py-2 text-left font-medium text-muted-foreground">Und</th>
+                            <th className="px-3 py-2 text-right font-medium text-muted-foreground">Val. Estimado</th>
+                            <th className="px-3 py-2 text-right font-medium text-muted-foreground">Val. Final</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {detailItems.map((item: any) => (
+                            <tr key={item.id} className="border-b border-border last:border-0 hover:bg-secondary/20">
+                              <td className="px-3 py-2 text-muted-foreground font-mono">{item.numero_item ?? "—"}</td>
+                              <td className="px-3 py-2 text-foreground max-w-[280px]">
+                                <Tooltip>
+                                  <TooltipTrigger asChild><span className="block truncate">{item.descricao}</span></TooltipTrigger>
+                                  <TooltipContent side="bottom" className="max-w-sm"><p className="text-xs">{item.descricao}</p></TooltipContent>
+                                </Tooltip>
+                              </td>
+                              <td className="px-3 py-2 text-right text-foreground">{item.quantidade?.toLocaleString("pt-BR") ?? "—"}</td>
+                              <td className="px-3 py-2 text-muted-foreground">{item.unidade || "—"}</td>
+                              <td className="px-3 py-2 text-right text-foreground">{formatCurrency(item.valor_unitario_estimado)}</td>
+                              <td className="px-3 py-2 text-right font-medium text-foreground">{formatCurrency(item.valor_unitario_final)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {/* Winners */}
+                {detailWinners.length > 0 && (
+                  <>
+                    <Separator />
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Award className="h-4 w-4 text-warning" />
+                        <h3 className="text-sm font-semibold text-foreground">Vencedores</h3>
+                        <Badge variant="secondary" className="text-[10px]">{detailWinners.length}</Badge>
+                      </div>
+                      <div className="space-y-2">
+                        {detailWinners.map((w: any, i: number) => (
+                          <div key={i} className="rounded-lg border border-border bg-card p-3 flex items-start gap-3">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-warning/10">
+                              <Trophy className="h-4 w-4 text-warning" />
+                            </div>
+                            <div className="space-y-0.5 min-w-0 flex-1">
+                              <p className="text-sm font-medium text-foreground">{w.razao_social || "Não informado"}</p>
+                              {w.cnpj && <p className="text-xs text-muted-foreground font-mono">CNPJ: {w.cnpj}</p>}
+                              <div className="flex flex-wrap gap-3 mt-1 text-xs text-muted-foreground">
+                                {w.valor_final != null && <span>Valor: <span className="font-medium text-foreground">{formatCurrency(w.valor_final)}</span></span>}
+                                {w.percentual_desconto != null && <span>Desconto: <span className="font-medium text-foreground">{w.percentual_desconto.toFixed(2)}%</span></span>}
+                                {w.numero_item != null && <span>Item #{w.numero_item}</span>}
+                              </div>
+                              {w.item_descricao && <p className="text-xs text-muted-foreground mt-1 truncate">{w.item_descricao}</p>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
