@@ -411,10 +411,22 @@ export default function LicitacoesPage() {
                 {/* Situação */}
                 <div className="space-y-1.5 min-w-[180px]">
                   <label className="text-xs font-medium text-muted-foreground">Situação</label>
-                  <select value={filterSituacao} onChange={(e) => { setFilterSituacao(e.target.value); setPage(0); }} className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                  <select value={filterSituacao} onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === "__COM_RESULTADO__") {
+                      setFilterSituacao("");
+                      setComVencedor(true);
+                    } else {
+                      setFilterSituacao(val);
+                      if (val) setComVencedor(false);
+                    }
+                    setPage(0);
+                  }} className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                     <option value="">Todas</option>
                     {situacoes?.map(s => (
-                      <option key={s.situacao} value={s.situacao}>{s.situacao} ({s.count.toLocaleString("pt-BR")})</option>
+                      <option key={s.situacao} value={s.situacao === "Com Resultado (Homologada)" ? "__COM_RESULTADO__" : s.situacao}>
+                        {s.situacao} ({s.count.toLocaleString("pt-BR")})
+                      </option>
                     ))}
                   </select>
                 </div>
