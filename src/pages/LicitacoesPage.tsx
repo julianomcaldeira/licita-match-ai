@@ -626,26 +626,46 @@ export default function LicitacoesPage() {
                   </div>
                 </div>
 
-                {/* Additional info */}
-                {(selectedLicitacao.data_resultado || selectedLicitacao.id_origem || selectedLicitacao.fonte) && (
-                  <div className="rounded-lg border border-border bg-card p-4 space-y-2">
-                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Informações Adicionais</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                      {selectedLicitacao.data_resultado && (
-                        <div><span className="text-muted-foreground">Data Resultado:</span> <span className="font-medium text-foreground">{format(new Date(selectedLicitacao.data_resultado + "T12:00:00"), "dd/MM/yyyy")}</span></div>
-                      )}
-                      {selectedLicitacao.fonte && (
-                        <div><span className="text-muted-foreground">Fonte:</span> <span className="font-medium text-foreground">{selectedLicitacao.fonte}</span></div>
-                      )}
-                      {selectedLicitacao.id_origem && (
-                        <div><span className="text-muted-foreground">ID Origem:</span> <span className="font-medium text-foreground font-mono text-xs">{selectedLicitacao.id_origem}</span></div>
-                      )}
-                      {selectedLicitacao.numero_controle_pncp && (
-                        <div><span className="text-muted-foreground">Nº Controle:</span> <span className="font-medium text-foreground font-mono text-xs">{selectedLicitacao.numero_controle_pncp}</span></div>
-                      )}
+                {/* Additional info from raw_json + base fields */}
+                {(() => {
+                  const raw = selectedLicitacao.raw_json || {};
+                  const infoItems = [
+                    { label: "Data Resultado", value: selectedLicitacao.data_resultado ? format(new Date(selectedLicitacao.data_resultado + "T12:00:00"), "dd/MM/yyyy") : null },
+                    { label: "Fonte", value: selectedLicitacao.fonte },
+                    { label: "Nº Controle", value: selectedLicitacao.numero_controle_pncp, mono: true },
+                    { label: "Critério de Julgamento", value: raw.criterioJulgamentoNome || raw.tipoCriterioJulgamento },
+                    { label: "Modo de Disputa", value: raw.modoDisputaNome || raw.tipoModoDisputa },
+                    { label: "Amparo Legal", value: raw.amparoLegal?.descricao || raw.amparoLegalNome },
+                    { label: "Instrumento Convocatório", value: raw.tipoInstrumentoConvocatorioNome },
+                    { label: "CNPJ Órgão", value: raw.orgaoEntidade?.cnpj },
+                    { label: "Unidade Compradora", value: raw.unidadeOrgao?.nomeUnidade },
+                    { label: "CNPJ Unidade", value: raw.unidadeOrgao?.cnpj },
+                    { label: "Srp", value: raw.srp != null ? (raw.srp ? "Sim (Registro de Preços)" : "Não") : null },
+                    { label: "Nº Processo", value: raw.processo?.numeroProcesso || raw.numeroProcesso },
+                    { label: "Nº Edital", value: raw.numeroEdital },
+                    { label: "Link do Sistema Origem", value: raw.linkSistemaOrigem, link: true },
+                    { label: "Informação Complementar", value: raw.informacaoComplementar },
+                  ].filter(i => i.value);
+                  return infoItems.length > 0 ? (
+                    <div className="rounded-lg border border-border bg-card p-4 space-y-2">
+                      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Informações Adicionais</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                        {infoItems.map((item, idx) => (
+                          <div key={idx}>
+                            <span className="text-muted-foreground">{item.label}:</span>{" "}
+                            {item.link ? (
+                              <a href={String(item.value)} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline inline-flex items-center gap-1">
+                                Acessar <ExternalLink className="h-3 w-3" />
+                              </a>
+                            ) : (
+                              <span className={cn("font-medium text-foreground", item.mono && "font-mono text-xs")}>{String(item.value)}</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  ) : null;
+                })()}
 
                 <Separator />
 
