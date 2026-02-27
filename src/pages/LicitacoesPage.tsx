@@ -35,12 +35,14 @@ function StatusBadge({ situacao }: { situacao: string | null }) {
   if (!situacao) return <span className="text-muted-foreground text-xs">—</span>;
   const normalized = situacao.toLowerCase();
   const color = normalized.includes("homologad") || normalized.includes("conclu")
-    ? "bg-success/10 text-success"
-    : normalized.includes("andamento") || normalized.includes("abert")
-    ? "bg-warning/10 text-warning"
-    : "bg-info/10 text-info";
+    ? "bg-success/10 text-success border-success/20"
+    : normalized.includes("andamento") || normalized.includes("abert") || normalized.includes("divulgada")
+    ? "bg-info/10 text-info border-info/20"
+    : normalized.includes("revogad") || normalized.includes("anulad") || normalized.includes("suspens")
+    ? "bg-destructive/10 text-destructive border-destructive/20"
+    : "bg-muted text-muted-foreground border-border";
   return (
-    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${color}`}>
+    <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${color}`}>
       {situacao}
     </span>
   );
@@ -491,61 +493,65 @@ export default function LicitacoesPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-border bg-secondary/50">
+                   <tr className="border-b border-border bg-secondary/50">
                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Ações</th>
                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Órgão</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Objeto</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Modalidade</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Valor Est.</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Vencedor</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Situação</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Data</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">UF</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {licitacoes.map((row: any) => {
-                    let pncpLink: string | null = null;
-                    if (row.numero_controle_pncp) {
-                      const match = row.numero_controle_pncp.match(/^(\d+)-\d+-(\d+)\/(\d+)$/);
-                      if (match) pncpLink = `https://pncp.gov.br/app/editais/${match[1]}/${match[3]}/${parseInt(match[2])}`;
-                    }
-                    return (
+                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Objeto</th>
+                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Modalidade</th>
+                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Valor Est.</th>
+                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Vencedor</th>
+                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Data</th>
+                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">UF</th>
+                   </tr>
+                 </thead>
+                 <tbody>
+                   {licitacoes.map((row: any) => {
+                     let pncpLink: string | null = null;
+                     if (row.numero_controle_pncp) {
+                       const match = row.numero_controle_pncp.match(/^(\d+)-\d+-(\d+)\/(\d+)$/);
+                       if (match) pncpLink = `https://pncp.gov.br/app/editais/${match[1]}/${match[3]}/${parseInt(match[2])}`;
+                     }
+                     const formattedDate = row.data_publicacao
+                       ? (() => { const [y, m, d] = row.data_publicacao.split("-"); return `${d}/${m}/${y}`; })()
+                       : "—";
+                     return (
                        <tr key={row.id} className="border-b border-border last:border-0 transition hover:bg-secondary/30">
                          <td className="px-4 py-3">
                            <button onClick={() => openDetail(row)} className="flex h-8 items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-3 text-xs font-medium text-primary hover:bg-primary/10 transition">
                              <Eye className="h-3.5 w-3.5" /> Ver
                            </button>
                          </td>
-                        <td className="px-4 py-3 font-medium text-foreground max-w-[220px]">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="block truncate">
-                                {pncpLink ? (
-                                  <a href={pncpLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary hover:underline">
-                                    {row.orgao} <ExternalLink className="h-3 w-3 shrink-0" />
-                                  </a>
-                                ) : row.orgao}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent side="bottom" className="max-w-sm"><p>{row.orgao}</p></TooltipContent>
-                          </Tooltip>
-                        </td>
-                        <td className="px-4 py-3 max-w-xs">
-                          <Tooltip>
-                            <TooltipTrigger asChild><span className="block truncate text-foreground">{row.objeto}</span></TooltipTrigger>
-                            <TooltipContent side="bottom" className="max-w-md"><p className="text-xs leading-relaxed">{row.objeto}</p></TooltipContent>
-                          </Tooltip>
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">{row.modalidade || "—"}</td>
-                        <td className="px-4 py-3 font-medium text-foreground">{formatCurrency(row.valor_estimado)}</td>
-                        <td className="px-4 py-3 text-foreground max-w-[180px] truncate">{row.vencedor_nome || "—"}</td>
-                        <td className="px-4 py-3"><StatusBadge situacao={row.situacao} /></td>
-                        <td className="px-4 py-3 text-muted-foreground">{row.data_publicacao || "—"}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{row.uf || "—"}</td>
-                      </tr>
-                    );
-                  })}
+                         <td className="px-4 py-3 font-medium text-foreground max-w-[250px]">
+                           <div className="space-y-1">
+                             <Tooltip>
+                               <TooltipTrigger asChild>
+                                 <span className="block truncate">
+                                   {pncpLink ? (
+                                     <a href={pncpLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary hover:underline">
+                                       {row.orgao} <ExternalLink className="h-3 w-3 shrink-0" />
+                                     </a>
+                                   ) : row.orgao}
+                                 </span>
+                               </TooltipTrigger>
+                               <TooltipContent side="bottom" className="max-w-sm"><p>{row.orgao}</p></TooltipContent>
+                             </Tooltip>
+                             <StatusBadge situacao={row.situacao} />
+                           </div>
+                         </td>
+                         <td className="px-4 py-3 max-w-xs">
+                           <Tooltip>
+                             <TooltipTrigger asChild><span className="block truncate text-foreground">{row.objeto}</span></TooltipTrigger>
+                             <TooltipContent side="bottom" className="max-w-md"><p className="text-xs leading-relaxed">{row.objeto}</p></TooltipContent>
+                           </Tooltip>
+                         </td>
+                         <td className="px-4 py-3 text-muted-foreground">{row.modalidade || "—"}</td>
+                         <td className="px-4 py-3 font-medium text-foreground">{formatCurrency(row.valor_estimado)}</td>
+                         <td className="px-4 py-3 text-foreground max-w-[180px] truncate">{row.vencedor_nome || "—"}</td>
+                         <td className="px-4 py-3 text-muted-foreground">{formattedDate}</td>
+                         <td className="px-4 py-3 text-muted-foreground">{row.uf || "—"}</td>
+                       </tr>
+                     );
+                   })}
                 </tbody>
               </table>
             </div>
