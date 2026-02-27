@@ -31,10 +31,11 @@ function formatCurrency(value: number | null) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 }
 
-function StatusBadge({ situacao }: { situacao: string | null }) {
-  if (!situacao) return <span className="text-muted-foreground text-xs">—</span>;
-  const normalized = situacao.toLowerCase();
-  const color = normalized.includes("homologad") || normalized.includes("conclu")
+function StatusBadge({ situacao, hasWinner }: { situacao: string | null; hasWinner?: boolean }) {
+  if (!situacao && !hasWinner) return <span className="text-muted-foreground text-xs">—</span>;
+  const displayStatus = hasWinner ? "Com Resultado (Homologada)" : situacao;
+  const normalized = (displayStatus || "").toLowerCase();
+  const color = hasWinner || normalized.includes("homologad") || normalized.includes("conclu") || normalized.includes("resultado")
     ? "bg-success/10 text-success border-success/20"
     : normalized.includes("andamento") || normalized.includes("abert") || normalized.includes("divulgada")
     ? "bg-info/10 text-info border-info/20"
@@ -43,7 +44,7 @@ function StatusBadge({ situacao }: { situacao: string | null }) {
     : "bg-muted text-muted-foreground border-border";
   return (
     <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${color}`}>
-      {situacao}
+      {displayStatus || "—"}
     </span>
   );
 }
@@ -411,14 +412,14 @@ export default function LicitacoesPage() {
                 {/* Situação */}
                 <div className="space-y-1.5 min-w-[180px]">
                   <label className="text-xs font-medium text-muted-foreground">Situação</label>
-                  <select value={filterSituacao} onChange={(e) => {
+                  <select value={comVencedor && !filterSituacao ? "__COM_RESULTADO__" : filterSituacao} onChange={(e) => {
                     const val = e.target.value;
                     if (val === "__COM_RESULTADO__") {
                       setFilterSituacao("");
                       setComVencedor(true);
                     } else {
                       setFilterSituacao(val);
-                      if (val) setComVencedor(false);
+                      setComVencedor(false);
                     }
                     setPage(0);
                   }} className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
@@ -564,7 +565,7 @@ export default function LicitacoesPage() {
                                </TooltipTrigger>
                                <TooltipContent side="bottom" className="max-w-sm"><p>{row.orgao}</p></TooltipContent>
                              </Tooltip>
-                             <StatusBadge situacao={row.situacao} />
+                             <StatusBadge situacao={row.situacao} hasWinner={!!row.vencedor_nome && row.vencedor_nome !== "—"} />
                            </div>
                          </td>
                          <td className="px-4 py-3 max-w-xs">
