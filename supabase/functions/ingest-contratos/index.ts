@@ -8,57 +8,12 @@ const corsHeaders = {
 };
 
 const API_BASE = "https://api.portaldatransparencia.gov.br/api-de-dados";
-const PAGE_SIZE = 500; // max allowed by the API
-
-interface ContratoAPI {
-  id?: number;
-  dataInicioVigencia?: string;
-  dataFimVigencia?: string;
-  dataAssinatura?: string;
-  dataPublicacao?: string;
-  numero?: string;
-  objeto?: string;
-  situacao?: string;
-  valorInicial?: number;
-  valorFinal?: number;
-  categoria?: string;
-  modalidadeCompra?: string;
-  numeroProcesso?: string;
-  licitacaoAssociada?: string;
-  unidadeGestora?: {
-    codigo?: string;
-    nome?: string;
-    orgaoVinculado?: {
-      cnpj?: string;
-      nome?: string;
-      sigla?: string;
-    };
-    orgaoMaximo?: {
-      codigo?: string;
-      nome?: string;
-    };
-  };
-  fornecedor?: {
-    nome?: string;
-    cnpjFormatado?: string;
-    cnpjCpf?: string;
-    tipo?: string;
-  };
-  [key: string]: unknown;
-}
-
-function fmtDateBR(d: Date): string {
-  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
-}
 
 async function fetchWithRetry(url: string, apiKey: string, retries = 3, delayMs = 2000): Promise<Response> {
   for (let i = 0; i < retries; i++) {
     try {
       const resp = await fetch(url, {
-        headers: {
-          Accept: "application/json",
-          "chave-api-dados": apiKey,
-        },
+        headers: { Accept: "application/json", "chave-api-dados": apiKey },
       });
       if (resp.status === 429) {
         const wait = delayMs * Math.pow(2, i);
@@ -75,41 +30,19 @@ async function fetchWithRetry(url: string, apiKey: string, retries = 3, delayMs 
   throw new Error("Max retries reached");
 }
 
-function mapContrato(c: ContratoAPI) {
-  const cnpjOrgao = c.unidadeGestora?.orgaoVinculado?.cnpj || c.unidadeGestora?.codigo || "desconhecido";
-  const numero = c.numero || `pt-${c.id || Date.now()}`;
-
-  return {
-    cnpj_orgao: cnpjOrgao.replace(/[.\-\/]/g, ""),
-    numero_contrato: numero,
-    orgao_nome: c.unidadeGestora?.orgaoVinculado?.nome || c.unidadeGestora?.orgaoMaximo?.nome || null,
-    orgao_codigo: c.unidadeGestora?.codigo || null,
-    fornecedor_nome: c.fornecedor?.nome || null,
-    fornecedor_cnpj: c.fornecedor?.cnpjCpf?.replace(/[.\-\/]/g, "") || null,
-    objeto: c.objeto || "Sem descrição",
-    valor_inicial: c.valorInicial || null,
-    valor_final: c.valorFinal || null,
-    data_assinatura: c.dataAssinatura || null,
-    data_vigencia_inicio: c.dataInicioVigencia || null,
-    data_vigencia_fim: c.dataFimVigencia || null,
-    data_publicacao: c.dataPublicacao || null,
-    situacao: c.situacao || null,
-    categoria: c.categoria || null,
-    modalidade_compra: c.modalidadeCompra || null,
-    numero_licitacao: c.licitacaoAssociada || c.numeroProcesso || null,
-    raw_json: c as unknown as Record<string, unknown>,
-    fonte: "PORTAL_TRANSPARENCIA",
-  };
+function fmtDateBR(d: Date): string {
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 }
 
 /**
- * Fetch contracts for a date range, paginating through all pages
+ * Fetch licitações from Portal da Transparência for a specific orgao (SIAFI code)
  */
-async function fetchContratos(
+async function fetchLicitacoesByOrgao(
   supabase: any,
   apiKey: string,
-  dataInicial: string, // DD/MM/YYYY
-  dataFinal: string,   // DD/MM/YYYY
+  codigoOrgao: string,
+  dataInicial: string,
+  dataFinal: string,
 ): Promise<{ total: number; errors: string[] }> {
   let pagina = 1;
   let hasMore = true;
@@ -118,47 +51,56 @@ async function fetchContratos(
 
   while (hasMore) {
     try {
-      const url = `${API_BASE}/contratos?dataInicial=${encodeURIComponent(dataInicial)}&dataFinal=${encodeURIComponent(dataFinal)}&pagina=${pagina}`;
+      const url = `${API_BASE}/licitacoes?dataInicial=${encodeURIComponent(dataInicial)}&dataFinal=${encodeURIComponent(dataFinal)}&codigoOrgao=${encodeURIComponent(codigoOrgao)}&pagina=${pagina}`;
       console.log(`Fetching: ${url}`);
-
       const response = await fetchWithRetry(url, apiKey);
 
       if (!response.ok) {
         const errText = await response.text();
-        errors.push(`Page ${pagina}: HTTP ${response.status} - ${errText.slice(0, 200)}`);
+        console.warn(`HTTP ${response.status}: ${errText.slice(0, 200)}`);
+        if (response.status === 404 || response.status === 400) {
+          hasMore = false;
+          continue;
+        }
+        errors.push(`Orgao ${codigoOrgao} p${pagina}: HTTP ${response.status}`);
         hasMore = false;
         continue;
       }
 
-      const contratos: ContratoAPI[] = await response.json();
-
-      if (!Array.isArray(contratos) || contratos.length === 0) {
+      const licitacoes = await response.json();
+      if (!Array.isArray(licitacoes) || licitacoes.length === 0) {
         hasMore = false;
         continue;
       }
 
-      const rows = contratos.map(mapContrato);
+      const rows = licitacoes.map((l: any) => ({
+        id_origem: `pt-lic-${l.id || Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        fonte: "PORTAL_TRANSPARENCIA",
+        orgao: l.unidadeGestora?.orgaoVinculado?.nome || l.unidadeGestora?.orgaoMaximo?.nome || "Não informado",
+        modalidade: l.modalidadeLicitacao?.descricao || null,
+        objeto: l.objeto || "Sem descrição",
+        data_publicacao: l.dataAbertura ? l.dataAbertura.split("T")[0] : null,
+        valor_estimado: l.valorLicitacao || null,
+        situacao: l.situacao || null,
+        uf: null,
+        municipio: null,
+        raw_json: l,
+      }));
 
-      // Upsert in batches of 50
       for (let i = 0; i < rows.length; i += 50) {
         const batch = rows.slice(i, i + 50);
         const { error } = await supabase
-          .from("contratos")
-          .upsert(batch, { onConflict: "cnpj_orgao,numero_contrato" });
-        if (error) {
-          errors.push(`Page ${pagina} batch ${i}: ${error.message}`);
-        } else {
-          total += batch.length;
-        }
+          .from("licitacoes")
+          .upsert(batch, { onConflict: "id_origem,fonte" });
+        if (error) errors.push(`Orgao ${codigoOrgao} p${pagina}: ${error.message}`);
+        else total += batch.length;
       }
 
-      hasMore = contratos.length >= PAGE_SIZE;
+      hasMore = licitacoes.length >= 500;
       pagina++;
-
-      // Small delay to respect rate limits
       await new Promise((r) => setTimeout(r, 200));
     } catch (e) {
-      errors.push(`Page ${pagina}: ${e instanceof Error ? e.message : "unknown"}`);
+      errors.push(`Orgao ${codigoOrgao} p${pagina}: ${e instanceof Error ? e.message : "unknown"}`);
       hasMore = false;
     }
   }
@@ -167,15 +109,70 @@ async function fetchContratos(
 }
 
 /**
- * Try to link contratos to existing licitacoes by matching fornecedor CNPJ + orgao
+ * Fetch contract details by contract number from Portal da Transparência
  */
-async function linkToLicitacoes(supabase: any): Promise<number> {
-  const { data, error } = await supabase.rpc("link_contratos_licitacoes");
-  if (error) {
-    console.warn("Error linking contratos:", error.message);
-    return 0;
+async function fetchContratoByNumero(
+  supabase: any,
+  apiKey: string,
+  numero: string,
+  licitacaoId: string,
+  orgaoNome: string,
+): Promise<{ found: number; errors: string[] }> {
+  const errors: string[] = [];
+  let found = 0;
+
+  try {
+    const url = `${API_BASE}/contratos/${encodeURIComponent(numero)}`;
+    const response = await fetchWithRetry(url, apiKey);
+
+    if (response.status === 404) {
+      await response.text();
+      return { found: 0, errors: [] };
+    }
+
+    if (!response.ok) {
+      const errText = await response.text();
+      errors.push(`Contract ${numero}: HTTP ${response.status} - ${errText.slice(0, 100)}`);
+      return { found, errors };
+    }
+
+    const data = await response.json();
+    const contratos = Array.isArray(data) ? data : [data];
+
+    for (const c of contratos) {
+      const cnpjOrgao = (c.unidadeGestora?.orgaoVinculado?.cnpj || c.unidadeGestora?.codigo || "").replace(/[.\-\/]/g, "");
+      const numContrato = c.numero || `pt-c-${c.id || Date.now()}`;
+
+      const { error } = await supabase.from("contratos").upsert({
+        cnpj_orgao: cnpjOrgao || "desconhecido",
+        numero_contrato: numContrato,
+        orgao_nome: c.unidadeGestora?.orgaoVinculado?.nome || orgaoNome,
+        orgao_codigo: c.unidadeGestora?.codigo || null,
+        fornecedor_nome: c.fornecedor?.nome || null,
+        fornecedor_cnpj: c.fornecedor?.cnpjCpf?.replace(/[.\-\/]/g, "") || null,
+        objeto: c.objeto || "Sem descrição",
+        valor_inicial: c.valorInicial || null,
+        valor_final: c.valorFinal || null,
+        data_assinatura: c.dataAssinatura || null,
+        data_vigencia_inicio: c.dataInicioVigencia || null,
+        data_vigencia_fim: c.dataFimVigencia || null,
+        data_publicacao: c.dataPublicacao || null,
+        situacao: c.situacao || null,
+        categoria: c.categoria || null,
+        modalidade_compra: c.modalidadeCompra || null,
+        licitacao_id: licitacaoId,
+        raw_json: c,
+        fonte: "PORTAL_TRANSPARENCIA",
+      }, { onConflict: "cnpj_orgao,numero_contrato" });
+
+      if (error) errors.push(`Contract upsert: ${error.message}`);
+      else found++;
+    }
+  } catch (e) {
+    errors.push(`Contract ${numero}: ${e instanceof Error ? e.message : "unknown"}`);
   }
-  return data || 0;
+
+  return { found, errors };
 }
 
 serve(async (req) => {
@@ -196,26 +193,31 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   const body = await req.json().catch(() => ({}));
-  const mode = body.mode || "ingest";
+  const mode = body.mode || "licitacoes";
 
   try {
-    if (mode === "cron") {
-      // Daily incremental: yesterday's contracts
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const dataInicial = fmtDateBR(yesterday);
-      const dataFinal = fmtDateBR(yesterday);
+    if (mode === "licitacoes") {
+      // Fetch federal licitações by orgao code (required param)
+      const dataInicial = body.dataInicial;
+      const dataFinal = body.dataFinal;
+      const codigoOrgao = body.codigoOrgao;
 
-      console.log(`Cron: fetching contratos for ${dataInicial}`);
-      const result = await fetchContratos(supabase, apiKey, dataInicial, dataFinal);
+      if (!dataInicial || !dataFinal || !codigoOrgao) {
+        return new Response(
+          JSON.stringify({ success: false, error: "Required: dataInicial (DD/MM/YYYY), dataFinal (DD/MM/YYYY), codigoOrgao (SIAFI code)" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const result = await fetchLicitacoesByOrgao(supabase, apiKey, codigoOrgao, dataInicial, dataFinal);
 
       await supabase.from("ingestao_logs").insert({
         fonte: "PORTAL_TRANSPARENCIA",
-        endpoint: "contratos-cron",
+        endpoint: `licitacoes/orgao=${codigoOrgao}`,
         status: result.errors.length > 0 ? "parcial" : "sucesso",
         registros_processados: result.total,
-        data_inicio: yesterday.toISOString().split("T")[0],
-        data_fim: yesterday.toISOString().split("T")[0],
+        data_inicio: dataInicial,
+        data_fim: dataFinal,
         erro: result.errors.length > 0 ? result.errors.join("; ").slice(0, 1000) : null,
       });
 
@@ -225,33 +227,40 @@ serve(async (req) => {
       );
     }
 
-    // Manual ingest with date range
-    const dataInicial = body.dataInicial; // DD/MM/YYYY
-    const dataFinal = body.dataFinal;     // DD/MM/YYYY
+    if (mode === "contratos") {
+      // Fetch contract by number
+      const numero = body.numero;
+      if (!numero) {
+        return new Response(
+          JSON.stringify({ success: false, error: "Required: numero (contract number)" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
-    if (!dataInicial || !dataFinal) {
+      const result = await fetchContratoByNumero(supabase, apiKey, numero, body.licitacaoId || null, body.orgaoNome || "");
+
       return new Response(
-        JSON.stringify({ success: false, error: "dataInicial and dataFinal required (DD/MM/YYYY)" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ success: true, contractsFound: result.found, errors: result.errors.length }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log(`Manual ingest: ${dataInicial} → ${dataFinal}`);
-    const result = await fetchContratos(supabase, apiKey, dataInicial, dataFinal);
+    if (mode === "test") {
+      // Quick test to verify API key works
+      const url = `${API_BASE}/licitacoes/modalidades`;
+      console.log(`Testing API key with: ${url}`);
+      const response = await fetchWithRetry(url, apiKey);
+      const data = await response.json();
 
-    await supabase.from("ingestao_logs").insert({
-      fonte: "PORTAL_TRANSPARENCIA",
-      endpoint: "contratos-manual",
-      status: result.errors.length > 0 ? "parcial" : "sucesso",
-      registros_processados: result.total,
-      data_inicio: dataInicial,
-      data_fim: dataFinal,
-      erro: result.errors.length > 0 ? result.errors.join("; ").slice(0, 1000) : null,
-    });
+      return new Response(
+        JSON.stringify({ success: response.ok, status: response.status, modalidades: data }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     return new Response(
-      JSON.stringify({ success: true, totalProcessed: result.total, errors: result.errors.length }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ success: false, error: "Invalid mode. Use: licitacoes, contratos, or test" }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
     console.error("Error:", error);
