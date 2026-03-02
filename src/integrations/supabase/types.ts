@@ -534,6 +534,7 @@ export type Database = {
           raw_json: Json
         }[]
       }
+      link_contratos_licitacoes: { Args: never; Returns: number }
       match_licitacoes_por_keywords: {
         Args: { p_empresa_id: string; p_limit?: number }
         Returns: {
