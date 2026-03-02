@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.analyze-objeto]
 verify_jwt = false
+
+[functions.ingest-contratos]
+verify_jwt = false

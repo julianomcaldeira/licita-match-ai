@@ -14,6 +14,92 @@ export type Database = {
   }
   public: {
     Tables: {
+      contratos: {
+        Row: {
+          categoria: string | null
+          cnpj_orgao: string
+          created_at: string
+          data_assinatura: string | null
+          data_publicacao: string | null
+          data_vigencia_fim: string | null
+          data_vigencia_inicio: string | null
+          fonte: string
+          fornecedor_cnpj: string | null
+          fornecedor_nome: string | null
+          id: string
+          licitacao_id: string | null
+          modalidade_compra: string | null
+          numero_contrato: string
+          numero_licitacao: string | null
+          objeto: string | null
+          orgao_codigo: string | null
+          orgao_nome: string | null
+          raw_json: Json | null
+          situacao: string | null
+          updated_at: string
+          valor_final: number | null
+          valor_inicial: number | null
+        }
+        Insert: {
+          categoria?: string | null
+          cnpj_orgao: string
+          created_at?: string
+          data_assinatura?: string | null
+          data_publicacao?: string | null
+          data_vigencia_fim?: string | null
+          data_vigencia_inicio?: string | null
+          fonte?: string
+          fornecedor_cnpj?: string | null
+          fornecedor_nome?: string | null
+          id?: string
+          licitacao_id?: string | null
+          modalidade_compra?: string | null
+          numero_contrato: string
+          numero_licitacao?: string | null
+          objeto?: string | null
+          orgao_codigo?: string | null
+          orgao_nome?: string | null
+          raw_json?: Json | null
+          situacao?: string | null
+          updated_at?: string
+          valor_final?: number | null
+          valor_inicial?: number | null
+        }
+        Update: {
+          categoria?: string | null
+          cnpj_orgao?: string
+          created_at?: string
+          data_assinatura?: string | null
+          data_publicacao?: string | null
+          data_vigencia_fim?: string | null
+          data_vigencia_inicio?: string | null
+          fonte?: string
+          fornecedor_cnpj?: string | null
+          fornecedor_nome?: string | null
+          id?: string
+          licitacao_id?: string | null
+          modalidade_compra?: string | null
+          numero_contrato?: string
+          numero_licitacao?: string | null
+          objeto?: string | null
+          orgao_codigo?: string | null
+          orgao_nome?: string | null
+          raw_json?: Json | null
+          situacao?: string | null
+          updated_at?: string
+          valor_final?: number | null
+          valor_inicial?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contratos_licitacao_id_fkey"
+            columns: ["licitacao_id"]
+            isOneToOne: false
+            referencedRelation: "licitacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       empresas_clientes: {
         Row: {
           cnpj: string | null
