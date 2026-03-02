@@ -199,6 +199,8 @@ export default function LicitacoesPage() {
       if (error) throw error;
       return data as any[];
     },
+    placeholderData: (prev) => prev,
+    staleTime: 30_000,
   });
 
   const licitacoes = queryResult || [];
@@ -304,7 +306,8 @@ export default function LicitacoesPage() {
   const clearFilters = () => {
     setFilterModalidade(""); setFilterUf(""); setFilterSituacao("");
     setFilterOrgao(""); setFilterVencedor("");
-    setDateFrom(undefined); setDateTo(undefined); setPage(0);
+    setDateFrom(new Date(new Date().getFullYear(), 0, 1)); setDateTo(undefined);
+    setComVencedor(true); setPage(0);
   };
 
   return (
