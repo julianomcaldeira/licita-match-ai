@@ -164,7 +164,9 @@ export default function LicitacoesPage() {
   const debouncedOrgao = useDebounce(filterOrgao, 400);
   const debouncedVencedor = useDebounce(filterVencedor, 400);
 
-  const activeFilterCount = [filterModalidade, filterUf, filterSituacao, debouncedOrgao, debouncedVencedor, dateFrom, dateTo].filter(Boolean).length;
+  const defaultDateFrom = new Date(new Date().getFullYear(), 0, 1);
+  const hasNonDefaultDateFrom = dateFrom && dateFrom.getTime() !== defaultDateFrom.getTime();
+  const activeFilterCount = [filterModalidade, filterUf, filterSituacao, debouncedOrgao, debouncedVencedor, hasNonDefaultDateFrom ? dateFrom : null, dateTo, !comVencedor ? "no-vencedor" : null].filter(Boolean).length;
 
   // Fetch distinct situacoes for dropdown
   const { data: situacoes } = useQuery({
@@ -304,7 +306,7 @@ export default function LicitacoesPage() {
   }, [debouncedSearch, filterModalidade, filterUf, filterSituacao, debouncedOrgao, debouncedVencedor, dateFrom, dateTo]);
 
   const clearFilters = () => {
-    setFilterModalidade(""); setFilterUf(""); setFilterSituacao("");
+    setSearchTerm(""); setFilterModalidade(""); setFilterUf(""); setFilterSituacao("");
     setFilterOrgao(""); setFilterVencedor("");
     setDateFrom(new Date(new Date().getFullYear(), 0, 1)); setDateTo(undefined);
     setComVencedor(true); setPage(0);
