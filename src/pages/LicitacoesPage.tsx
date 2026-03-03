@@ -17,6 +17,10 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const UFS = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
+const SITUACOES = ["Homologada","Concluída","Divulgada","Em andamento","Aberta","Suspensa","Revogada","Anulada","Fracassada","Deserta"];
 
 const PAGE_SIZE = 20;
 
@@ -89,10 +93,12 @@ export default function LicitacoesPage() {
   const [filterSearch, setFilterSearch] = useState("");
   const [filterDateFrom, setFilterDateFrom] = useState<Date | undefined>();
   const [filterDateTo, setFilterDateTo] = useState<Date | undefined>();
+  const [filterUf, setFilterUf] = useState("");
+  const [filterSituacao, setFilterSituacao] = useState("");
 
   // Applied filters (only update on search click)
   const [appliedFilters, setAppliedFilters] = useState<{
-    vencedor: string; orgao: string; search: string; dateFrom?: string; dateTo?: string;
+    vencedor: string; orgao: string; search: string; dateFrom?: string; dateTo?: string; uf?: string; situacao?: string;
   }>({ vencedor: "", orgao: "", search: "" });
 
   const handleSearch = () => {
@@ -103,6 +109,8 @@ export default function LicitacoesPage() {
       search: filterSearch.trim(),
       dateFrom: filterDateFrom ? format(filterDateFrom, "yyyy-MM-dd") : undefined,
       dateTo: filterDateTo ? format(filterDateTo, "yyyy-MM-dd") : undefined,
+      uf: filterUf || undefined,
+      situacao: filterSituacao || undefined,
     });
   };
 
@@ -112,11 +120,13 @@ export default function LicitacoesPage() {
     setFilterSearch("");
     setFilterDateFrom(undefined);
     setFilterDateTo(undefined);
+    setFilterUf("");
+    setFilterSituacao("");
     setPage(0);
     setAppliedFilters({ vencedor: "", orgao: "", search: "" });
   };
 
-  const hasActiveFilters = appliedFilters.vencedor || appliedFilters.orgao || appliedFilters.search || appliedFilters.dateFrom || appliedFilters.dateTo;
+  const hasActiveFilters = appliedFilters.vencedor || appliedFilters.orgao || appliedFilters.search || appliedFilters.dateFrom || appliedFilters.dateTo || appliedFilters.uf || appliedFilters.situacao;
 
   // Detail modal state
   const [selectedLicitacao, setSelectedLicitacao] = useState<any | null>(null);
@@ -190,6 +200,8 @@ export default function LicitacoesPage() {
       if (appliedFilters.search) params.p_search = appliedFilters.search;
       if (appliedFilters.dateFrom) params.p_date_from = appliedFilters.dateFrom;
       if (appliedFilters.dateTo) params.p_date_to = appliedFilters.dateTo;
+      if (appliedFilters.uf) params.p_uf = appliedFilters.uf;
+      if (appliedFilters.situacao) params.p_situacao = appliedFilters.situacao;
       const { data, error } = await (supabase as any).rpc("search_licitacoes", params);
       if (error) throw error;
       return data as any[];
@@ -333,7 +345,7 @@ export default function LicitacoesPage() {
 
       {/* Filters */}
       <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Palavra-chave do Objeto</label>
             <Input
@@ -391,6 +403,26 @@ export default function LicitacoesPage() {
                 <Calendar mode="single" selected={filterDateTo} onSelect={setFilterDateTo} locale={ptBR} initialFocus className="p-3 pointer-events-auto" />
               </PopoverContent>
             </Popover>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Estado (UF)</label>
+            <Select value={filterUf} onValueChange={(v) => setFilterUf(v === "__all__" ? "" : v)}>
+              <SelectTrigger className="h-9"><SelectValue placeholder="Todos" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Todos</SelectItem>
+                {UFS.map(uf => <SelectItem key={uf} value={uf}>{uf}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Status</label>
+            <Select value={filterSituacao} onValueChange={(v) => setFilterSituacao(v === "__all__" ? "" : v)}>
+              <SelectTrigger className="h-9"><SelectValue placeholder="Todos" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Todos</SelectItem>
+                {SITUACOES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
           <div className="flex items-end gap-2">
             <Button onClick={handleSearch} className="h-9 flex-1 gap-2">
