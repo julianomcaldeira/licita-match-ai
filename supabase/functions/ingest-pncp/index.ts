@@ -9,7 +9,7 @@ const corsHeaders = {
 
 const PNCP_CONSULTA_URL = "https://pncp.gov.br/api/consulta/v1";
 const PNCP_DATA_URL = "https://pncp.gov.br/api/pncp/v1";
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 500; // Increased from 50 for faster ingestion
 const MODALIDADES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
 
 interface PNCPContratacao {
@@ -99,7 +99,8 @@ async function fetchAllPages(
   modalidade: number,
   dataInicial: string,
   dataFinal: string,
-  fetchWinners = false
+  fetchWinners = false,
+  cnpj?: string
 ): Promise<{ total: number; winners: number; errors: string[] }> {
   let pagina = 1;
   let hasMore = true;
@@ -109,7 +110,9 @@ async function fetchAllPages(
 
   while (hasMore) {
     try {
-      const url = `${PNCP_CONSULTA_URL}/contratacoes/publicacao?dataInicial=${dataInicial}&dataFinal=${dataFinal}&codigoModalidadeContratacao=${modalidade}&pagina=${pagina}&tamanhoPagina=${PAGE_SIZE}`;
+      let url = `${PNCP_CONSULTA_URL}/contratacoes/publicacao?dataInicial=${dataInicial}&dataFinal=${dataFinal}&codigoModalidadeContratacao=${modalidade}&pagina=${pagina}&tamanhoPagina=${PAGE_SIZE}`;
+      if (cnpj) url += `&cnpj=${cnpj}`;
+      
       const response = await fetchWithRetry(url);
       if (!response.ok) {
         await response.text();
@@ -123,8 +126,8 @@ async function fetchAllPages(
       if (contratacoes.length === 0) { hasMore = false; continue; }
 
       const rows = contratacoes.map(mapContratacao);
-      for (let i = 0; i < rows.length; i += 50) {
-        const batch = rows.slice(i, i + 50);
+      for (let i = 0; i < rows.length; i += 200) {
+        const batch = rows.slice(i, i + 200);
         if (fetchWinners) {
           const { data: upserted, error } = await supabase
             .from("licitacoes")
@@ -135,7 +138,7 @@ async function fetchAllPages(
           } else {
             total += batch.length;
             if (upserted) {
-              const PARALLEL = 5;
+              const PARALLEL = 10;
               for (let j = 0; j < upserted.length; j += PARALLEL) {
                 const winBatch = upserted.slice(j, j + PARALLEL);
                 const results = await Promise.allSettled(
@@ -166,10 +169,94 @@ async function fetchAllPages(
 }
 
 /**
+ * MODE "orgao": Search and ingest all licitações from a specific organ by CNPJ or name
+ * This queries the PNCP API with the cnpj filter to fetch ALL records for that organ
+ */
+async function handleOrgao(supabase: any, body: any) {
+  const { cnpj, nome, dataInicial = "20230101" } = body;
+  
+  if (!cnpj && !nome) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Informe o CNPJ ou nome do órgão" }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  // If only name provided, try to find CNPJ via PNCP search
+  let orgaoCnpj = cnpj;
+  let orgaoNome = nome || "";
+  
+  if (!orgaoCnpj && nome) {
+    // Search PNCP for the organ
+    try {
+      const searchUrl = `${PNCP_CONSULTA_URL}/contratacoes/publicacao?dataInicial=20260101&dataFinal=${fmtDate(new Date())}&pagina=1&tamanhoPagina=5&codigoModalidadeContratacao=5`;
+      // We can't search by name directly, we need to try different approaches
+      // Let's try the orgaos endpoint
+      const orgaoResp = await fetchWithRetry(`${PNCP_DATA_URL}/orgaos?razaoSocial=${encodeURIComponent(nome)}&pagina=1&tamanhoPagina=10`);
+      if (orgaoResp.ok) {
+        const orgaos = await orgaoResp.json();
+        const orgaoList = Array.isArray(orgaos) ? orgaos : orgaos?.data || [];
+        if (orgaoList.length > 0) {
+          orgaoCnpj = orgaoList[0].cnpj;
+          orgaoNome = orgaoList[0].razaoSocial || nome;
+          console.log(`Found organ: ${orgaoNome} (CNPJ: ${orgaoCnpj})`);
+        }
+      }
+    } catch (e) {
+      console.warn("Error searching for organ:", e);
+    }
+  }
+
+  if (!orgaoCnpj) {
+    return new Response(
+      JSON.stringify({ success: false, error: `Órgão "${nome}" não encontrado na API do PNCP. Tente informar o CNPJ diretamente.` }),
+      { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  const today = fmtDate(new Date());
+  let totalIngested = 0;
+  let totalWinners = 0;
+  const allErrors: string[] = [];
+
+  console.log(`Fetching all licitações for CNPJ ${orgaoCnpj} (${orgaoNome}) from ${dataInicial} to ${today}`);
+
+  // Process all modalidades for this CNPJ
+  for (const mod of MODALIDADES) {
+    console.log(`  Mod ${mod}: fetching...`);
+    const result = await fetchAllPages(supabase, mod, dataInicial, today, true, orgaoCnpj);
+    totalIngested += result.total;
+    totalWinners += result.winners;
+    allErrors.push(...result.errors);
+    console.log(`  Mod ${mod}: ${result.total} records, ${result.winners} winners`);
+  }
+
+  // Log
+  await supabase.from("ingestao_logs").insert({
+    fonte: "PNCP",
+    endpoint: `orgao/${orgaoCnpj}`,
+    status: allErrors.length > 0 ? "parcial" : "sucesso",
+    registros_processados: totalIngested,
+    data_inicio: fmtDateISO(dataInicial),
+    data_fim: fmtDateISO(today),
+    erro: allErrors.length > 0 ? allErrors.join("; ").slice(0, 1000) : null,
+  });
+
+  return new Response(
+    JSON.stringify({ 
+      success: true, 
+      orgao: orgaoNome, 
+      cnpj: orgaoCnpj,
+      totalIngested, 
+      totalWinners, 
+      errors: allErrors.length 
+    }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
+/**
  * MODE "cron": Incremental daily ingestion
- * - Checks sync_status for each modalidade to find last processed date
- * - Only fetches from last_date + 1 day to yesterday
- * - Updates sync_status after each modalidade
  */
 async function handleCron(supabase: any) {
   const yesterday = new Date();
@@ -180,7 +267,6 @@ async function handleCron(supabase: any) {
   let totalWinners = 0;
   const errors: string[] = [];
 
-  // Get current sync status for all modalidades
   const { data: syncRows } = await supabase
     .from("sync_status")
     .select("*")
@@ -196,7 +282,6 @@ async function handleCron(supabase: any) {
     let startDate: string;
 
     if (existing) {
-      // Calculate next day after last processed
       const lastDate = existing.last_date_processed;
       const y = parseInt(lastDate.substring(0, 4));
       const m = parseInt(lastDate.substring(4, 6)) - 1;
@@ -204,11 +289,9 @@ async function handleCron(supabase: any) {
       const nextDay = new Date(y, m, d + 1);
       startDate = fmtDate(nextDay);
     } else {
-      // First run: start from yesterday only (not the full history)
       startDate = yesterdayStr;
     }
 
-    // Skip if already up to date
     if (startDate > yesterdayStr) {
       console.log(`Mod ${mod}: already up to date (last: ${existing?.last_date_processed})`);
       continue;
@@ -220,7 +303,6 @@ async function handleCron(supabase: any) {
     totalWinners += result.winners;
     errors.push(...result.errors);
 
-    // Update sync_status
     await supabase.from("sync_status").upsert({
       api_source: "pncp",
       modalidade: mod,
@@ -230,7 +312,6 @@ async function handleCron(supabase: any) {
     }, { onConflict: "api_source,modalidade" });
   }
 
-  // Log the result
   await supabase.from("ingestao_logs").insert({
     fonte: "PNCP",
     endpoint: "cron-diario",
@@ -331,14 +412,12 @@ async function processWinner(supabase: any, lic: any): Promise<number> {
 }
 
 /**
- * MODE "ingest" (manual): Incremental ingestion for a specific modalidade
- * Uses sync_status to track progress. Only fetches new data.
+ * MODE "ingest" (manual): Bulk ingestion with improved throughput
  */
 async function handleIngest(supabase: any, body: any) {
   const modalidade: number = body.modalidade || 6;
   const forceStartDate: string | undefined = body.dataInicial;
 
-  // Get last sync state for this modalidade
   const { data: syncRow } = await supabase
     .from("sync_status")
     .select("*")
@@ -347,16 +426,13 @@ async function handleIngest(supabase: any, body: any) {
     .maybeSingle();
 
   let startDate: string;
-  const today = new Date();
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
   const endDate = fmtDate(yesterday);
 
   if (forceStartDate) {
-    // Manual override
     startDate = forceStartDate;
   } else if (syncRow) {
-    // Resume from last processed date + 1
     const lastDate = syncRow.last_date_processed;
     const y = parseInt(lastDate.substring(0, 4));
     const m = parseInt(lastDate.substring(4, 6)) - 1;
@@ -364,7 +440,6 @@ async function handleIngest(supabase: any, body: any) {
     const nextDay = new Date(y, m, d + 1);
     startDate = fmtDate(nextDay);
   } else {
-    // First run: start from Jan 2023
     startDate = "20230101";
   }
 
@@ -378,7 +453,6 @@ async function handleIngest(supabase: any, body: any) {
     );
   }
 
-  // Process in monthly chunks to avoid timeouts
   const startY = parseInt(startDate.substring(0, 4));
   const startM = parseInt(startDate.substring(4, 6));
   const endY = parseInt(dataFinal.substring(0, 4));
@@ -389,9 +463,9 @@ async function handleIngest(supabase: any, body: any) {
   let lastProcessedDate = startDate;
   let hasMore = false;
 
-  // Process one month at a time, stop after ~2 months to avoid timeout
+  // Process up to 3 months per call for faster throughput
   let monthsProcessed = 0;
-  const MAX_MONTHS_PER_CALL = 1;
+  const MAX_MONTHS_PER_CALL = 3;
 
   for (let y = startY; y <= endY; y++) {
     const mStart = (y === startY) ? startM : 1;
@@ -417,7 +491,6 @@ async function handleIngest(supabase: any, body: any) {
     if (hasMore) break;
   }
 
-  // Update sync_status
   await supabase.from("sync_status").upsert({
     api_source: "pncp",
     modalidade,
@@ -426,7 +499,6 @@ async function handleIngest(supabase: any, body: any) {
     updated_at: new Date().toISOString(),
   }, { onConflict: "api_source,modalidade" });
 
-  // Log to ingestao_logs
   await supabase.from("ingestao_logs").insert({
     fonte: "PNCP",
     endpoint: `/contratacoes/publicacao?mod=${modalidade}`,
@@ -461,8 +533,7 @@ async function handleWinners(supabase: any, body: any) {
   let winnersFound = 0;
   let processed = 0;
 
-  // Process in parallel batches of 5 for speed
-  const PARALLEL = 5;
+  const PARALLEL = 10; // Increased from 5 for faster processing
   for (let i = 0; i < licitacoes.length; i += PARALLEL) {
     const batch = licitacoes.slice(i, i + PARALLEL);
     const results = await Promise.allSettled(
@@ -474,7 +545,6 @@ async function handleWinners(supabase: any, body: any) {
     }
   }
 
-  // Log
   await supabase.from("ingestao_logs").insert({
     fonte: "PNCP",
     endpoint: "busca-vencedores",
@@ -489,6 +559,55 @@ async function handleWinners(supabase: any, body: any) {
       success: true, winnersFound, processed,
       hasMore: licitacoes.length >= batchSize,
     }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
+/**
+ * MODE "bulk-backfill": Aggressive bulk ingestion across ALL modalidades
+ * Processes multiple modalidades in parallel for maximum throughput
+ */
+async function handleBulkBackfill(supabase: any, body: any) {
+  const dataInicial = body.dataInicial || "20230101";
+  const dataFinal = body.dataFinal || fmtDate(new Date());
+  
+  let totalIngested = 0;
+  let totalWinners = 0;
+  const allErrors: string[] = [];
+
+  // Process modalidades in parallel batches of 3
+  const PARALLEL_MODS = 3;
+  for (let i = 0; i < MODALIDADES.length; i += PARALLEL_MODS) {
+    const modBatch = MODALIDADES.slice(i, i + PARALLEL_MODS);
+    const results = await Promise.allSettled(
+      modBatch.map(async (mod) => {
+        console.log(`Bulk: Mod ${mod} ${dataInicial} → ${dataFinal}`);
+        const result = await fetchAllPages(supabase, mod, dataInicial, dataFinal, false);
+        return { mod, ...result };
+      })
+    );
+    for (const r of results) {
+      if (r.status === "fulfilled") {
+        totalIngested += r.value.total;
+        totalWinners += r.value.winners;
+        allErrors.push(...r.value.errors);
+        console.log(`Bulk: Mod ${r.value.mod} done: ${r.value.total} records`);
+      }
+    }
+  }
+
+  await supabase.from("ingestao_logs").insert({
+    fonte: "PNCP",
+    endpoint: "bulk-backfill",
+    status: allErrors.length > 0 ? "parcial" : "sucesso",
+    registros_processados: totalIngested,
+    data_inicio: fmtDateISO(dataInicial),
+    data_fim: fmtDateISO(dataFinal),
+    erro: allErrors.length > 0 ? allErrors.join("; ").slice(0, 1000) : null,
+  });
+
+  return new Response(
+    JSON.stringify({ success: true, totalIngested, totalWinners, errors: allErrors.length }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 }
@@ -508,6 +627,8 @@ serve(async (req) => {
   try {
     if (mode === "winners") return await handleWinners(supabase, body);
     if (mode === "cron") return await handleCron(supabase);
+    if (mode === "orgao") return await handleOrgao(supabase, body);
+    if (mode === "bulk-backfill") return await handleBulkBackfill(supabase, body);
     return await handleIngest(supabase, body);
   } catch (error) {
     console.error("Error:", error);
