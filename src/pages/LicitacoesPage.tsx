@@ -20,7 +20,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const UFS = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
-const SITUACOES = ["Homologada","Concluída","Divulgada","Em andamento","Aberta","Suspensa","Revogada","Anulada","Fracassada","Deserta"];
+const SITUACOES = ["Divulgada no PNCP", "Revogada", "Anulada", "Suspensa"];
 
 const PAGE_SIZE = 20;
 
@@ -95,10 +95,11 @@ export default function LicitacoesPage() {
   const [filterDateTo, setFilterDateTo] = useState<Date | undefined>();
   const [filterUf, setFilterUf] = useState("");
   const [filterSituacao, setFilterSituacao] = useState("");
+  const [filterComVencedor, setFilterComVencedor] = useState(false);
 
   // Applied filters (only update on search click)
   const [appliedFilters, setAppliedFilters] = useState<{
-    vencedor: string; orgao: string; search: string; dateFrom?: string; dateTo?: string; uf?: string; situacao?: string;
+    vencedor: string; orgao: string; search: string; dateFrom?: string; dateTo?: string; uf?: string; situacao?: string; comVencedor?: boolean;
   }>({ vencedor: "", orgao: "", search: "" });
 
   const handleSearch = () => {
@@ -111,6 +112,7 @@ export default function LicitacoesPage() {
       dateTo: filterDateTo ? format(filterDateTo, "yyyy-MM-dd") : undefined,
       uf: filterUf || undefined,
       situacao: filterSituacao || undefined,
+      comVencedor: filterComVencedor || undefined,
     });
   };
 
@@ -122,11 +124,12 @@ export default function LicitacoesPage() {
     setFilterDateTo(undefined);
     setFilterUf("");
     setFilterSituacao("");
+    setFilterComVencedor(false);
     setPage(0);
     setAppliedFilters({ vencedor: "", orgao: "", search: "" });
   };
 
-  const hasActiveFilters = appliedFilters.vencedor || appliedFilters.orgao || appliedFilters.search || appliedFilters.dateFrom || appliedFilters.dateTo || appliedFilters.uf || appliedFilters.situacao;
+  const hasActiveFilters = appliedFilters.vencedor || appliedFilters.orgao || appliedFilters.search || appliedFilters.dateFrom || appliedFilters.dateTo || appliedFilters.uf || appliedFilters.situacao || appliedFilters.comVencedor;
 
   // Detail modal state
   const [selectedLicitacao, setSelectedLicitacao] = useState<any | null>(null);
@@ -193,8 +196,8 @@ export default function LicitacoesPage() {
       const params: any = {
         p_limit: PAGE_SIZE,
         p_offset: page * PAGE_SIZE,
-        p_com_vencedor: true,
       };
+      if (appliedFilters.comVencedor) params.p_com_vencedor = true;
       if (appliedFilters.vencedor) params.p_vencedor = appliedFilters.vencedor;
       if (appliedFilters.orgao) params.p_orgao = appliedFilters.orgao;
       if (appliedFilters.search) params.p_search = appliedFilters.search;
@@ -276,7 +279,7 @@ export default function LicitacoesPage() {
       const batchSize = 1000;
       let hasMore = true;
       while (hasMore && allData.length < 10000) {
-        const params: any = { p_limit: batchSize, p_offset: offset, p_com_vencedor: true };
+        const params: any = { p_limit: batchSize, p_offset: offset };
         const { data, error } = await (supabase as any).rpc("search_licitacoes", params);
         if (error) throw error;
         if (data && data.length > 0) { allData = [...allData, ...data]; offset += batchSize; hasMore = data.length === batchSize; }
@@ -423,6 +426,12 @@ export default function LicitacoesPage() {
                 {SITUACOES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
+          </div>
+          <div className="flex items-end gap-2">
+            <label className="flex items-center gap-2 h-9 cursor-pointer select-none">
+              <input type="checkbox" checked={filterComVencedor} onChange={(e) => setFilterComVencedor(e.target.checked)} className="rounded border-input" />
+              <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Só com vencedor</span>
+            </label>
           </div>
           <div className="flex items-end gap-2">
             <Button onClick={handleSearch} className="h-9 flex-1 gap-2">
