@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
-import { RefreshCw, Loader2, Database, ChevronLeft, ChevronRight, X, Trophy, ExternalLink, ChevronDown, FileSpreadsheet, Eye, Package, Award, FileText, MapPin, DollarSign, Clock, Brain, Sparkles } from "lucide-react";
+import { RefreshCw, Loader2, Database, ChevronLeft, ChevronRight, X, Trophy, ExternalLink, ChevronDown, FileSpreadsheet, Eye, Package, Award, FileText, MapPin, DollarSign, Clock, Brain, Sparkles, Search, CalendarIcon } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -10,9 +10,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 
 const PAGE_SIZE = 20;
 
@@ -79,6 +83,41 @@ export default function LicitacoesPage() {
   const abortRef = useRef(false);
   const queryClient = useQueryClient();
 
+  // Filter state
+  const [filterVencedor, setFilterVencedor] = useState("");
+  const [filterOrgao, setFilterOrgao] = useState("");
+  const [filterSearch, setFilterSearch] = useState("");
+  const [filterDateFrom, setFilterDateFrom] = useState<Date | undefined>();
+  const [filterDateTo, setFilterDateTo] = useState<Date | undefined>();
+
+  // Applied filters (only update on search click)
+  const [appliedFilters, setAppliedFilters] = useState<{
+    vencedor: string; orgao: string; search: string; dateFrom?: string; dateTo?: string;
+  }>({ vencedor: "", orgao: "", search: "" });
+
+  const handleSearch = () => {
+    setPage(0);
+    setAppliedFilters({
+      vencedor: filterVencedor.trim(),
+      orgao: filterOrgao.trim(),
+      search: filterSearch.trim(),
+      dateFrom: filterDateFrom ? format(filterDateFrom, "yyyy-MM-dd") : undefined,
+      dateTo: filterDateTo ? format(filterDateTo, "yyyy-MM-dd") : undefined,
+    });
+  };
+
+  const handleClearFilters = () => {
+    setFilterVencedor("");
+    setFilterOrgao("");
+    setFilterSearch("");
+    setFilterDateFrom(undefined);
+    setFilterDateTo(undefined);
+    setPage(0);
+    setAppliedFilters({ vencedor: "", orgao: "", search: "" });
+  };
+
+  const hasActiveFilters = appliedFilters.vencedor || appliedFilters.orgao || appliedFilters.search || appliedFilters.dateFrom || appliedFilters.dateTo;
+
   // Detail modal state
   const [selectedLicitacao, setSelectedLicitacao] = useState<any | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -138,15 +177,19 @@ export default function LicitacoesPage() {
     }
   };
 
-  // No filters - just fetch all, ordered by largest value (RPC default)
   const { data: queryResult, isLoading } = useQuery({
-    queryKey: ["licitacoes-all", page],
+    queryKey: ["licitacoes-all", page, appliedFilters],
     queryFn: async () => {
       const params: any = {
         p_limit: PAGE_SIZE,
         p_offset: page * PAGE_SIZE,
         p_com_vencedor: true,
       };
+      if (appliedFilters.vencedor) params.p_vencedor = appliedFilters.vencedor;
+      if (appliedFilters.orgao) params.p_orgao = appliedFilters.orgao;
+      if (appliedFilters.search) params.p_search = appliedFilters.search;
+      if (appliedFilters.dateFrom) params.p_date_from = appliedFilters.dateFrom;
+      if (appliedFilters.dateTo) params.p_date_to = appliedFilters.dateTo;
       const { data, error } = await (supabase as any).rpc("search_licitacoes", params);
       if (error) throw error;
       return data as any[];
@@ -285,6 +328,80 @@ export default function LicitacoesPage() {
               </div>
             </PopoverContent>
           </Popover>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Palavra-chave do Objeto</label>
+            <Input
+              placeholder="Ex: computador, limpeza..."
+              value={filterSearch}
+              onChange={(e) => setFilterSearch(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              className="h-9"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Órgão</label>
+            <Input
+              placeholder="Nome do órgão..."
+              value={filterOrgao}
+              onChange={(e) => setFilterOrgao(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              className="h-9"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Vencedor</label>
+            <Input
+              placeholder="Nome ou CNPJ do vencedor..."
+              value={filterVencedor}
+              onChange={(e) => setFilterVencedor(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              className="h-9"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Data Início</label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className={cn("h-9 w-full justify-start text-left font-normal", !filterDateFrom && "text-muted-foreground")}>
+                  <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                  {filterDateFrom ? format(filterDateFrom, "dd/MM/yyyy") : "Selecionar..."}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={filterDateFrom} onSelect={setFilterDateFrom} locale={ptBR} initialFocus className="p-3 pointer-events-auto" />
+              </PopoverContent>
+            </Popover>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Data Fim</label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className={cn("h-9 w-full justify-start text-left font-normal", !filterDateTo && "text-muted-foreground")}>
+                  <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                  {filterDateTo ? format(filterDateTo, "dd/MM/yyyy") : "Selecionar..."}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={filterDateTo} onSelect={setFilterDateTo} locale={ptBR} initialFocus className="p-3 pointer-events-auto" />
+              </PopoverContent>
+            </Popover>
+          </div>
+          <div className="flex items-end gap-2">
+            <Button onClick={handleSearch} className="h-9 flex-1 gap-2">
+              <Search className="h-3.5 w-3.5" /> Pesquisar
+            </Button>
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={handleClearFilters} className="h-9 px-2 text-muted-foreground">
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
