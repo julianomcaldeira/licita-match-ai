@@ -90,14 +90,23 @@ export default function DashboardOverview() {
   const { data: stats } = useQuery({
     queryKey: ["dashboard-stats", empresaId, isAdmin],
     queryFn: async () => {
-      const [licQ, opsQ] = await Promise.all([
+      // Use the same RPC as the licitações page for consistent numbers
+      const currentYear = new Date().getFullYear();
+      const [licAllQ, licFilteredQ, opsQ] = await Promise.all([
         supabase.from("licitacoes").select("*", { count: "exact", head: true }),
+        (supabase as any).rpc("search_licitacoes", {
+          p_limit: 1,
+          p_offset: 0,
+          p_com_vencedor: true,
+          p_date_from: `${currentYear}-01-01`,
+        }),
         (() => {
           let q = supabase.from("oportunidades").select("score_aderencia, nivel_risco, tipo_oportunidade, empresa_id");
           if (!isAdmin && empresaId) q = q.eq("empresa_id", empresaId);
           return q;
         })(),
       ]);
+      const licitacoesComResultado = licFilteredQ.data?.[0]?.total_count ?? 0;
       const ops = opsQ.data || [];
       const totalOps = ops.length;
       const highScore = ops.filter(o => o.score_aderencia >= 80).length;
@@ -111,7 +120,7 @@ export default function DashboardOverview() {
         const { count } = await supabase.from("empresas_clientes").select("*", { count: "exact", head: true });
         empresasCount = count ?? 0;
       }
-      return { licitacoes: licQ.count ?? 0, totalOps, highScore, midScore, lowScore, avgScore, coreBusiness, riskLow, empresas: empresasCount };
+      return { licitacoes: licAllQ.count ?? 0, licitacoesComResultado, totalOps, highScore, midScore, lowScore, avgScore, coreBusiness, riskLow, empresas: empresasCount };
     },
   });
 
@@ -175,7 +184,7 @@ export default function DashboardOverview() {
 
       {/* KPI Cards */}
       <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Licitações na Base" value={stats?.licitacoes?.toLocaleString("pt-BR") ?? "—"} icon={Database} subtitle="Total ingeridas" />
+        <StatCard label="Licitações c/ Resultado" value={stats?.licitacoesComResultado?.toLocaleString("pt-BR") ?? "—"} icon={Database} subtitle={`${stats?.licitacoes?.toLocaleString("pt-BR") ?? "—"} total na base`} />
         <StatCard label="Oportunidades Analisadas" value={stats?.totalOps?.toLocaleString("pt-BR") ?? "—"} icon={Brain} subtitle={`${stats?.coreBusiness ?? 0} core business`} />
         <StatCard label="Score Médio" value={stats?.avgScore ?? "—"} icon={TrendingUp}
           subtitle={stats?.avgScore && stats.avgScore >= 50 ? "Bom desempenho" : "Refine as keywords"}
