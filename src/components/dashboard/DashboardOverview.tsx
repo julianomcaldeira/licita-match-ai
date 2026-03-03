@@ -92,8 +92,7 @@ export default function DashboardOverview() {
     queryFn: async () => {
       // Use the same RPC as the licitações page for consistent numbers
       const currentYear = new Date().getFullYear();
-      const [licAllQ, licFilteredQ, opsQ] = await Promise.all([
-        supabase.from("licitacoes").select("*", { count: "exact", head: true }),
+      const [licFilteredQ, opsQ] = await Promise.all([
         (supabase as any).rpc("search_licitacoes", {
           p_limit: 1,
           p_offset: 0,
@@ -120,7 +119,7 @@ export default function DashboardOverview() {
         const { count } = await supabase.from("empresas_clientes").select("*", { count: "exact", head: true });
         empresasCount = count ?? 0;
       }
-      return { licitacoes: licAllQ.count ?? 0, licitacoesComResultado, totalOps, highScore, midScore, lowScore, avgScore, coreBusiness, riskLow, empresas: empresasCount };
+      return { licitacoes: licitacoesComResultado, licitacoesComResultado, totalOps, highScore, midScore, lowScore, avgScore, coreBusiness, riskLow, empresas: empresasCount };
     },
   });
 

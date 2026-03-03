@@ -5,12 +5,9 @@ import {
   Search,
   Building2,
   Users,
-  Brain,
   BarChart3,
   FileText,
   Settings,
-  Bell,
-  Shield,
   ChevronLeft,
   ChevronRight,
   Zap,
@@ -21,15 +18,11 @@ import { cn } from "@/lib/utils";
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Licitações", href: "/licitacoes", icon: Search },
-  { name: "Oportunidades", href: "/oportunidades", icon: Zap },
   { name: "Empresas", href: "/empresas", icon: Building2 },
   { name: "Usuários", href: "/usuarios", icon: Users },
-  { name: "Motor IA", href: "/motor-ia", icon: Brain },
   { name: "Relatórios", href: "/relatorios", icon: FileText },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
-  { name: "Notificações", href: "/notificacoes", icon: Bell },
   { name: "Monitor Ingestão", href: "/monitor-ingestao", icon: Activity },
-  { name: "Auditoria", href: "/auditoria", icon: Shield },
   { name: "Configurações", href: "/configuracoes", icon: Settings },
 ];
 
