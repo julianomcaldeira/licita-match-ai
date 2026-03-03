@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Search, Filter, Calendar, RefreshCw, Loader2, Database, ChevronLeft, ChevronRight, X, Trophy, ExternalLink, ChevronDown, FileSpreadsheet, Building2, User, Eye, Package, Award, FileText, MapPin, Hash, DollarSign, Clock, Brain, Sparkles } from "lucide-react";
+import { motion } from "framer-motion";
+import { Search, Calendar, RefreshCw, Loader2, Database, ChevronLeft, ChevronRight, X, Trophy, ExternalLink, ChevronDown, FileSpreadsheet, Building2, User, Eye, Package, Award, FileText, MapPin, Hash, DollarSign, Clock, Brain, Sparkles } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -98,8 +98,7 @@ export default function LicitacoesPage() {
   const [filterVencedor, setFilterVencedor] = useState<string>("");
   const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date(new Date().getFullYear(), 0, 1));
   const [dateTo, setDateTo] = useState<Date | undefined>();
-  const [showFilters, setShowFilters] = useState(false);
-  const [comVencedor, setComVencedor] = useState(true); // DEFAULT: only with winners
+  const [comVencedor, setComVencedor] = useState(true);
 
   // Detail modal state
   const [selectedLicitacao, setSelectedLicitacao] = useState<any | null>(null);
@@ -168,7 +167,6 @@ export default function LicitacoesPage() {
   const hasNonDefaultDateFrom = dateFrom && dateFrom.getTime() !== defaultDateFrom.getTime();
   const activeFilterCount = [filterModalidade, filterUf, filterSituacao, debouncedOrgao, debouncedVencedor, hasNonDefaultDateFrom ? dateFrom : null, dateTo, !comVencedor ? "no-vencedor" : null].filter(Boolean).length;
 
-  // Fetch distinct situacoes for dropdown
   const { data: situacoes } = useQuery({
     queryKey: ["situacoes-distintas"],
     queryFn: async () => {
@@ -179,7 +177,6 @@ export default function LicitacoesPage() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Use the optimized RPC for all queries
   const { data: queryResult, isLoading } = useQuery({
     queryKey: ["licitacoes-rpc", debouncedSearch, page, filterModalidade, filterUf, filterSituacao, debouncedOrgao, debouncedVencedor, dateFrom?.toISOString(), dateTo?.toISOString(), comVencedor],
     queryFn: async () => {
@@ -211,7 +208,7 @@ export default function LicitacoesPage() {
   const total = totalCount;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  // --- Ingestion callbacks (unchanged logic) ---
+  // --- Ingestion callbacks ---
   const startBulkIngestion = useCallback(async () => {
     abortRef.current = false;
     const today = new Date();
@@ -303,7 +300,7 @@ export default function LicitacoesPage() {
       toast.success(`${rows.length.toLocaleString("pt-BR")} registros exportados com sucesso!`);
     } catch (err) { console.error("Export error:", err); toast.error("Erro ao exportar dados."); }
     finally { setExporting(false); }
-  }, [debouncedSearch, filterModalidade, filterUf, filterSituacao, debouncedOrgao, debouncedVencedor, dateFrom, dateTo]);
+  }, [debouncedSearch, filterModalidade, filterUf, filterSituacao, debouncedOrgao, debouncedVencedor, dateFrom, dateTo, comVencedor]);
 
   const clearFilters = () => {
     setSearchTerm(""); setFilterModalidade(""); setFilterUf(""); setFilterSituacao("");
@@ -313,224 +310,208 @@ export default function LicitacoesPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      {/* Header compact */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-2xl font-bold text-foreground">Licitações</h1>
           <p className="text-sm text-muted-foreground">
             {total > 0
-              ? `${total.toLocaleString("pt-BR")} ${comVencedor ? "licitações com resultado" : "registros do PNCP"}`
-              : "Dados ingeridos do PNCP e Portal da Transparência"}
+              ? `${total.toLocaleString("pt-BR")} ${comVencedor ? "licitações com resultado" : "registros"} encontrados`
+              : "Busque por órgão, objeto, vencedor ou UF"}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {progress?.isRunning && (
-            <button onClick={cancelIngestion} className="flex h-10 items-center gap-2 rounded-lg border border-destructive px-4 text-sm font-medium text-destructive hover:bg-destructive/10 transition">
-              <X className="h-4 w-4" /> Cancelar
+        {/* Ingestion actions in dropdown */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <button className="flex h-9 items-center gap-2 rounded-lg border border-input bg-card px-3 text-xs font-medium text-muted-foreground hover:bg-secondary transition">
+              <Database className="h-3.5 w-3.5" /> Ingestão <ChevronDown className="h-3 w-3" />
             </button>
-          )}
-          <button onClick={startWinnerFetching} disabled={progress?.isRunning} className="flex h-10 items-center gap-2 rounded-lg border border-input bg-card px-4 text-sm font-medium text-foreground hover:bg-secondary transition disabled:opacity-50">
-            {progress?.isRunning && progress.phase === "winners" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trophy className="h-4 w-4" />}
-            Buscar Vencedores
-          </button>
-          <button onClick={startBulkIngestion} disabled={progress?.isRunning} className="flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow hover:opacity-90 transition disabled:opacity-50">
-            {progress?.isRunning && progress.phase === "ingest" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            {progress?.isRunning && progress.phase === "ingest" ? "Ingerindo..." : "Ingerir PNCP (2023–Hoje)"}
-          </button>
-        </div>
+          </PopoverTrigger>
+          <PopoverContent className="w-56 p-2" align="end">
+            <div className="space-y-1">
+              <button onClick={startBulkIngestion} disabled={progress?.isRunning} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-secondary transition disabled:opacity-50">
+                {progress?.isRunning && progress.phase === "ingest" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                Ingerir PNCP (2023–Hoje)
+              </button>
+              <button onClick={startWinnerFetching} disabled={progress?.isRunning} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-secondary transition disabled:opacity-50">
+                {progress?.isRunning && progress.phase === "winners" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trophy className="h-4 w-4" />}
+                Buscar Vencedores
+              </button>
+              {progress?.isRunning && (
+                <button onClick={cancelIngestion} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition">
+                  <X className="h-4 w-4" /> Cancelar
+                </button>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
 
       {/* Progress bar */}
       {progress && (
-        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border border-border bg-card p-4 space-y-2">
-          <div className="flex items-center justify-between text-sm">
+        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="rounded-lg border border-border bg-card p-3 space-y-1.5">
+          <div className="flex items-center justify-between text-xs">
             <span className="font-medium text-foreground">
-              {progress.isRunning ? (progress.phase === "ingest" ? "Ingestão em andamento..." : "Buscando vencedores...") : (progress.phase === "ingest" ? "Ingestão concluída" : "Busca de vencedores concluída")}
+              {progress.isRunning ? (progress.phase === "ingest" ? "Ingestão em andamento..." : "Buscando vencedores...") : "Concluído"}
             </span>
             <span className="font-mono text-primary font-bold">
-              {progress.phase === "winners" ? `${(progress.winnersFound || 0).toLocaleString("pt-BR")} vencedores / ${progress.totalProcessed.toLocaleString("pt-BR")} processados` : `${progress.totalProcessed.toLocaleString("pt-BR")} registros`}
+              {progress.phase === "winners" ? `${(progress.winnersFound || 0).toLocaleString("pt-BR")} vencedores` : `${progress.totalProcessed.toLocaleString("pt-BR")} registros`}
             </span>
           </div>
-          {progress.isRunning && progress.phase === "ingest" && (
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <span>Período: {progress.currentChunk}</span>
-              <span>Modalidade: {progress.currentModalidade}</span>
-              <span>Página: {progress.currentPage}</span>
-            </div>
-          )}
           {progress.isRunning && (
-            <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
+            <div className="h-1 w-full rounded-full bg-secondary overflow-hidden">
               <motion.div className="h-full rounded-full bg-primary" animate={{ width: ["0%", "100%"] }} transition={{ duration: 2, repeat: Infinity, ease: "linear" }} />
             </div>
           )}
         </motion.div>
       )}
 
-      {/* Filters */}
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Toggle: com vencedor */}
+      {/* Search & Filters - Always visible */}
+      <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+        {/* Row 1: Main search bar */}
+        <div className="relative">
+          <Search className="absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={searchTerm}
+            onChange={(e) => handleSearch(e.target.value)}
+            placeholder="Buscar por objeto ou descrição da licitação..."
+            className="h-12 w-full rounded-xl border border-input bg-background pl-12 pr-4 text-base placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-primary transition"
+          />
+        </div>
+
+        {/* Row 2: Quick filters always visible */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+          {/* Órgão */}
+          <div className="space-y-1 col-span-2 sm:col-span-1 lg:col-span-2">
+            <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+              <Building2 className="h-3 w-3" /> Órgão
+            </label>
+            <input
+              value={filterOrgao}
+              onChange={(e) => { setFilterOrgao(e.target.value); setPage(0); }}
+              placeholder="Ex: Sanasa, UFMG..."
+              className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+
+          {/* UF */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">UF</label>
+            <select value={filterUf} onChange={(e) => { setFilterUf(e.target.value); setPage(0); }} className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+              <option value="">Todas</option>
+              {["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"].map(uf => (
+                <option key={uf} value={uf}>{uf}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Modalidade */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Modalidade</label>
+            <select value={filterModalidade} onChange={(e) => { setFilterModalidade(e.target.value); setPage(0); }} className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+              <option value="">Todas</option>
+              <option value="Pregão - Eletrônico">Pregão Eletrônico</option>
+              <option value="Concorrência - Eletrônica">Concorrência</option>
+              <option value="Dispensa">Dispensa</option>
+              <option value="Inexigibilidade">Inexigibilidade</option>
+              <option value="Credenciamento">Credenciamento</option>
+              <option value="Pregão - Presencial">Pregão Presencial</option>
+              <option value="Concorrência - Presencial">Concorrência Presencial</option>
+              <option value="Leilão - Eletrônico">Leilão</option>
+              <option value="Concurso">Concurso</option>
+              <option value="Manifestação de Interesse">Manif. Interesse</option>
+              <option value="Pré-qualificação">Pré-qualificação</option>
+            </select>
+          </div>
+
+          {/* Data Inicial */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">De</label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className={cn("flex h-9 w-full items-center gap-1.5 rounded-lg border border-input bg-background px-2 text-sm", !dateFrom && "text-muted-foreground")}>
+                  <Calendar className="h-3.5 w-3.5 shrink-0" />
+                  {dateFrom ? format(dateFrom, "dd/MM/yy") : "Início"}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <CalendarComponent mode="single" selected={dateFrom} onSelect={(d) => { setDateFrom(d); setPage(0); }} locale={ptBR} initialFocus className="p-3 pointer-events-auto" />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Data Final */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Até</label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className={cn("flex h-9 w-full items-center gap-1.5 rounded-lg border border-input bg-background px-2 text-sm", !dateTo && "text-muted-foreground")}>
+                  <Calendar className="h-3.5 w-3.5 shrink-0" />
+                  {dateTo ? format(dateTo, "dd/MM/yy") : "Hoje"}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <CalendarComponent mode="single" selected={dateTo} onSelect={(d) => { setDateTo(d); setPage(0); }} locale={ptBR} initialFocus className="p-3 pointer-events-auto" />
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
+
+        {/* Row 3: Toggle chips + more filters + actions */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Com Vencedor toggle */}
           <button
             onClick={() => { setComVencedor(!comVencedor); setPage(0); }}
             className={cn(
-              "flex h-10 items-center gap-2 rounded-lg border px-4 text-sm font-medium transition",
+              "flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition",
               comVencedor
-                ? "border-success bg-success/10 text-success"
-                : "border-input bg-card text-muted-foreground hover:bg-secondary"
+                ? "border-success/40 bg-success/10 text-success"
+                : "border-input bg-background text-muted-foreground hover:bg-secondary"
             )}
           >
-            <Trophy className="h-4 w-4" />
-            {comVencedor ? "Com Vencedor" : "Todas"}
+            <Trophy className="h-3 w-3" />
+            {comVencedor ? "Com Resultado" : "Todas as situações"}
           </button>
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={searchTerm}
-              onChange={(e) => handleSearch(e.target.value)}
-              placeholder="Buscar por objeto, órgão..."
-              className="h-10 w-full rounded-lg border border-input bg-card pl-10 pr-4 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-          </div>
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={cn(
-              "flex h-10 items-center gap-2 rounded-lg border px-4 text-sm font-medium transition",
-              showFilters || activeFilterCount > 0 ? "border-primary bg-primary/10 text-primary" : "border-input bg-card text-muted-foreground hover:bg-secondary"
-            )}
-          >
-            <Filter className="h-4 w-4" />
-            Filtros
-            {activeFilterCount > 0 && (
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">{activeFilterCount}</span>
-            )}
-            <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", showFilters && "rotate-180")} />
-          </button>
-          <button onClick={exportToExcel} disabled={exporting || !hasData} className="flex h-10 items-center gap-2 rounded-lg border border-input bg-card px-4 text-sm font-medium text-foreground hover:bg-secondary transition disabled:opacity-50">
-            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
-            Exportar Excel
-          </button>
+
+          {/* Vencedor filter */}
+          {comVencedor && (
+            <div className="relative flex items-center">
+              <User className="absolute left-2.5 h-3 w-3 text-muted-foreground" />
+              <input
+                value={filterVencedor}
+                onChange={(e) => { setFilterVencedor(e.target.value); setPage(0); }}
+                placeholder="Filtrar por vencedor..."
+                className="h-8 w-40 rounded-full border border-input bg-background pl-7 pr-3 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:w-56 transition-all"
+              />
+            </div>
+          )}
+
+          {/* Situação (when not filtering by vencedor) */}
+          {!comVencedor && (
+            <select value={filterSituacao} onChange={(e) => { setFilterSituacao(e.target.value); setPage(0); }} className="h-8 rounded-full border border-input bg-background px-3 text-xs focus:outline-none focus:ring-2 focus:ring-ring">
+              <option value="">Todas situações</option>
+              {situacoes?.map(s => (
+                <option key={s.situacao} value={s.situacao}>
+                  {s.situacao} ({s.count.toLocaleString("pt-BR")})
+                </option>
+              ))}
+            </select>
+          )}
+
+          <div className="flex-1" />
+
           {activeFilterCount > 0 && (
-            <button onClick={clearFilters} className="flex h-10 items-center gap-1.5 rounded-lg border border-destructive/30 px-3 text-sm text-destructive hover:bg-destructive/10 transition">
-              <X className="h-3.5 w-3.5" /> Limpar filtros
+            <button onClick={clearFilters} className="flex h-8 items-center gap-1.5 rounded-full border border-destructive/30 px-3 text-xs font-medium text-destructive hover:bg-destructive/10 transition">
+              <X className="h-3 w-3" /> Limpar ({activeFilterCount})
             </button>
           )}
+
+          <button onClick={exportToExcel} disabled={exporting || !hasData} className="flex h-8 items-center gap-1.5 rounded-full border border-input bg-background px-3 text-xs font-medium text-muted-foreground hover:bg-secondary transition disabled:opacity-50">
+            {exporting ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileSpreadsheet className="h-3 w-3" />}
+            Excel
+          </button>
         </div>
-
-        <AnimatePresence>
-          {showFilters && (
-            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-              <div className="flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card p-4">
-                {/* Modalidade */}
-                <div className="space-y-1.5 min-w-[180px]">
-                  <label className="text-xs font-medium text-muted-foreground">Modalidade</label>
-                  <select value={filterModalidade} onChange={(e) => { setFilterModalidade(e.target.value); setPage(0); }} className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-                    <option value="">Todas</option>
-                    <option value="Pregão - Eletrônico">Pregão - Eletrônico</option>
-                    <option value="Pregão - Presencial">Pregão - Presencial</option>
-                    <option value="Concorrência - Eletrônica">Concorrência - Eletrônica</option>
-                    <option value="Concorrência - Presencial">Concorrência - Presencial</option>
-                    <option value="Dispensa">Dispensa</option>
-                    <option value="Inexigibilidade">Inexigibilidade</option>
-                    <option value="Credenciamento">Credenciamento</option>
-                    <option value="Leilão - Eletrônico">Leilão - Eletrônico</option>
-                    <option value="Leilão - Presencial">Leilão - Presencial</option>
-                    <option value="Concurso">Concurso</option>
-                    <option value="Manifestação de Interesse">Manifestação de Interesse</option>
-                    <option value="Pré-qualificação">Pré-qualificação</option>
-                  </select>
-                </div>
-
-                {/* Situação */}
-                <div className="space-y-1.5 min-w-[180px]">
-                  <label className="text-xs font-medium text-muted-foreground">Situação</label>
-                  <select value={comVencedor && !filterSituacao ? "__COM_RESULTADO__" : filterSituacao} onChange={(e) => {
-                    const val = e.target.value;
-                    if (val === "__COM_RESULTADO__") {
-                      setFilterSituacao("");
-                      setComVencedor(true);
-                    } else {
-                      setFilterSituacao(val);
-                      setComVencedor(false);
-                    }
-                    setPage(0);
-                  }} className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-                    <option value="">Todas</option>
-                    {situacoes?.map(s => (
-                      <option key={s.situacao} value={s.situacao === "Com Resultado (Homologada)" ? "__COM_RESULTADO__" : s.situacao}>
-                        {s.situacao} ({s.count.toLocaleString("pt-BR")})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* UF */}
-                <div className="space-y-1.5 min-w-[120px]">
-                  <label className="text-xs font-medium text-muted-foreground">UF</label>
-                  <select value={filterUf} onChange={(e) => { setFilterUf(e.target.value); setPage(0); }} className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-                    <option value="">Todas</option>
-                    {["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"].map(uf => (
-                      <option key={uf} value={uf}>{uf}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Órgão (text input) */}
-                <div className="space-y-1.5 min-w-[200px] flex-1">
-                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1"><Building2 className="h-3 w-3" /> Órgão</label>
-                  <input
-                    value={filterOrgao}
-                    onChange={(e) => { setFilterOrgao(e.target.value); setPage(0); }}
-                    placeholder="Filtrar por nome do órgão..."
-                    className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </div>
-
-                {/* Vencedor (text input) */}
-                <div className="space-y-1.5 min-w-[200px] flex-1">
-                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1"><User className="h-3 w-3" /> Vencedor</label>
-                  <input
-                    value={filterVencedor}
-                    onChange={(e) => { setFilterVencedor(e.target.value); setPage(0); }}
-                    placeholder="Filtrar por nome do vencedor..."
-                    className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </div>
-
-                {/* Date From */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Data inicial</label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <button className={cn("flex h-9 items-center gap-2 rounded-lg border border-input bg-background px-3 text-sm", !dateFrom && "text-muted-foreground")}>
-                        <Calendar className="h-3.5 w-3.5" />
-                        {dateFrom ? format(dateFrom, "dd/MM/yyyy") : "Selecionar"}
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <CalendarComponent mode="single" selected={dateFrom} onSelect={(d) => { setDateFrom(d); setPage(0); }} locale={ptBR} initialFocus className="p-3 pointer-events-auto" />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                {/* Date To */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Data final</label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <button className={cn("flex h-9 items-center gap-2 rounded-lg border border-input bg-background px-3 text-sm", !dateTo && "text-muted-foreground")}>
-                        <Calendar className="h-3.5 w-3.5" />
-                        {dateTo ? format(dateTo, "dd/MM/yyyy") : "Selecionar"}
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <CalendarComponent mode="single" selected={dateTo} onSelect={(d) => { setDateTo(d); setPage(0); }} locale={ptBR} initialFocus className="p-3 pointer-events-auto" />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
 
       {/* Table */}
@@ -545,7 +526,7 @@ export default function LicitacoesPage() {
           </div>
           <h2 className="mt-4 font-display text-lg font-semibold text-foreground">Nenhuma licitação encontrada</h2>
           <p className="mt-2 text-sm text-muted-foreground max-w-md text-center">
-            {activeFilterCount > 0 || debouncedSearch ? "Nenhum resultado para os filtros aplicados. Tente ajustar os critérios." : 'Clique em "Ingerir PNCP" para buscar dados reais de licitações do Portal Nacional de Contratações Públicas.'}
+            {activeFilterCount > 0 || debouncedSearch ? "Nenhum resultado para os filtros aplicados. Tente ajustar os critérios." : 'Use o menu "Ingestão" para buscar dados do PNCP.'}
           </p>
         </motion.div>
       ) : (
@@ -733,7 +714,7 @@ export default function LicitacoesPage() {
                   </div>
                 </div>
 
-                {/* Additional info from raw_json + base fields */}
+                {/* Additional info from raw_json */}
                 {(() => {
                   const raw = selectedLicitacao.raw_json || {};
                   const infoItems = [
@@ -857,19 +838,22 @@ export default function LicitacoesPage() {
                       </div>
                       <div className="space-y-2">
                         {detailWinners.map((w: any, i: number) => (
-                          <div key={i} className="rounded-lg border border-border bg-card p-3 flex items-start gap-3">
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-warning/10">
+                          <div key={i} className="flex items-center gap-3 rounded-lg border border-border bg-card p-3">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-warning/10">
                               <Trophy className="h-4 w-4 text-warning" />
                             </div>
-                            <div className="space-y-0.5 min-w-0 flex-1">
-                              <p className="text-sm font-medium text-foreground">{w.razao_social || "Não informado"}</p>
-                              {w.cnpj && <p className="text-xs text-muted-foreground font-mono">CNPJ: {w.cnpj}</p>}
-                              <div className="flex flex-wrap gap-3 mt-1 text-xs text-muted-foreground">
-                                {w.valor_final != null && <span>Valor: <span className="font-medium text-foreground">{formatCurrency(w.valor_final)}</span></span>}
-                                {w.percentual_desconto != null && <span>Desconto: <span className="font-medium text-foreground">{w.percentual_desconto.toFixed(2)}%</span></span>}
-                                {w.numero_item != null && <span>Item #{w.numero_item}</span>}
-                              </div>
-                              {w.item_descricao && <p className="text-xs text-muted-foreground mt-1 truncate">{w.item_descricao}</p>}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-foreground truncate">{w.razao_social || "—"}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {w.cnpj && `CNPJ: ${w.cnpj}`}
+                                {w.numero_item != null && ` · Item ${w.numero_item}`}
+                              </p>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className="text-sm font-bold text-success">{formatCurrency(w.valor_final)}</p>
+                              {w.percentual_desconto != null && (
+                                <p className="text-[10px] text-muted-foreground">-{w.percentual_desconto.toFixed(1)}%</p>
+                              )}
                             </div>
                           </div>
                         ))}
