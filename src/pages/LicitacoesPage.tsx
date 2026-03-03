@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
-import { Search, Calendar, RefreshCw, Loader2, Database, ChevronLeft, ChevronRight, X, Trophy, ExternalLink, ChevronDown, FileSpreadsheet, Building2, User, Eye, Package, Award, FileText, MapPin, Hash, DollarSign, Clock, Brain, Sparkles } from "lucide-react";
+import { RefreshCw, Loader2, Database, ChevronLeft, ChevronRight, X, Trophy, ExternalLink, ChevronDown, FileSpreadsheet, Eye, Package, Award, FileText, MapPin, DollarSign, Clock, Brain, Sparkles } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -10,11 +10,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 
 const PAGE_SIZE = 20;
 
@@ -33,7 +31,7 @@ function formatCurrency(value: number | null) {
 
 function StatusBadge({ situacao, hasWinner }: { situacao: string | null; hasWinner?: boolean }) {
   if (!situacao && !hasWinner) return <span className="text-muted-foreground text-xs">—</span>;
-  const displayStatus = hasWinner ? "Com Resultado (Homologada)" : situacao;
+  const displayStatus = hasWinner ? "Com Resultado" : situacao;
   const normalized = (displayStatus || "").toLowerCase();
   const color = hasWinner || normalized.includes("homologad") || normalized.includes("conclu") || normalized.includes("resultado")
     ? "bg-success/10 text-success border-success/20"
@@ -48,8 +46,6 @@ function StatusBadge({ situacao, hasWinner }: { situacao: string | null; hasWinn
     </span>
   );
 }
-
-// Removed useDebounce - using explicit search button instead
 
 function generateMonthlyChunks(startDate: string, endDate: string) {
   const chunks: { dataInicial: string; dataFinal: string }[] = [];
@@ -78,48 +74,10 @@ interface IngestProgress {
 }
 
 export default function LicitacoesPage() {
-  const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(0);
   const [progress, setProgress] = useState<IngestProgress | null>(null);
   const abortRef = useRef(false);
   const queryClient = useQueryClient();
-
-  const [filterModalidade, setFilterModalidade] = useState<string>("");
-  const [filterUf, setFilterUf] = useState<string>("");
-  const [filterSituacao, setFilterSituacao] = useState<string>("");
-  const [filterOrgao, setFilterOrgao] = useState<string>("");
-  const [filterVencedor, setFilterVencedor] = useState<string>("");
-  const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date(new Date().getFullYear(), 0, 1));
-  const [dateTo, setDateTo] = useState<Date | undefined>();
-  const [comVencedor, setComVencedor] = useState(true);
-
-  // Applied filters - only update when user clicks "Pesquisar"
-  const [appliedFilters, setAppliedFilters] = useState({
-    search: "",
-    orgao: "",
-    vencedor: "",
-    modalidade: "",
-    uf: "",
-    situacao: "",
-    dateFrom: new Date(new Date().getFullYear(), 0, 1) as Date | undefined,
-    dateTo: undefined as Date | undefined,
-    comVencedor: true,
-  });
-
-  const applyFilters = () => {
-    setAppliedFilters({
-      search: searchTerm.trim(),
-      orgao: filterOrgao.trim(),
-      vencedor: filterVencedor.trim(),
-      modalidade: filterModalidade,
-      uf: filterUf,
-      situacao: filterSituacao,
-      dateFrom,
-      dateTo,
-      comVencedor,
-    });
-    setPage(0);
-  };
 
   // Detail modal state
   const [selectedLicitacao, setSelectedLicitacao] = useState<any | null>(null);
@@ -180,50 +138,27 @@ export default function LicitacoesPage() {
     }
   };
 
-  const defaultDateFrom = new Date(new Date().getFullYear(), 0, 1);
-  const hasNonDefaultDateFrom = appliedFilters.dateFrom && appliedFilters.dateFrom.getTime() !== defaultDateFrom.getTime();
-  const activeFilterCount = [appliedFilters.modalidade, appliedFilters.uf, appliedFilters.situacao, appliedFilters.orgao, appliedFilters.vencedor, hasNonDefaultDateFrom ? appliedFilters.dateFrom : null, appliedFilters.dateTo, !appliedFilters.comVencedor ? "no-vencedor" : null].filter(Boolean).length;
-
-  const SITUACOES_FIXAS = [
-    "Divulgada no PNCP",
-    "Encerrada",
-    "Suspensa",
-    "Revogada",
-    "Anulada",
-    "Aberta",
-    "Em andamento",
-  ];
-
+  // No filters - just fetch all, ordered by largest value (RPC default)
   const { data: queryResult, isLoading } = useQuery({
-    queryKey: ["licitacoes-rpc", appliedFilters, page],
+    queryKey: ["licitacoes-all", page],
     queryFn: async () => {
       const params: any = {
         p_limit: PAGE_SIZE,
         p_offset: page * PAGE_SIZE,
-        p_com_vencedor: appliedFilters.comVencedor,
+        p_com_vencedor: true,
       };
-      if (appliedFilters.search) params.p_search = appliedFilters.search;
-      if (appliedFilters.modalidade) params.p_modalidade = appliedFilters.modalidade;
-      if (appliedFilters.uf) params.p_uf = appliedFilters.uf;
-      if (appliedFilters.situacao) params.p_situacao = appliedFilters.situacao;
-      if (appliedFilters.orgao) params.p_orgao = appliedFilters.orgao;
-      if (appliedFilters.vencedor) params.p_vencedor = appliedFilters.vencedor;
-      if (appliedFilters.dateFrom) params.p_date_from = format(appliedFilters.dateFrom, "yyyy-MM-dd");
-      if (appliedFilters.dateTo) params.p_date_to = format(appliedFilters.dateTo, "yyyy-MM-dd");
-
       const { data, error } = await (supabase as any).rpc("search_licitacoes", params);
       if (error) throw error;
       return data as any[];
     },
     placeholderData: (prev) => prev,
-    staleTime: 30_000,
+    staleTime: 60_000,
   });
 
   const licitacoes = queryResult || [];
   const totalCount = licitacoes.length > 0 ? Number(licitacoes[0].total_count) : 0;
   const hasData = licitacoes.length > 0;
-  const total = totalCount;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   // --- Ingestion callbacks ---
   const startBulkIngestion = useCallback(async () => {
@@ -246,13 +181,13 @@ export default function LicitacoesPage() {
             const { data, error } = await supabase.functions.invoke("ingest-pncp", { body: { dataInicial: chunk.dataInicial, dataFinal: chunk.dataFinal, modalidade, pagina } });
             if (error) { consecutiveErrors++; if (consecutiveErrors >= 3) hasMore = false; else await new Promise(r => setTimeout(r, 1000)); continue; }
             consecutiveErrors = 0; grandTotal += data?.totalProcessed || 0; hasMore = data?.hasMore || false; pagina++;
-            if (grandTotal % 500 < 50) { queryClient.invalidateQueries({ queryKey: ["licitacoes-rpc"] }); }
+            if (grandTotal % 500 < 50) { queryClient.invalidateQueries({ queryKey: ["licitacoes-all"] }); }
           } catch { consecutiveErrors++; if (consecutiveErrors >= 3) hasMore = false; await new Promise(r => setTimeout(r, 1000)); }
         }
       }
     }
     setProgress(p => (p ? { ...p, isRunning: false } : null));
-    queryClient.invalidateQueries({ queryKey: ["licitacoes-rpc"] });
+    queryClient.invalidateQueries({ queryKey: ["licitacoes-all"] });
     toast.success(`Ingestão concluída! ${grandTotal.toLocaleString("pt-BR")} registros processados.`);
   }, [queryClient]);
 
@@ -266,17 +201,15 @@ export default function LicitacoesPage() {
         if (error) { await new Promise(r => setTimeout(r, 2000)); continue; }
         totalWinners += data?.winnersFound || 0; totalProcessed += data?.processed || 0; hasMore = data?.hasMore || false;
         setProgress({ totalProcessed, currentChunk: "", currentModalidade: "", currentPage: 0, isRunning: true, phase: "winners", winnersFound: totalWinners });
-        if (totalProcessed % 100 < 30) queryClient.invalidateQueries({ queryKey: ["licitacoes-rpc"] });
+        if (totalProcessed % 100 < 30) queryClient.invalidateQueries({ queryKey: ["licitacoes-all"] });
       } catch { await new Promise(r => setTimeout(r, 2000)); }
     }
     setProgress(p => (p ? { ...p, isRunning: false } : null));
-    queryClient.invalidateQueries({ queryKey: ["licitacoes-rpc"] });
+    queryClient.invalidateQueries({ queryKey: ["licitacoes-all"] });
     toast.success(`Vencedores: ${totalWinners.toLocaleString("pt-BR")} encontrados em ${totalProcessed.toLocaleString("pt-BR")} licitações.`);
   }, [queryClient]);
 
   const cancelIngestion = () => { abortRef.current = true; toast.info("Cancelando..."); };
-
-  
 
   const [exporting, setExporting] = useState(false);
 
@@ -288,15 +221,7 @@ export default function LicitacoesPage() {
       const batchSize = 1000;
       let hasMore = true;
       while (hasMore && allData.length < 10000) {
-        const params: any = { p_limit: batchSize, p_offset: offset, p_com_vencedor: appliedFilters.comVencedor };
-        if (appliedFilters.search) params.p_search = appliedFilters.search;
-        if (appliedFilters.modalidade) params.p_modalidade = appliedFilters.modalidade;
-        if (appliedFilters.uf) params.p_uf = appliedFilters.uf;
-        if (appliedFilters.situacao) params.p_situacao = appliedFilters.situacao;
-        if (appliedFilters.orgao) params.p_orgao = appliedFilters.orgao;
-        if (appliedFilters.vencedor) params.p_vencedor = appliedFilters.vencedor;
-        if (appliedFilters.dateFrom) params.p_date_from = format(appliedFilters.dateFrom, "yyyy-MM-dd");
-        if (appliedFilters.dateTo) params.p_date_to = format(appliedFilters.dateTo, "yyyy-MM-dd");
+        const params: any = { p_limit: batchSize, p_offset: offset, p_com_vencedor: true };
         const { data, error } = await (supabase as any).rpc("search_licitacoes", params);
         if (error) throw error;
         if (data && data.length > 0) { allData = [...allData, ...data]; offset += batchSize; hasMore = data.length === batchSize; }
@@ -317,58 +242,50 @@ export default function LicitacoesPage() {
       toast.success(`${rows.length.toLocaleString("pt-BR")} registros exportados com sucesso!`);
     } catch (err) { console.error("Export error:", err); toast.error("Erro ao exportar dados."); }
     finally { setExporting(false); }
-  }, [appliedFilters]);
-
-  const clearFilters = () => {
-    const defaults = {
-      search: "", orgao: "", vencedor: "", modalidade: "", uf: "", situacao: "",
-      dateFrom: new Date(new Date().getFullYear(), 0, 1) as Date | undefined,
-      dateTo: undefined as Date | undefined, comVencedor: true,
-    };
-    setSearchTerm(""); setFilterModalidade(""); setFilterUf(""); setFilterSituacao("");
-    setFilterOrgao(""); setFilterVencedor("");
-    setDateFrom(defaults.dateFrom); setDateTo(undefined);
-    setComVencedor(true); setPage(0);
-    setAppliedFilters(defaults);
-  };
+  }, []);
 
   return (
     <div className="space-y-4">
-      {/* Header compact */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-2xl font-bold text-foreground">Licitações</h1>
           <p className="text-sm text-muted-foreground">
-            {total > 0
-              ? `${total.toLocaleString("pt-BR")} ${comVencedor ? "licitações com resultado" : "registros"} encontrados`
-              : "Busque por órgão, objeto, vencedor ou UF"}
+            {totalCount > 0
+              ? `${totalCount.toLocaleString("pt-BR")} licitações com resultado · Ordenadas por maior valor`
+              : "Carregando dados..."}
           </p>
         </div>
-        {/* Ingestion actions in dropdown */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <button className="flex h-9 items-center gap-2 rounded-lg border border-input bg-card px-3 text-xs font-medium text-muted-foreground hover:bg-secondary transition">
-              <Database className="h-3.5 w-3.5" /> Ingestão <ChevronDown className="h-3 w-3" />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-56 p-2" align="end">
-            <div className="space-y-1">
-              <button onClick={startBulkIngestion} disabled={progress?.isRunning} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-secondary transition disabled:opacity-50">
-                {progress?.isRunning && progress.phase === "ingest" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                Ingerir PNCP (2023–Hoje)
+        <div className="flex items-center gap-2">
+          <button onClick={exportToExcel} disabled={exporting || !hasData} className="flex h-9 items-center gap-2 rounded-lg border border-input bg-card px-3 text-xs font-medium text-muted-foreground hover:bg-secondary transition disabled:opacity-50">
+            {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileSpreadsheet className="h-3.5 w-3.5" />}
+            Exportar Excel
+          </button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="flex h-9 items-center gap-2 rounded-lg border border-input bg-card px-3 text-xs font-medium text-muted-foreground hover:bg-secondary transition">
+                <Database className="h-3.5 w-3.5" /> Ingestão <ChevronDown className="h-3 w-3" />
               </button>
-              <button onClick={startWinnerFetching} disabled={progress?.isRunning} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-secondary transition disabled:opacity-50">
-                {progress?.isRunning && progress.phase === "winners" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trophy className="h-4 w-4" />}
-                Buscar Vencedores
-              </button>
-              {progress?.isRunning && (
-                <button onClick={cancelIngestion} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition">
-                  <X className="h-4 w-4" /> Cancelar
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-2" align="end">
+              <div className="space-y-1">
+                <button onClick={startBulkIngestion} disabled={progress?.isRunning} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-secondary transition disabled:opacity-50">
+                  {progress?.isRunning && progress.phase === "ingest" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  Ingerir PNCP (2023–Hoje)
                 </button>
-              )}
-            </div>
-          </PopoverContent>
-        </Popover>
+                <button onClick={startWinnerFetching} disabled={progress?.isRunning} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-secondary transition disabled:opacity-50">
+                  {progress?.isRunning && progress.phase === "winners" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trophy className="h-4 w-4" />}
+                  Buscar Vencedores
+                </button>
+                {progress?.isRunning && (
+                  <button onClick={cancelIngestion} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition">
+                    <X className="h-4 w-4" /> Cancelar
+                  </button>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
 
       {/* Progress bar */}
@@ -390,161 +307,6 @@ export default function LicitacoesPage() {
         </motion.div>
       )}
 
-      {/* Search & Filters - Always visible */}
-      <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-        {/* Row 1: Main search bar with Pesquisar button */}
-        <form onSubmit={(e) => { e.preventDefault(); applyFilters(); }} className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar por objeto ou descrição da licitação..."
-              className="h-12 w-full rounded-xl border border-input bg-background pl-12 pr-4 text-base placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-primary transition"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="flex h-12 items-center gap-2 rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition disabled:opacity-50 shrink-0"
-          >
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-            Pesquisar
-          </button>
-        </form>
-
-        {/* Row 2: Quick filters always visible */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-          {/* Órgão */}
-          <div className="space-y-1 col-span-2 sm:col-span-1 lg:col-span-2">
-            <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-              <Building2 className="h-3 w-3" /> Órgão
-            </label>
-            <input
-              value={filterOrgao}
-              onChange={(e) => setFilterOrgao(e.target.value)}
-              placeholder="Ex: Sanasa, UFMG..."
-              className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-          </div>
-
-          {/* UF */}
-          <div className="space-y-1">
-            <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">UF</label>
-            <select value={filterUf} onChange={(e) => setFilterUf(e.target.value)} className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-              <option value="">Todas</option>
-              {["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"].map(uf => (
-                <option key={uf} value={uf}>{uf}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Modalidade */}
-          <div className="space-y-1">
-            <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Modalidade</label>
-            <select value={filterModalidade} onChange={(e) => setFilterModalidade(e.target.value)} className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-              <option value="">Todas</option>
-              <option value="Pregão - Eletrônico">Pregão Eletrônico</option>
-              <option value="Concorrência - Eletrônica">Concorrência</option>
-              <option value="Dispensa">Dispensa</option>
-              <option value="Inexigibilidade">Inexigibilidade</option>
-              <option value="Credenciamento">Credenciamento</option>
-              <option value="Pregão - Presencial">Pregão Presencial</option>
-              <option value="Concorrência - Presencial">Concorrência Presencial</option>
-              <option value="Leilão - Eletrônico">Leilão</option>
-              <option value="Concurso">Concurso</option>
-              <option value="Manifestação de Interesse">Manif. Interesse</option>
-              <option value="Pré-qualificação">Pré-qualificação</option>
-            </select>
-          </div>
-
-          {/* Data Inicial */}
-          <div className="space-y-1">
-            <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">De</label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <button className={cn("flex h-9 w-full items-center gap-1.5 rounded-lg border border-input bg-background px-2 text-sm", !dateFrom && "text-muted-foreground")}>
-                  <Calendar className="h-3.5 w-3.5 shrink-0" />
-                  {dateFrom ? format(dateFrom, "dd/MM/yy") : "Início"}
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <CalendarComponent mode="single" selected={dateFrom} onSelect={(d) => setDateFrom(d)} locale={ptBR} initialFocus className="p-3 pointer-events-auto" />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          {/* Data Final */}
-          <div className="space-y-1">
-            <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Até</label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <button className={cn("flex h-9 w-full items-center gap-1.5 rounded-lg border border-input bg-background px-2 text-sm", !dateTo && "text-muted-foreground")}>
-                  <Calendar className="h-3.5 w-3.5 shrink-0" />
-                  {dateTo ? format(dateTo, "dd/MM/yy") : "Hoje"}
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <CalendarComponent mode="single" selected={dateTo} onSelect={(d) => setDateTo(d)} locale={ptBR} initialFocus className="p-3 pointer-events-auto" />
-              </PopoverContent>
-            </Popover>
-          </div>
-        </div>
-
-        {/* Row 3: Toggle chips + more filters + actions */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Com Vencedor toggle */}
-          <button
-            onClick={() => setComVencedor(!comVencedor)}
-            className={cn(
-              "flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition",
-              comVencedor
-                ? "border-success/40 bg-success/10 text-success"
-                : "border-input bg-background text-muted-foreground hover:bg-secondary"
-            )}
-          >
-            <Trophy className="h-3 w-3" />
-            {comVencedor ? "Com Resultado" : "Todas as situações"}
-          </button>
-
-          {/* Vencedor filter */}
-          {comVencedor && (
-            <div className="relative flex items-center">
-              <User className="absolute left-2.5 h-3 w-3 text-muted-foreground" />
-              <input
-                value={filterVencedor}
-                onChange={(e) => setFilterVencedor(e.target.value)}
-                placeholder="Filtrar por vencedor..."
-                className="h-8 w-40 rounded-full border border-input bg-background pl-7 pr-3 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:w-56 transition-all"
-              />
-            </div>
-          )}
-
-          {/* Situação (when not filtering by vencedor) */}
-          {!comVencedor && (
-            <select value={filterSituacao} onChange={(e) => { setFilterSituacao(e.target.value); }} className="h-8 rounded-full border border-input bg-background px-3 text-xs focus:outline-none focus:ring-2 focus:ring-ring">
-              <option value="">Todas situações</option>
-              {SITUACOES_FIXAS.map(s => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-          )}
-
-          <div className="flex-1" />
-
-          {activeFilterCount > 0 && (
-            <button onClick={clearFilters} className="flex h-8 items-center gap-1.5 rounded-full border border-destructive/30 px-3 text-xs font-medium text-destructive hover:bg-destructive/10 transition">
-              <X className="h-3 w-3" /> Limpar ({activeFilterCount})
-            </button>
-          )}
-
-          <button onClick={exportToExcel} disabled={exporting || !hasData} className="flex h-8 items-center gap-1.5 rounded-full border border-input bg-background px-3 text-xs font-medium text-muted-foreground hover:bg-secondary transition disabled:opacity-50">
-            {exporting ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileSpreadsheet className="h-3 w-3" />}
-            Excel
-          </button>
-        </div>
-      </div>
-
       {/* Table */}
       {isLoading ? (
         <div className="flex items-center justify-center py-20">
@@ -557,7 +319,7 @@ export default function LicitacoesPage() {
           </div>
           <h2 className="mt-4 font-display text-lg font-semibold text-foreground">Nenhuma licitação encontrada</h2>
           <p className="mt-2 text-sm text-muted-foreground max-w-md text-center">
-            {activeFilterCount > 0 || appliedFilters.search ? "Nenhum resultado para os filtros aplicados. Tente ajustar os critérios." : 'Use o menu "Ingestão" para buscar dados do PNCP.'}
+            Use o menu "Ingestão" para buscar dados do PNCP.
           </p>
         </motion.div>
       ) : (
@@ -566,80 +328,77 @@ export default function LicitacoesPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                   <tr className="border-b border-border bg-secondary/50">
-                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Ações</th>
-                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Órgão</th>
-                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Objeto</th>
-                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Modalidade</th>
-                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Valor Est.</th>
-                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Val. Homologado</th>
-                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Economia</th>
-                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Vencedor</th>
-                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Data</th>
-                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">UF</th>
-                   </tr>
-                 </thead>
-                 <tbody>
-                   {licitacoes.map((row: any) => {
-                     let pncpLink: string | null = null;
-                     if (row.numero_controle_pncp) {
-                       const match = row.numero_controle_pncp.match(/^(\d+)-\d+-(\d+)\/(\d+)$/);
-                       if (match) pncpLink = `https://pncp.gov.br/app/editais/${match[1]}/${match[3]}/${parseInt(match[2])}`;
-                     }
-                     const formattedDate = row.data_publicacao
-                       ? (() => { const [y, m, d] = row.data_publicacao.split("-"); return `${d}/${m}/${y}`; })()
-                       : "—";
-                     return (
-                       <tr key={row.id} className="border-b border-border last:border-0 transition hover:bg-secondary/30">
-                         <td className="px-4 py-3">
-                           <button onClick={() => openDetail(row)} className="flex h-8 items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-3 text-xs font-medium text-primary hover:bg-primary/10 transition">
-                             <Eye className="h-3.5 w-3.5" /> Ver
-                           </button>
-                         </td>
-                         <td className="px-4 py-3 font-medium text-foreground max-w-[250px]">
-                           <div className="space-y-1">
-                             <Tooltip>
-                               <TooltipTrigger asChild>
-                                 <span className="block truncate">
-                                   {pncpLink ? (
-                                     <a href={pncpLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary hover:underline">
-                                       {row.orgao} <ExternalLink className="h-3 w-3 shrink-0" />
-                                     </a>
-                                   ) : row.orgao}
-                                 </span>
-                               </TooltipTrigger>
-                               <TooltipContent side="bottom" className="max-w-sm"><p>{row.orgao}</p></TooltipContent>
-                             </Tooltip>
-                             <StatusBadge situacao={row.situacao} hasWinner={!!row.vencedor_nome && row.vencedor_nome !== "—"} />
-                           </div>
-                         </td>
-                         <td className="px-4 py-3 max-w-xs">
-                           <Tooltip>
-                             <TooltipTrigger asChild><span className="block truncate text-foreground">{row.objeto}</span></TooltipTrigger>
-                             <TooltipContent side="bottom" className="max-w-md"><p className="text-xs leading-relaxed">{row.objeto}</p></TooltipContent>
-                           </Tooltip>
-                         </td>
-                         <td className="px-4 py-3 text-muted-foreground">{row.modalidade || "—"}</td>
-                          <td className="px-4 py-3 font-medium text-foreground">{formatCurrency(row.valor_estimado)}</td>
-                           <td className="px-4 py-3 font-medium text-success">{row.valor_homologado ? formatCurrency(row.valor_homologado) : "—"}</td>
-                           <td className="px-4 py-3 font-medium">
-                             {row.valor_estimado && row.valor_homologado ? (
-                               <span className={row.valor_estimado - row.valor_homologado > 0 ? "text-success" : "text-destructive"}>
-                                 {formatCurrency(row.valor_estimado - row.valor_homologado)}
-                               </span>
-                             ) : "—"}
-                           </td>
-                           <td className="px-4 py-3 text-foreground max-w-[180px]">
-                            <Tooltip>
-                              <TooltipTrigger asChild><span className="block truncate">{row.vencedor_nome || "—"}</span></TooltipTrigger>
-                              <TooltipContent side="bottom" className="max-w-sm"><p className="text-xs">{row.vencedor_nome || "Sem vencedor"}</p></TooltipContent>
-                            </Tooltip>
-                          </td>
-                         <td className="px-4 py-3 text-muted-foreground">{formattedDate}</td>
-                         <td className="px-4 py-3 text-muted-foreground">{row.uf || "—"}</td>
-                       </tr>
-                     );
-                   })}
+                  <tr className="border-b border-border bg-secondary/50">
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground w-16"></th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Órgão</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Objeto</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Modalidade</th>
+                    <th className="px-4 py-3 text-right font-medium text-muted-foreground">Valor Est.</th>
+                    <th className="px-4 py-3 text-right font-medium text-muted-foreground">Val. Homologado</th>
+                    <th className="px-4 py-3 text-right font-medium text-muted-foreground">Economia</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Vencedor</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Data</th>
+                    <th className="px-4 py-3 text-center font-medium text-muted-foreground">UF</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {licitacoes.map((row: any) => {
+                    let pncpLink: string | null = null;
+                    if (row.numero_controle_pncp) {
+                      const match = row.numero_controle_pncp.match(/^(\d+)-\d+-(\d+)\/(\d+)$/);
+                      if (match) pncpLink = `https://pncp.gov.br/app/editais/${match[1]}/${match[3]}/${parseInt(match[2])}`;
+                    }
+                    const formattedDate = row.data_publicacao
+                      ? (() => { const [y, m, d] = row.data_publicacao.split("-"); return `${d}/${m}/${y}`; })()
+                      : "—";
+                    return (
+                      <tr key={row.id} className="border-b border-border last:border-0 transition hover:bg-secondary/30 cursor-pointer" onClick={() => openDetail(row)}>
+                        <td className="px-4 py-3">
+                          <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition">
+                            <Eye className="h-3.5 w-3.5" />
+                          </button>
+                        </td>
+                        <td className="px-4 py-3 font-medium text-foreground max-w-[220px]">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="block truncate">
+                                {pncpLink ? (
+                                  <a href={pncpLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="flex items-center gap-1 text-primary hover:underline">
+                                    {row.orgao} <ExternalLink className="h-3 w-3 shrink-0" />
+                                  </a>
+                                ) : row.orgao}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="max-w-sm"><p>{row.orgao}</p></TooltipContent>
+                          </Tooltip>
+                        </td>
+                        <td className="px-4 py-3 max-w-xs">
+                          <Tooltip>
+                            <TooltipTrigger asChild><span className="block truncate text-foreground">{row.objeto}</span></TooltipTrigger>
+                            <TooltipContent side="bottom" className="max-w-md"><p className="text-xs leading-relaxed">{row.objeto}</p></TooltipContent>
+                          </Tooltip>
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground text-xs">{row.modalidade || "—"}</td>
+                        <td className="px-4 py-3 text-right font-medium text-foreground tabular-nums">{formatCurrency(row.valor_estimado)}</td>
+                        <td className="px-4 py-3 text-right font-medium text-success tabular-nums">{row.valor_homologado ? formatCurrency(row.valor_homologado) : "—"}</td>
+                        <td className="px-4 py-3 text-right font-medium tabular-nums">
+                          {row.valor_estimado && row.valor_homologado ? (
+                            <span className={row.valor_estimado - row.valor_homologado > 0 ? "text-success" : "text-destructive"}>
+                              {formatCurrency(row.valor_estimado - row.valor_homologado)}
+                            </span>
+                          ) : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-foreground max-w-[160px]">
+                          <Tooltip>
+                            <TooltipTrigger asChild><span className="block truncate text-xs">{row.vencedor_nome || "—"}</span></TooltipTrigger>
+                            <TooltipContent side="bottom" className="max-w-sm"><p className="text-xs">{row.vencedor_nome || "Sem vencedor"}</p></TooltipContent>
+                          </Tooltip>
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground text-xs">{formattedDate}</td>
+                        <td className="px-4 py-3 text-center text-muted-foreground text-xs font-medium">{row.uf || "—"}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -648,7 +407,7 @@ export default function LicitacoesPage() {
           {/* Pagination */}
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
-              Mostrando {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} de {total.toLocaleString("pt-BR")}
+              Mostrando {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalCount)} de {totalCount.toLocaleString("pt-BR")}
             </p>
             <div className="flex items-center gap-2">
               <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="flex h-9 w-9 items-center justify-center rounded-lg border border-input bg-card text-muted-foreground hover:bg-secondary disabled:opacity-40">
@@ -808,9 +567,9 @@ export default function LicitacoesPage() {
                             <th className="px-3 py-2 text-left font-medium text-muted-foreground">Descrição</th>
                             <th className="px-3 py-2 text-right font-medium text-muted-foreground">Qtd</th>
                             <th className="px-3 py-2 text-left font-medium text-muted-foreground">Und</th>
-                             <th className="px-3 py-2 text-right font-medium text-muted-foreground">Val. Unit. Est.</th>
-                             <th className="px-3 py-2 text-right font-medium text-muted-foreground">Val. Final Item</th>
-                             <th className="px-3 py-2 text-left font-medium text-muted-foreground">Vencedor</th>
+                            <th className="px-3 py-2 text-right font-medium text-muted-foreground">Val. Unit. Est.</th>
+                            <th className="px-3 py-2 text-right font-medium text-muted-foreground">Val. Final Item</th>
+                            <th className="px-3 py-2 text-left font-medium text-muted-foreground">Vencedor</th>
                           </tr>
                         </thead>
                         <tbody>
