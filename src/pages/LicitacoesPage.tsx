@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import { Search, Calendar, RefreshCw, Loader2, Database, ChevronLeft, ChevronRight, X, Trophy, ExternalLink, ChevronDown, FileSpreadsheet, Building2, User, Eye, Package, Award, FileText, MapPin, Hash, DollarSign, Clock, Brain, Sparkles } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -49,14 +49,7 @@ function StatusBadge({ situacao, hasWinner }: { situacao: string | null; hasWinn
   );
 }
 
-function useDebounce<T>(value: T, delay: number): T {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(t);
-  }, [value, delay]);
-  return debounced;
-}
+// Removed useDebounce - using explicit search button instead
 
 function generateMonthlyChunks(startDate: string, endDate: string) {
   const chunks: { dataInicial: string; dataFinal: string }[] = [];
@@ -99,6 +92,34 @@ export default function LicitacoesPage() {
   const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date(new Date().getFullYear(), 0, 1));
   const [dateTo, setDateTo] = useState<Date | undefined>();
   const [comVencedor, setComVencedor] = useState(true);
+
+  // Applied filters - only update when user clicks "Pesquisar"
+  const [appliedFilters, setAppliedFilters] = useState({
+    search: "",
+    orgao: "",
+    vencedor: "",
+    modalidade: "",
+    uf: "",
+    situacao: "",
+    dateFrom: new Date(new Date().getFullYear(), 0, 1) as Date | undefined,
+    dateTo: undefined as Date | undefined,
+    comVencedor: true,
+  });
+
+  const applyFilters = () => {
+    setAppliedFilters({
+      search: searchTerm.trim(),
+      orgao: filterOrgao.trim(),
+      vencedor: filterVencedor.trim(),
+      modalidade: filterModalidade,
+      uf: filterUf,
+      situacao: filterSituacao,
+      dateFrom,
+      dateTo,
+      comVencedor,
+    });
+    setPage(0);
+  };
 
   // Detail modal state
   const [selectedLicitacao, setSelectedLicitacao] = useState<any | null>(null);
@@ -159,40 +180,36 @@ export default function LicitacoesPage() {
     }
   };
 
-  const debouncedSearch = useDebounce(searchTerm, 400);
-  const debouncedOrgao = useDebounce(filterOrgao, 400);
-  const debouncedVencedor = useDebounce(filterVencedor, 400);
-
   const defaultDateFrom = new Date(new Date().getFullYear(), 0, 1);
-  const hasNonDefaultDateFrom = dateFrom && dateFrom.getTime() !== defaultDateFrom.getTime();
-  const activeFilterCount = [filterModalidade, filterUf, filterSituacao, debouncedOrgao, debouncedVencedor, hasNonDefaultDateFrom ? dateFrom : null, dateTo, !comVencedor ? "no-vencedor" : null].filter(Boolean).length;
+  const hasNonDefaultDateFrom = appliedFilters.dateFrom && appliedFilters.dateFrom.getTime() !== defaultDateFrom.getTime();
+  const activeFilterCount = [appliedFilters.modalidade, appliedFilters.uf, appliedFilters.situacao, appliedFilters.orgao, appliedFilters.vencedor, hasNonDefaultDateFrom ? appliedFilters.dateFrom : null, appliedFilters.dateTo, !appliedFilters.comVencedor ? "no-vencedor" : null].filter(Boolean).length;
 
-  const { data: situacoes } = useQuery({
-    queryKey: ["situacoes-distintas"],
-    queryFn: async () => {
-      const { data, error } = await (supabase as any).rpc("get_distinct_situacoes");
-      if (error) { console.warn("Situacoes error:", error); return []; }
-      return data as { situacao: string; count: number }[];
-    },
-    staleTime: 5 * 60 * 1000,
-  });
+  const SITUACOES_FIXAS = [
+    "Divulgada no PNCP",
+    "Encerrada",
+    "Suspensa",
+    "Revogada",
+    "Anulada",
+    "Aberta",
+    "Em andamento",
+  ];
 
   const { data: queryResult, isLoading } = useQuery({
-    queryKey: ["licitacoes-rpc", debouncedSearch, page, filterModalidade, filterUf, filterSituacao, debouncedOrgao, debouncedVencedor, dateFrom?.toISOString(), dateTo?.toISOString(), comVencedor],
+    queryKey: ["licitacoes-rpc", appliedFilters, page],
     queryFn: async () => {
       const params: any = {
         p_limit: PAGE_SIZE,
         p_offset: page * PAGE_SIZE,
-        p_com_vencedor: comVencedor,
+        p_com_vencedor: appliedFilters.comVencedor,
       };
-      if (debouncedSearch.trim()) params.p_search = debouncedSearch.trim();
-      if (filterModalidade) params.p_modalidade = filterModalidade;
-      if (filterUf) params.p_uf = filterUf;
-      if (filterSituacao) params.p_situacao = filterSituacao;
-      if (debouncedOrgao.trim()) params.p_orgao = debouncedOrgao.trim();
-      if (debouncedVencedor.trim()) params.p_vencedor = debouncedVencedor.trim();
-      if (dateFrom) params.p_date_from = format(dateFrom, "yyyy-MM-dd");
-      if (dateTo) params.p_date_to = format(dateTo, "yyyy-MM-dd");
+      if (appliedFilters.search) params.p_search = appliedFilters.search;
+      if (appliedFilters.modalidade) params.p_modalidade = appliedFilters.modalidade;
+      if (appliedFilters.uf) params.p_uf = appliedFilters.uf;
+      if (appliedFilters.situacao) params.p_situacao = appliedFilters.situacao;
+      if (appliedFilters.orgao) params.p_orgao = appliedFilters.orgao;
+      if (appliedFilters.vencedor) params.p_vencedor = appliedFilters.vencedor;
+      if (appliedFilters.dateFrom) params.p_date_from = format(appliedFilters.dateFrom, "yyyy-MM-dd");
+      if (appliedFilters.dateTo) params.p_date_to = format(appliedFilters.dateTo, "yyyy-MM-dd");
 
       const { data, error } = await (supabase as any).rpc("search_licitacoes", params);
       if (error) throw error;
@@ -259,7 +276,7 @@ export default function LicitacoesPage() {
 
   const cancelIngestion = () => { abortRef.current = true; toast.info("Cancelando..."); };
 
-  const handleSearch = (value: string) => { setSearchTerm(value); setPage(0); };
+  
 
   const [exporting, setExporting] = useState(false);
 
@@ -271,15 +288,15 @@ export default function LicitacoesPage() {
       const batchSize = 1000;
       let hasMore = true;
       while (hasMore && allData.length < 10000) {
-        const params: any = { p_limit: batchSize, p_offset: offset, p_com_vencedor: comVencedor };
-        if (debouncedSearch.trim()) params.p_search = debouncedSearch.trim();
-        if (filterModalidade) params.p_modalidade = filterModalidade;
-        if (filterUf) params.p_uf = filterUf;
-        if (filterSituacao) params.p_situacao = filterSituacao;
-        if (debouncedOrgao.trim()) params.p_orgao = debouncedOrgao.trim();
-        if (debouncedVencedor.trim()) params.p_vencedor = debouncedVencedor.trim();
-        if (dateFrom) params.p_date_from = format(dateFrom, "yyyy-MM-dd");
-        if (dateTo) params.p_date_to = format(dateTo, "yyyy-MM-dd");
+        const params: any = { p_limit: batchSize, p_offset: offset, p_com_vencedor: appliedFilters.comVencedor };
+        if (appliedFilters.search) params.p_search = appliedFilters.search;
+        if (appliedFilters.modalidade) params.p_modalidade = appliedFilters.modalidade;
+        if (appliedFilters.uf) params.p_uf = appliedFilters.uf;
+        if (appliedFilters.situacao) params.p_situacao = appliedFilters.situacao;
+        if (appliedFilters.orgao) params.p_orgao = appliedFilters.orgao;
+        if (appliedFilters.vencedor) params.p_vencedor = appliedFilters.vencedor;
+        if (appliedFilters.dateFrom) params.p_date_from = format(appliedFilters.dateFrom, "yyyy-MM-dd");
+        if (appliedFilters.dateTo) params.p_date_to = format(appliedFilters.dateTo, "yyyy-MM-dd");
         const { data, error } = await (supabase as any).rpc("search_licitacoes", params);
         if (error) throw error;
         if (data && data.length > 0) { allData = [...allData, ...data]; offset += batchSize; hasMore = data.length === batchSize; }
@@ -300,13 +317,19 @@ export default function LicitacoesPage() {
       toast.success(`${rows.length.toLocaleString("pt-BR")} registros exportados com sucesso!`);
     } catch (err) { console.error("Export error:", err); toast.error("Erro ao exportar dados."); }
     finally { setExporting(false); }
-  }, [debouncedSearch, filterModalidade, filterUf, filterSituacao, debouncedOrgao, debouncedVencedor, dateFrom, dateTo, comVencedor]);
+  }, [appliedFilters]);
 
   const clearFilters = () => {
+    const defaults = {
+      search: "", orgao: "", vencedor: "", modalidade: "", uf: "", situacao: "",
+      dateFrom: new Date(new Date().getFullYear(), 0, 1) as Date | undefined,
+      dateTo: undefined as Date | undefined, comVencedor: true,
+    };
     setSearchTerm(""); setFilterModalidade(""); setFilterUf(""); setFilterSituacao("");
     setFilterOrgao(""); setFilterVencedor("");
-    setDateFrom(new Date(new Date().getFullYear(), 0, 1)); setDateTo(undefined);
+    setDateFrom(defaults.dateFrom); setDateTo(undefined);
     setComVencedor(true); setPage(0);
+    setAppliedFilters(defaults);
   };
 
   return (
@@ -369,16 +392,26 @@ export default function LicitacoesPage() {
 
       {/* Search & Filters - Always visible */}
       <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-        {/* Row 1: Main search bar */}
-        <div className="relative">
-          <Search className="absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-          <input
-            value={searchTerm}
-            onChange={(e) => handleSearch(e.target.value)}
-            placeholder="Buscar por objeto ou descrição da licitação..."
-            className="h-12 w-full rounded-xl border border-input bg-background pl-12 pr-4 text-base placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-primary transition"
-          />
-        </div>
+        {/* Row 1: Main search bar with Pesquisar button */}
+        <form onSubmit={(e) => { e.preventDefault(); applyFilters(); }} className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Buscar por objeto ou descrição da licitação..."
+              className="h-12 w-full rounded-xl border border-input bg-background pl-12 pr-4 text-base placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-primary transition"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="flex h-12 items-center gap-2 rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition disabled:opacity-50 shrink-0"
+          >
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+            Pesquisar
+          </button>
+        </form>
 
         {/* Row 2: Quick filters always visible */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
@@ -389,7 +422,7 @@ export default function LicitacoesPage() {
             </label>
             <input
               value={filterOrgao}
-              onChange={(e) => { setFilterOrgao(e.target.value); setPage(0); }}
+              onChange={(e) => setFilterOrgao(e.target.value)}
               placeholder="Ex: Sanasa, UFMG..."
               className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             />
@@ -398,7 +431,7 @@ export default function LicitacoesPage() {
           {/* UF */}
           <div className="space-y-1">
             <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">UF</label>
-            <select value={filterUf} onChange={(e) => { setFilterUf(e.target.value); setPage(0); }} className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+            <select value={filterUf} onChange={(e) => setFilterUf(e.target.value)} className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
               <option value="">Todas</option>
               {["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"].map(uf => (
                 <option key={uf} value={uf}>{uf}</option>
@@ -409,7 +442,7 @@ export default function LicitacoesPage() {
           {/* Modalidade */}
           <div className="space-y-1">
             <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Modalidade</label>
-            <select value={filterModalidade} onChange={(e) => { setFilterModalidade(e.target.value); setPage(0); }} className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+            <select value={filterModalidade} onChange={(e) => setFilterModalidade(e.target.value)} className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
               <option value="">Todas</option>
               <option value="Pregão - Eletrônico">Pregão Eletrônico</option>
               <option value="Concorrência - Eletrônica">Concorrência</option>
@@ -436,7 +469,7 @@ export default function LicitacoesPage() {
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
-                <CalendarComponent mode="single" selected={dateFrom} onSelect={(d) => { setDateFrom(d); setPage(0); }} locale={ptBR} initialFocus className="p-3 pointer-events-auto" />
+                <CalendarComponent mode="single" selected={dateFrom} onSelect={(d) => setDateFrom(d)} locale={ptBR} initialFocus className="p-3 pointer-events-auto" />
               </PopoverContent>
             </Popover>
           </div>
@@ -452,7 +485,7 @@ export default function LicitacoesPage() {
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
-                <CalendarComponent mode="single" selected={dateTo} onSelect={(d) => { setDateTo(d); setPage(0); }} locale={ptBR} initialFocus className="p-3 pointer-events-auto" />
+                <CalendarComponent mode="single" selected={dateTo} onSelect={(d) => setDateTo(d)} locale={ptBR} initialFocus className="p-3 pointer-events-auto" />
               </PopoverContent>
             </Popover>
           </div>
@@ -462,7 +495,7 @@ export default function LicitacoesPage() {
         <div className="flex flex-wrap items-center gap-2">
           {/* Com Vencedor toggle */}
           <button
-            onClick={() => { setComVencedor(!comVencedor); setPage(0); }}
+            onClick={() => setComVencedor(!comVencedor)}
             className={cn(
               "flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition",
               comVencedor
@@ -480,7 +513,7 @@ export default function LicitacoesPage() {
               <User className="absolute left-2.5 h-3 w-3 text-muted-foreground" />
               <input
                 value={filterVencedor}
-                onChange={(e) => { setFilterVencedor(e.target.value); setPage(0); }}
+                onChange={(e) => setFilterVencedor(e.target.value)}
                 placeholder="Filtrar por vencedor..."
                 className="h-8 w-40 rounded-full border border-input bg-background pl-7 pr-3 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:w-56 transition-all"
               />
@@ -489,12 +522,10 @@ export default function LicitacoesPage() {
 
           {/* Situação (when not filtering by vencedor) */}
           {!comVencedor && (
-            <select value={filterSituacao} onChange={(e) => { setFilterSituacao(e.target.value); setPage(0); }} className="h-8 rounded-full border border-input bg-background px-3 text-xs focus:outline-none focus:ring-2 focus:ring-ring">
+            <select value={filterSituacao} onChange={(e) => { setFilterSituacao(e.target.value); }} className="h-8 rounded-full border border-input bg-background px-3 text-xs focus:outline-none focus:ring-2 focus:ring-ring">
               <option value="">Todas situações</option>
-              {situacoes?.map(s => (
-                <option key={s.situacao} value={s.situacao}>
-                  {s.situacao} ({s.count.toLocaleString("pt-BR")})
-                </option>
+              {SITUACOES_FIXAS.map(s => (
+                <option key={s} value={s}>{s}</option>
               ))}
             </select>
           )}
@@ -526,7 +557,7 @@ export default function LicitacoesPage() {
           </div>
           <h2 className="mt-4 font-display text-lg font-semibold text-foreground">Nenhuma licitação encontrada</h2>
           <p className="mt-2 text-sm text-muted-foreground max-w-md text-center">
-            {activeFilterCount > 0 || debouncedSearch ? "Nenhum resultado para os filtros aplicados. Tente ajustar os critérios." : 'Use o menu "Ingestão" para buscar dados do PNCP.'}
+            {activeFilterCount > 0 || appliedFilters.search ? "Nenhum resultado para os filtros aplicados. Tente ajustar os critérios." : 'Use o menu "Ingestão" para buscar dados do PNCP.'}
           </p>
         </motion.div>
       ) : (
