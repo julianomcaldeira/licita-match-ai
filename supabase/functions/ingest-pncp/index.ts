@@ -9,7 +9,7 @@ const corsHeaders = {
 
 const PNCP_CONSULTA_URL = "https://pncp.gov.br/api/consulta/v1";
 const PNCP_DATA_URL = "https://pncp.gov.br/api/pncp/v1";
-const PAGE_SIZE = 500; // Increased from 50 for faster ingestion
+const PAGE_SIZE = 50; // PNCP API max is now 50 (was 500 before API change)
 const MODALIDADES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
 
 interface PNCPContratacao {
@@ -115,7 +115,9 @@ async function fetchAllPages(
       
       const response = await fetchWithRetry(url);
       if (!response.ok) {
-        await response.text();
+        const errBody = await response.text();
+        console.error(`API error mod ${modalidade} page ${pagina}: ${response.status} - ${errBody.slice(0, 200)}`);
+        errors.push(`Mod ${modalidade} pag ${pagina}: HTTP ${response.status} - ${errBody.slice(0, 100)}`);
         hasMore = false;
         continue;
       }
@@ -463,9 +465,9 @@ async function handleIngest(supabase: any, body: any) {
   let lastProcessedDate = startDate;
   let hasMore = false;
 
-  // Process up to 3 months per call for faster throughput
+  // Process only 1 month per call to avoid edge function timeout (60s)
   let monthsProcessed = 0;
-  const MAX_MONTHS_PER_CALL = 3;
+  const MAX_MONTHS_PER_CALL = 1;
 
   for (let y = startY; y <= endY; y++) {
     const mStart = (y === startY) ? startM : 1;
@@ -564,50 +566,108 @@ async function handleWinners(supabase: any, body: any) {
 }
 
 /**
- * MODE "bulk-backfill": Aggressive bulk ingestion across ALL modalidades
- * Processes multiple modalidades in parallel for maximum throughput
+ * MODE "bulk-backfill": Now processes ONE modalidade at a time, ONE month window.
+ * Uses sync_status with api_source='pncp-backfill' to track progress per modalidade.
+ * Designed to be called repeatedly (e.g., every 2 min via pg_cron).
+ * Target: fill gap from 20231201 to 20260303.
  */
 async function handleBulkBackfill(supabase: any, body: any) {
-  const dataInicial = body.dataInicial || "20230101";
-  const dataFinal = body.dataFinal || fmtDate(new Date());
-  
-  let totalIngested = 0;
-  let totalWinners = 0;
-  const allErrors: string[] = [];
+  const backfillStart = body.dataInicial || "20231201";
+  const backfillEnd = body.dataFinal || fmtDate(new Date());
 
-  // Process modalidades in parallel batches of 3
-  const PARALLEL_MODS = 3;
-  for (let i = 0; i < MODALIDADES.length; i += PARALLEL_MODS) {
-    const modBatch = MODALIDADES.slice(i, i + PARALLEL_MODS);
-    const results = await Promise.allSettled(
-      modBatch.map(async (mod) => {
-        console.log(`Bulk: Mod ${mod} ${dataInicial} → ${dataFinal}`);
-        const result = await fetchAllPages(supabase, mod, dataInicial, dataFinal, false);
-        return { mod, ...result };
-      })
-    );
-    for (const r of results) {
-      if (r.status === "fulfilled") {
-        totalIngested += r.value.total;
-        totalWinners += r.value.winners;
-        allErrors.push(...r.value.errors);
-        console.log(`Bulk: Mod ${r.value.mod} done: ${r.value.total} records`);
-      }
-    }
+  // Find the next modalidade that still needs backfilling
+  const { data: backfillRows } = await supabase
+    .from("sync_status")
+    .select("*")
+    .eq("api_source", "pncp-backfill");
+
+  const backfillMap: Record<number, string> = {};
+  for (const row of backfillRows || []) {
+    backfillMap[row.modalidade] = row.last_date_processed;
   }
 
+  let targetMod: number | null = null;
+  let startDate = backfillStart;
+
+  for (const mod of MODALIDADES) {
+    const lastProcessed = backfillMap[mod];
+    if (!lastProcessed) {
+      // Never started this modalidade
+      targetMod = mod;
+      startDate = backfillStart;
+      break;
+    }
+    if (lastProcessed < backfillEnd) {
+      // Still has months to process
+      const y = parseInt(lastProcessed.substring(0, 4));
+      const m = parseInt(lastProcessed.substring(4, 6)) - 1;
+      const d = parseInt(lastProcessed.substring(6, 8));
+      const nextDay = new Date(y, m, d + 1);
+      targetMod = mod;
+      startDate = fmtDate(nextDay);
+      break;
+    }
+    // This modalidade is complete, try next
+  }
+
+  if (targetMod === null) {
+    console.log("All modalidades backfilled up to", backfillEnd);
+    return new Response(
+      JSON.stringify({ success: true, totalIngested: 0, complete: true, message: "Backfill complete" }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  if (startDate > backfillEnd) {
+    console.log(`Mod ${targetMod}: already complete`);
+    // Mark as done and let next call pick up next modalidade
+    await supabase.from("sync_status").upsert({
+      api_source: "pncp-backfill", modalidade: targetMod,
+      last_date_processed: backfillEnd,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "api_source,modalidade" });
+    return new Response(
+      JSON.stringify({ success: true, totalIngested: 0, modalidade: targetMod, complete: false }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  // Process ONE month for this modalidade
+  const sy = parseInt(startDate.substring(0, 4));
+  const sm = parseInt(startDate.substring(4, 6));
+  const lastDay = new Date(sy, sm, 0).getDate();
+  let monthEnd = `${sy}${String(sm).padStart(2, "0")}${String(lastDay).padStart(2, "0")}`;
+  if (monthEnd > backfillEnd) monthEnd = backfillEnd;
+
+  console.log(`Backfill: Mod ${targetMod} ${startDate} → ${monthEnd}`);
+  const result = await fetchAllPages(supabase, targetMod, startDate, monthEnd, false);
+  console.log(`Backfill: Mod ${targetMod} done: ${result.total} records, ${result.errors.length} errors`);
+
+  // Update backfill progress
+  const existing = backfillMap[targetMod];
+  const prevTotal = (backfillRows || []).find((r: any) => r.modalidade === targetMod)?.total_synced || 0;
+
+  await supabase.from("sync_status").upsert({
+    api_source: "pncp-backfill", modalidade: targetMod,
+    last_date_processed: monthEnd,
+    total_synced: prevTotal + result.total,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: "api_source,modalidade" });
+
   await supabase.from("ingestao_logs").insert({
-    fonte: "PNCP",
-    endpoint: "bulk-backfill",
-    status: allErrors.length > 0 ? "parcial" : "sucesso",
-    registros_processados: totalIngested,
-    data_inicio: fmtDateISO(dataInicial),
-    data_fim: fmtDateISO(dataFinal),
-    erro: allErrors.length > 0 ? allErrors.join("; ").slice(0, 1000) : null,
+    fonte: "PNCP", endpoint: `backfill/mod-${targetMod}`,
+    status: result.errors.length > 0 ? "parcial" : "sucesso",
+    registros_processados: result.total,
+    data_inicio: fmtDateISO(startDate), data_fim: fmtDateISO(monthEnd),
+    erro: result.errors.length > 0 ? result.errors.join("; ").slice(0, 1000) : null,
   });
 
   return new Response(
-    JSON.stringify({ success: true, totalIngested, totalWinners, errors: allErrors.length }),
+    JSON.stringify({
+      success: true, totalIngested: result.total,
+      modalidade: targetMod, period: `${startDate}-${monthEnd}`,
+      errors: result.errors.length, complete: false,
+    }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 }
