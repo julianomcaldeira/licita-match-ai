@@ -462,7 +462,25 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      mv_empresas_vencedoras: {
+        Row: {
+          cnpj: string | null
+          municipio: string | null
+          razao_social: string | null
+          total_vitorias: number | null
+          uf: string | null
+        }
+        Relationships: []
+      }
+      mv_orgaos: {
+        Row: {
+          municipio: string | null
+          orgao: string | null
+          total_licitacoes: number | null
+          uf: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       analytics_daily_by_status: {
