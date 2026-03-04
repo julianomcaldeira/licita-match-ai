@@ -1,7 +1,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, Building2, LayoutDashboard, Trophy } from "lucide-react";
+import { Building2, FileText, LayoutDashboard, Trophy } from "lucide-react";
 import DashboardOverview from "@/components/dashboard/DashboardOverview";
-import DashboardAnalytics from "@/components/dashboard/DashboardAnalytics";
+import TopLicitacoesList from "@/components/dashboard/TopLicitacoesList";
 import OrgaosList from "@/components/dashboard/OrgaosList";
 import EmpresasVencedorasList from "@/components/dashboard/EmpresasVencedorasList";
 
@@ -12,8 +12,8 @@ export default function Dashboard() {
         <TabsTrigger value="overview" className="gap-2">
           <LayoutDashboard className="h-4 w-4" /> Visão Geral
         </TabsTrigger>
-        <TabsTrigger value="analytics" className="gap-2">
-          <BarChart3 className="h-4 w-4" /> Analytics
+        <TabsTrigger value="licitacoes" className="gap-2">
+          <FileText className="h-4 w-4" /> Licitações
         </TabsTrigger>
         <TabsTrigger value="orgaos" className="gap-2">
           <Building2 className="h-4 w-4" /> Órgãos
@@ -25,8 +25,8 @@ export default function Dashboard() {
       <TabsContent value="overview">
         <DashboardOverview />
       </TabsContent>
-      <TabsContent value="analytics">
-        <DashboardAnalytics />
+      <TabsContent value="licitacoes">
+        <TopLicitacoesList />
       </TabsContent>
       <TabsContent value="orgaos">
         <OrgaosList />
