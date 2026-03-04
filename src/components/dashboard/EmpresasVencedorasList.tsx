@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useDeferredValue } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Search, Loader2, Trophy, MapPin } from "lucide-react";
@@ -19,15 +19,16 @@ const UFS = [
 
 export default function EmpresasVencedorasList() {
   const [search, setSearch] = useState("");
+  const deferredSearch = useDeferredValue(search);
   const [uf, setUf] = useState<string>("");
   const [page, setPage] = useState(0);
   const limit = 50;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["list-empresas-vencedoras", search, uf, page],
+    queryKey: ["list-empresas-vencedoras", deferredSearch, uf, page],
     queryFn: async () => {
       const { data, error } = await (supabase as any).rpc("list_empresas_vencedoras", {
-        p_search: search || null,
+        p_search: deferredSearch || null,
         p_uf: uf || null,
         p_limit: limit,
         p_offset: page * limit,
