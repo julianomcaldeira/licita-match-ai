@@ -1,7 +1,7 @@
 import { useState, useDeferredValue } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, Loader2, Building2, MapPin } from "lucide-react";
+import { Search, Loader2, Building2, MapPin, ArrowUpDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -17,24 +17,29 @@ const UFS = [
   "PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO",
 ];
 
+const fmt = (v: number) =>
+  v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+
 export default function OrgaosList() {
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
   const [uf, setUf] = useState<string>("");
+  const [orderBy, setOrderBy] = useState<string>("total_licitacoes");
   const [page, setPage] = useState(0);
   const limit = 50;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["list-orgaos", deferredSearch, uf, page],
+    queryKey: ["list-orgaos", deferredSearch, uf, orderBy, page],
     queryFn: async () => {
       const { data, error } = await (supabase as any).rpc("list_orgaos", {
         p_search: deferredSearch || null,
         p_uf: uf || null,
         p_limit: limit,
         p_offset: page * limit,
+        p_order_by: orderBy,
       });
       if (error) throw error;
-      return data as { orgao: string; uf: string; municipio: string; total_licitacoes: number; total_count: number }[];
+      return data as { orgao: string; uf: string; municipio: string; total_licitacoes: number; total_valor: number; total_count: number }[];
     },
     placeholderData: (prev) => prev,
   });
@@ -64,6 +69,16 @@ export default function OrgaosList() {
             {UFS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
           </SelectContent>
         </Select>
+        <Select value={orderBy} onValueChange={(v) => { setOrderBy(v); setPage(0); }}>
+          <SelectTrigger className="w-[180px]">
+            <ArrowUpDown className="h-4 w-4 mr-2" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="total_licitacoes">Ordenar por Qtd</SelectItem>
+            <SelectItem value="total_valor">Ordenar por Valor</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Total */}
@@ -91,6 +106,7 @@ export default function OrgaosList() {
                   <TableHead className="w-[80px]">UF</TableHead>
                   <TableHead>Município</TableHead>
                   <TableHead className="text-right w-[120px]">Licitações</TableHead>
+                  <TableHead className="text-right w-[160px]">Valor Total</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -107,11 +123,12 @@ export default function OrgaosList() {
                       </span>
                     </TableCell>
                     <TableCell className="text-right font-bold text-sm">{row.total_licitacoes.toLocaleString("pt-BR")}</TableCell>
+                    <TableCell className="text-right font-bold text-sm text-primary">{fmt(row.total_valor)}</TableCell>
                   </TableRow>
                 ))}
                 {(!data || data.length === 0) && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                       Nenhum órgão encontrado
                     </TableCell>
                   </TableRow>
@@ -120,7 +137,6 @@ export default function OrgaosList() {
             </Table>
           </div>
 
-          {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">
