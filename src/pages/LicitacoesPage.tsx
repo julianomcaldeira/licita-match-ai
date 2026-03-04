@@ -91,7 +91,8 @@ export default function LicitacoesPage() {
   const [filterVencedor, setFilterVencedor] = useState("");
   const [filterOrgao, setFilterOrgao] = useState("");
   const [filterSearch, setFilterSearch] = useState("");
-  const [filterDateFrom, setFilterDateFrom] = useState<Date | undefined>();
+  const defaultDateFrom = new Date(2023, 0, 1);
+  const [filterDateFrom, setFilterDateFrom] = useState<Date | undefined>(defaultDateFrom);
   const [filterDateTo, setFilterDateTo] = useState<Date | undefined>();
   const [filterUf, setFilterUf] = useState("");
   const [filterSituacao, setFilterSituacao] = useState("");
@@ -100,7 +101,7 @@ export default function LicitacoesPage() {
   // Applied filters (only update on search click)
   const [appliedFilters, setAppliedFilters] = useState<{
     vencedor: string; orgao: string; search: string; dateFrom?: string; dateTo?: string; uf?: string; situacao?: string; comVencedor?: boolean;
-  }>({ vencedor: "", orgao: "", search: "" });
+  }>({ vencedor: "", orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd") });
 
   const handleSearch = () => {
     setPage(0);
@@ -120,13 +121,13 @@ export default function LicitacoesPage() {
     setFilterVencedor("");
     setFilterOrgao("");
     setFilterSearch("");
-    setFilterDateFrom(undefined);
+    setFilterDateFrom(defaultDateFrom);
     setFilterDateTo(undefined);
     setFilterUf("");
     setFilterSituacao("");
     setFilterComVencedor(false);
     setPage(0);
-    setAppliedFilters({ vencedor: "", orgao: "", search: "" });
+    setAppliedFilters({ vencedor: "", orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd") });
   };
 
   const hasActiveFilters = appliedFilters.vencedor || appliedFilters.orgao || appliedFilters.search || appliedFilters.dateFrom || appliedFilters.dateTo || appliedFilters.uf || appliedFilters.situacao || appliedFilters.comVencedor;
