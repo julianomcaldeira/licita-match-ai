@@ -467,6 +467,7 @@ export type Database = {
           cnpj: string | null
           municipio: string | null
           razao_social: string | null
+          total_valor: number | null
           total_vitorias: number | null
           uf: string | null
         }
@@ -477,6 +478,7 @@ export type Database = {
           municipio: string | null
           orgao: string | null
           total_licitacoes: number | null
+          total_valor: number | null
           uf: string | null
         }
         Relationships: []
@@ -571,37 +573,74 @@ export type Database = {
         }[]
       }
       link_contratos_licitacoes: { Args: never; Returns: number }
-      list_empresas_vencedoras: {
-        Args: {
-          p_limit?: number
-          p_offset?: number
-          p_search?: string
-          p_uf?: string
-        }
-        Returns: {
-          cnpj: string
-          municipio: string
-          razao_social: string
-          total_count: number
-          total_vitorias: number
-          uf: string
-        }[]
-      }
-      list_orgaos: {
-        Args: {
-          p_limit?: number
-          p_offset?: number
-          p_search?: string
-          p_uf?: string
-        }
-        Returns: {
-          municipio: string
-          orgao: string
-          total_count: number
-          total_licitacoes: number
-          uf: string
-        }[]
-      }
+      list_empresas_vencedoras:
+        | {
+            Args: {
+              p_limit?: number
+              p_offset?: number
+              p_search?: string
+              p_uf?: string
+            }
+            Returns: {
+              cnpj: string
+              municipio: string
+              razao_social: string
+              total_count: number
+              total_vitorias: number
+              uf: string
+            }[]
+          }
+        | {
+            Args: {
+              p_limit?: number
+              p_offset?: number
+              p_order_by?: string
+              p_search?: string
+              p_uf?: string
+            }
+            Returns: {
+              cnpj: string
+              municipio: string
+              razao_social: string
+              total_count: number
+              total_valor: number
+              total_vitorias: number
+              uf: string
+            }[]
+          }
+      list_orgaos:
+        | {
+            Args: {
+              p_limit?: number
+              p_offset?: number
+              p_search?: string
+              p_uf?: string
+            }
+            Returns: {
+              municipio: string
+              orgao: string
+              total_count: number
+              total_licitacoes: number
+              uf: string
+            }[]
+          }
+        | {
+            Args: {
+              p_limit?: number
+              p_offset?: number
+              p_order_by?: string
+              p_search?: string
+              p_uf?: string
+            }
+            Returns: {
+              municipio: string
+              orgao: string
+              total_count: number
+              total_licitacoes: number
+              total_valor: number
+              uf: string
+            }[]
+          }
       match_licitacoes_por_keywords: {
         Args: { p_empresa_id: string; p_limit?: number }
         Returns: {
