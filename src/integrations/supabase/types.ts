@@ -553,6 +553,37 @@ export type Database = {
         }[]
       }
       link_contratos_licitacoes: { Args: never; Returns: number }
+      list_empresas_vencedoras: {
+        Args: {
+          p_limit?: number
+          p_offset?: number
+          p_search?: string
+          p_uf?: string
+        }
+        Returns: {
+          cnpj: string
+          municipio: string
+          razao_social: string
+          total_count: number
+          total_vitorias: number
+          uf: string
+        }[]
+      }
+      list_orgaos: {
+        Args: {
+          p_limit?: number
+          p_offset?: number
+          p_search?: string
+          p_uf?: string
+        }
+        Returns: {
+          municipio: string
+          orgao: string
+          total_count: number
+          total_licitacoes: number
+          uf: string
+        }[]
+      }
       match_licitacoes_por_keywords: {
         Args: { p_empresa_id: string; p_limit?: number }
         Returns: {
