@@ -194,11 +194,11 @@ export default function LicitacoesPage() {
   const { data: queryResult, isLoading } = useQuery({
     queryKey: ["licitacoes-all", page, appliedFilters],
     queryFn: async () => {
+      // Use estimated count for performance - avoid exact count on huge tables
       let query = supabase
         .from("licitacoes")
-        .select("id, orgao, objeto, modalidade, valor_estimado, valor_homologado, data_publicacao, uf, municipio, situacao, numero_controle_pncp", { count: "exact" })
+        .select("id, orgao, objeto, modalidade, valor_estimado, valor_homologado, data_publicacao, uf, municipio, situacao, numero_controle_pncp", { count: "estimated" })
         .order("valor_homologado", { ascending: false, nullsFirst: false })
-        .order("valor_estimado", { ascending: false, nullsFirst: false })
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
       if (appliedFilters.dateFrom) query = query.gte("data_publicacao", appliedFilters.dateFrom);
