@@ -20,32 +20,32 @@ export default function TopLicitacoesList() {
   const [page, setPage] = useState(0);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["top-licitacoes", search, uf, page],
+    queryKey: ["top-licitacoes-dash", search, uf, page],
     queryFn: async () => {
-      const { data, error } = await (supabase as any).rpc("search_licitacoes", {
-        p_search: search || null,
-        p_uf: uf === "all" ? null : uf,
-        p_limit: PAGE_SIZE,
-        p_offset: page * PAGE_SIZE,
-      });
+      let query = supabase
+        .from("licitacoes")
+        .select("id, orgao, uf, municipio, objeto, valor_estimado, valor_homologado, situacao, data_publicacao", { count: "exact" })
+        .order("valor_homologado", { ascending: false, nullsFirst: false })
+        .order("valor_estimado", { ascending: false, nullsFirst: false })
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+      if (uf && uf !== "all") {
+        query = query.eq("uf", uf);
+      }
+
+      if (search) {
+        query = query.or(`orgao.ilike.%${search}%,objeto.ilike.%${search}%`);
+      }
+
+      const { data, error, count } = await query;
       if (error) throw error;
-      return data as {
-        id: string;
-        orgao: string;
-        uf: string;
-        municipio: string;
-        objeto: string;
-        valor_estimado: number;
-        valor_homologado: number;
-        situacao: string;
-        data_publicacao: string;
-        total_count: number;
-      }[];
+      return { rows: data, totalCount: count || 0 };
     },
   });
 
-  const totalCount = data?.[0]?.total_count || 0;
+  const totalCount = data?.totalCount || 0;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+  const rows = data?.rows || [];
 
   const { data: ufs } = useQuery({
     queryKey: ["ufs-licitacoes"],
@@ -105,7 +105,7 @@ export default function TopLicitacoesList() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data?.map((l, i) => {
+                {rows.map((l, i) => {
                   const valor = l.valor_homologado || l.valor_estimado || 0;
                   return (
                     <Tooltip key={l.id}>
@@ -130,7 +130,7 @@ export default function TopLicitacoesList() {
                     </Tooltip>
                   );
                 })}
-                {(!data || data.length === 0) && (
+                {rows.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                       Nenhuma licitação encontrada
