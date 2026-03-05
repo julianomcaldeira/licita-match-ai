@@ -194,28 +194,36 @@ export default function LicitacoesPage() {
   const { data: queryResult, isLoading } = useQuery({
     queryKey: ["licitacoes-all", page, appliedFilters],
     queryFn: async () => {
-      const params: any = {
-        p_limit: PAGE_SIZE,
-        p_offset: page * PAGE_SIZE,
-      };
-      if (appliedFilters.comVencedor) params.p_com_vencedor = true;
-      if (appliedFilters.vencedor) params.p_vencedor = appliedFilters.vencedor;
-      if (appliedFilters.orgao) params.p_orgao = appliedFilters.orgao;
-      if (appliedFilters.search) params.p_search = appliedFilters.search;
-      if (appliedFilters.dateFrom) params.p_date_from = appliedFilters.dateFrom;
-      if (appliedFilters.dateTo) params.p_date_to = appliedFilters.dateTo;
-      if (appliedFilters.uf) params.p_uf = appliedFilters.uf;
-      if (appliedFilters.situacao) params.p_situacao = appliedFilters.situacao;
-      const { data, error } = await (supabase as any).rpc("search_licitacoes", params);
+      let query = supabase
+        .from("licitacoes")
+        .select("id, orgao, objeto, modalidade, valor_estimado, valor_homologado, data_publicacao, uf, municipio, situacao, numero_controle_pncp", { count: "exact" })
+        .order("valor_homologado", { ascending: false, nullsFirst: false })
+        .order("valor_estimado", { ascending: false, nullsFirst: false })
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+      if (appliedFilters.dateFrom) query = query.gte("data_publicacao", appliedFilters.dateFrom);
+      if (appliedFilters.dateTo) query = query.lte("data_publicacao", appliedFilters.dateTo);
+      if (appliedFilters.uf) query = query.eq("uf", appliedFilters.uf);
+      if (appliedFilters.situacao) query = query.eq("situacao", appliedFilters.situacao);
+      if (appliedFilters.orgao) query = query.ilike("orgao", `%${appliedFilters.orgao}%`);
+      if (appliedFilters.search) {
+        const terms = appliedFilters.search.split(/\s+/).filter(Boolean);
+        for (const term of terms) {
+          query = query.ilike("objeto", `%${term}%`);
+        }
+      }
+      if (appliedFilters.comVencedor) query = query.not("valor_homologado", "is", null);
+
+      const { data, error, count } = await query;
       if (error) throw error;
-      return data as any[];
+      return { rows: data || [], totalCount: count || 0 };
     },
     placeholderData: (prev) => prev,
     staleTime: 60_000,
   });
 
-  const licitacoes = queryResult || [];
-  const totalCount = licitacoes.length > 0 ? Number(licitacoes[0].total_count) : 0;
+  const licitacoes = queryResult?.rows || [];
+  const totalCount = queryResult?.totalCount || 0;
   const hasData = licitacoes.length > 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
@@ -280,8 +288,11 @@ export default function LicitacoesPage() {
       const batchSize = 1000;
       let hasMore = true;
       while (hasMore && allData.length < 10000) {
-        const params: any = { p_limit: batchSize, p_offset: offset };
-        const { data, error } = await (supabase as any).rpc("search_licitacoes", params);
+        const { data, error } = await supabase
+          .from("licitacoes")
+          .select("orgao, objeto, modalidade, valor_estimado, valor_homologado, data_publicacao, uf, municipio, situacao")
+          .order("valor_homologado", { ascending: false, nullsFirst: false })
+          .range(offset, offset + batchSize - 1);
         if (error) throw error;
         if (data && data.length > 0) { allData = [...allData, ...data]; offset += batchSize; hasMore = data.length === batchSize; }
         else hasMore = false;
@@ -548,10 +559,7 @@ export default function LicitacoesPage() {
                           ) : "—"}
                         </td>
                         <td className="px-4 py-3 text-foreground max-w-[160px]">
-                          <Tooltip>
-                            <TooltipTrigger asChild><span className="block truncate text-xs">{row.vencedor_nome || "—"}</span></TooltipTrigger>
-                            <TooltipContent side="bottom" className="max-w-sm"><p className="text-xs">{row.vencedor_nome || "Sem vencedor"}</p></TooltipContent>
-                          </Tooltip>
+                          <span className="block truncate text-xs text-muted-foreground">Ver detalhes</span>
                         </td>
                         <td className="px-4 py-3 text-muted-foreground text-xs">{formattedDate}</td>
                         <td className="px-4 py-3 text-center text-muted-foreground text-xs font-medium">{row.uf || "—"}</td>
