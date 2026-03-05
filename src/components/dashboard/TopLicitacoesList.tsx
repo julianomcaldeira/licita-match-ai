@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useDeferredValue } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -16,11 +16,12 @@ function formatCurrency(value: number) {
 
 export default function TopLicitacoesList() {
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDeferredValue(search);
   const [uf, setUf] = useState("all");
   const [page, setPage] = useState(0);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["top-licitacoes-dash", search, uf, page],
+    queryKey: ["top-licitacoes-dash", debouncedSearch, uf, page],
     queryFn: async () => {
       let query = supabase
         .from("licitacoes")
@@ -33,8 +34,8 @@ export default function TopLicitacoesList() {
         query = query.eq("uf", uf);
       }
 
-      if (search) {
-        query = query.or(`orgao.ilike.%${search}%,objeto.ilike.%${search}%`);
+      if (debouncedSearch) {
+        query = query.or(`orgao.ilike.%${debouncedSearch}%,objeto.ilike.%${debouncedSearch}%`);
       }
 
       const { data, error, count } = await query;

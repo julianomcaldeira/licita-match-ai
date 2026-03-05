@@ -288,8 +288,11 @@ export default function LicitacoesPage() {
       const batchSize = 1000;
       let hasMore = true;
       while (hasMore && allData.length < 10000) {
-        const params: any = { p_limit: batchSize, p_offset: offset };
-        const { data, error } = await (supabase as any).rpc("search_licitacoes", params);
+        const { data, error } = await supabase
+          .from("licitacoes")
+          .select("orgao, objeto, modalidade, valor_estimado, valor_homologado, data_publicacao, uf, municipio, situacao")
+          .order("valor_homologado", { ascending: false, nullsFirst: false })
+          .range(offset, offset + batchSize - 1);
         if (error) throw error;
         if (data && data.length > 0) { allData = [...allData, ...data]; offset += batchSize; hasMore = data.length === batchSize; }
         else hasMore = false;
