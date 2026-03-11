@@ -672,9 +672,40 @@ async function handleBulkBackfill(supabase: any, body: any) {
   );
 }
 
+async function authenticateAdmin(req: Request): Promise<{ userId: string } | null> {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) return null;
+
+  const supabaseAuth = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || "",
+    { global: { headers: { Authorization: authHeader } } }
+  );
+
+  const token = authHeader.replace("Bearer ", "");
+  const { data, error } = await supabaseAuth.auth.getClaims(token);
+  if (error || !data?.claims) return null;
+
+  const userId = data.claims.sub as string;
+  const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const { data: roles } = await supabase
+    .from("user_roles").select("role").eq("user_id", userId).eq("role", "admin_central").limit(1);
+
+  if (!roles?.length) return null;
+  return { userId };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Auth + admin check
+  const auth = await authenticateAdmin(req);
+  if (!auth) {
+    return new Response(JSON.stringify({ error: "Não autorizado. Acesso restrito a administradores." }), {
+      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;

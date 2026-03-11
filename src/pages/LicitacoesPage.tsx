@@ -1,6 +1,8 @@
 import { useState, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import { RefreshCw, Loader2, Database, ChevronLeft, ChevronRight, X, Trophy, ExternalLink, ChevronDown, FileSpreadsheet, Eye, Package, Award, FileText, MapPin, DollarSign, Clock, Brain, Sparkles, Search, CalendarIcon } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -675,7 +677,7 @@ export default function LicitacoesPage() {
                   </div>
                   {aiAnalysis && (
                     <div className="prose prose-sm max-w-none text-foreground [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_p]:text-sm [&_li]:text-sm [&_strong]:text-foreground">
-                      <div dangerouslySetInnerHTML={{ __html: aiAnalysis.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br/>').replace(/^- (.*)/gm, '• $1') }} />
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{aiAnalysis}</ReactMarkdown>
                     </div>
                   )}
                   {!aiAnalysis && !aiLoading && (

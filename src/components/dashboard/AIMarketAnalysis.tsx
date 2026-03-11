@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { format, subMonths } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
 
 const ANALYSIS_TYPES = [
   { id: "market_overview", label: "Visão Geral", icon: BarChart3, description: "Tendências, concentrações e oportunidades gerais" },
@@ -148,13 +149,21 @@ export default function AIMarketAnalysis() {
     const dateTo = format(new Date(), "yyyy-MM-dd");
 
     try {
+      const { data: session } = await supabase.auth.getSession();
+      const accessToken = session?.session?.access_token;
+      if (!accessToken) {
+        setCurrentContent("❌ **Erro:** Você precisa estar logado para usar a análise IA.");
+        setIsStreaming(false);
+        return;
+      }
+
       const resp = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/market-analysis`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            Authorization: `Bearer ${accessToken}`,
           },
           body: JSON.stringify({
             analysisType: selectedType,
