@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.ingest-contratos]
 verify_jwt = false
+
+[functions.market-analysis]
+verify_jwt = false
