@@ -115,6 +115,7 @@ export default function LicitacoesPage() {
       dateTo: filterDateTo ? format(filterDateTo, "yyyy-MM-dd") : undefined,
       uf: filterUf || undefined,
       situacao: filterSituacao || undefined,
+      vencedor: filterVencedor.trim() || undefined,
     });
   };
 
