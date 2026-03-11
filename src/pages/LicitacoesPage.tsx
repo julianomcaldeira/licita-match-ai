@@ -606,21 +606,19 @@ export default function LicitacoesPage() {
                             </span>
                           ) : "—"}
                         </td>
-                        {appliedFilters.vencedor && (
-                          <td className="px-4 py-3 max-w-[200px]" onClick={(e) => e.stopPropagation()}>
-                            {row.vencedor_nome ? (
-                              <button
-                                onClick={() => searchByWinner(row.vencedor_nome)}
-                                className="block truncate text-primary text-xs font-medium hover:underline text-left max-w-full"
-                                title={`Ver todas licitações de ${row.vencedor_nome}`}
-                              >
-                                {row.vencedor_nome}
-                              </button>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">—</span>
-                            )}
-                          </td>
-                        )}
+                        <td className="px-4 py-3 max-w-[200px]" onClick={(e) => e.stopPropagation()}>
+                          {row.vencedor_nome ? (
+                            <button
+                              onClick={() => searchByWinner(row.vencedor_nome)}
+                              className="block truncate text-primary text-xs font-medium hover:underline text-left max-w-full"
+                              title={`Ver todas licitações de ${row.vencedor_nome}`}
+                            >
+                              {row.vencedor_nome}
+                            </button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-muted-foreground text-xs">{formattedDate}</td>
                         <td className="px-4 py-3 text-center text-muted-foreground text-xs font-medium">{row.uf || "—"}</td>
                       </tr>
