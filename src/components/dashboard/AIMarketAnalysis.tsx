@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { format, subMonths } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
 
 const ANALYSIS_TYPES = [
   { id: "market_overview", label: "Visão Geral", icon: BarChart3, description: "Tendências, concentrações e oportunidades gerais" },
