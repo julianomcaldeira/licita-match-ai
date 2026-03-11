@@ -100,18 +100,6 @@ export default function LicitacoesPage() {
   const [filterSituacao, setFilterSituacao] = useState("");
   
 
-  // Load órgãos for dropdown
-  const { data: orgaoOptions, isLoading: orgaosLoading } = useQuery({
-    queryKey: ["orgaos-dropdown"],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("list_orgaos", { p_limit: 1000, p_offset: 0, p_order_by: "total_licitacoes" });
-      if (error) throw error;
-      return (data || []).map((o: any) => ({ label: `${o.orgao} (${o.uf || "?"})`, value: o.orgao }));
-    },
-    staleTime: 10 * 60_000,
-    retry: 1,
-    refetchOnWindowFocus: false,
-  });
 
 
   // Applied filters (only update on search click)
