@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { Check, ChevronsUpDown, Search, X } from "lucide-react";
+import { Check, ChevronsUpDown, Search, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface ComboboxFilterProps {
@@ -14,6 +13,8 @@ interface ComboboxFilterProps {
   searchPlaceholder?: string;
   isLoading?: boolean;
   className?: string;
+  /** Server-side search callback. When provided, options are fetched dynamically. */
+  onServerSearch?: (term: string) => void;
 }
 
 export default function ComboboxFilter({
@@ -24,20 +25,35 @@ export default function ComboboxFilter({
   searchPlaceholder = "Buscar...",
   isLoading,
   className,
+  onServerSearch,
 }: ComboboxFilterProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     if (open) {
       setTimeout(() => inputRef.current?.focus(), 100);
+      // Trigger initial load when opening
+      if (onServerSearch) onServerSearch("");
     } else {
       setSearch("");
     }
   }, [open]);
 
-  const filtered = search
+  const handleSearchChange = (term: string) => {
+    setSearch(term);
+    if (onServerSearch) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => onServerSearch(term), 300);
+    }
+  };
+
+  // Client-side filter only when no server search is provided
+  const filtered = onServerSearch
+    ? options
+    : search
     ? options.filter((o) => o.label.toLowerCase().includes(search.toLowerCase()))
     : options;
 
@@ -75,14 +91,15 @@ export default function ComboboxFilter({
           <input
             ref={inputRef}
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             placeholder={searchPlaceholder}
             className="flex h-7 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
+          {isLoading && <Loader2 className="ml-2 h-4 w-4 shrink-0 animate-spin text-muted-foreground" />}
         </div>
         <ScrollArea className="max-h-[250px]">
           <div className="p-1">
-            {isLoading ? (
+            {isLoading && filtered.length === 0 ? (
               <div className="py-6 text-center text-sm text-muted-foreground">Carregando...</div>
             ) : filtered.length === 0 ? (
               <div className="py-6 text-center text-sm text-muted-foreground">Nenhum resultado</div>

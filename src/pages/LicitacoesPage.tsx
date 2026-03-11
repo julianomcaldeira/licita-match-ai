@@ -101,26 +101,32 @@ export default function LicitacoesPage() {
   const [filterSituacao, setFilterSituacao] = useState("");
   const [filterVencedor, setFilterVencedor] = useState("");
 
-  // Load orgão options from materialized view
+  // Server-side search for orgão options
+  const [orgaoSearch, setOrgaoSearch] = useState("");
   const { data: orgaoOptions = [], isLoading: orgaosLoading } = useQuery({
-    queryKey: ["filter-orgaos"],
+    queryKey: ["filter-orgaos", orgaoSearch],
     queryFn: async () => {
-      const { data, error } = await supabase.from("mv_orgaos").select("orgao").order("total_licitacoes", { ascending: false }).limit(5000);
+      let query = supabase.from("mv_orgaos").select("orgao").order("total_licitacoes", { ascending: false }).limit(100);
+      if (orgaoSearch) query = query.ilike("orgao", `%${orgaoSearch}%`);
+      const { data, error } = await query;
       if (error) throw error;
       return (data || []).filter((r: any) => r.orgao).map((r: any) => ({ label: r.orgao, value: r.orgao }));
     },
-    staleTime: 300_000,
+    staleTime: 60_000,
   });
 
-  // Load vencedor options from materialized view
+  // Server-side search for vencedor options
+  const [vencedorSearch, setVencedorSearch] = useState("");
   const { data: vencedorOptions = [], isLoading: vencedoresLoading } = useQuery({
-    queryKey: ["filter-vencedores"],
+    queryKey: ["filter-vencedores", vencedorSearch],
     queryFn: async () => {
-      const { data, error } = await supabase.from("mv_empresas_vencedoras").select("razao_social").order("total_vitorias", { ascending: false }).limit(5000);
+      let query = supabase.from("mv_empresas_vencedoras").select("razao_social").order("total_vitorias", { ascending: false }).limit(100);
+      if (vencedorSearch) query = query.ilike("razao_social", `%${vencedorSearch}%`);
+      const { data, error } = await query;
       if (error) throw error;
       return (data || []).filter((r: any) => r.razao_social).map((r: any) => ({ label: r.razao_social, value: r.razao_social }));
     },
-    staleTime: 300_000,
+    staleTime: 60_000,
   });
 
 
@@ -443,6 +449,7 @@ export default function LicitacoesPage() {
               placeholder="Selecionar órgão..."
               searchPlaceholder="Buscar órgão..."
               isLoading={orgaosLoading}
+              onServerSearch={setOrgaoSearch}
             />
           </div>
           <div className="space-y-1">
@@ -492,6 +499,7 @@ export default function LicitacoesPage() {
               placeholder="Selecionar vencedor..."
               searchPlaceholder="Buscar vencedor..."
               isLoading={vencedoresLoading}
+              onServerSearch={setVencedorSearch}
             />
           </div>
           <div className="space-y-1">
