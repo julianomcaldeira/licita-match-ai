@@ -426,18 +426,6 @@ export default function LicitacoesPage() {
             />
           </div>
           <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Vencedor</label>
-            <ComboboxFilter
-              value={filterVencedor}
-              onChange={setFilterVencedor}
-              options={vencedorOptions || []}
-              isLoading={vencedoresLoading}
-              placeholder="Todos os vencedores"
-              searchPlaceholder="Buscar vencedor..."
-              className="h-9"
-            />
-          </div>
-          <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Data Início</label>
             <Popover>
               <PopoverTrigger asChild>
