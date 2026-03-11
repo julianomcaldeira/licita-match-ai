@@ -40,16 +40,14 @@ export default function AppSidebar() {
     >
       {/* Brand */}
       <div className="flex h-16 items-center gap-3 px-4">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-accent">
-          <Zap className="h-5 w-5 text-sidebar-accent-foreground" />
-        </div>
+        <img src={logoImg} alt="i-pesquisei" className="h-9 w-9 shrink-0 rounded-lg object-contain" />
         {!collapsed && (
           <div className="animate-fade-in">
             <h1 className="font-display text-base font-bold text-sidebar-primary">
-              LicitaMatch
+              i-pesquisei
             </h1>
             <p className="text-[10px] font-medium tracking-wider text-sidebar-foreground/60 uppercase">
-              Powered by AI
+              Inteligência B2G
             </p>
           </div>
         )}
