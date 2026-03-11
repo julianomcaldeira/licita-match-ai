@@ -567,7 +567,6 @@ export default function LicitacoesPage() {
                     <th className="px-4 py-3 text-right font-medium text-muted-foreground">Economia</th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Data</th>
                     <th className="px-4 py-3 text-center font-medium text-muted-foreground">UF</th>
-                    <th className="px-4 py-3 text-center font-medium text-muted-foreground">UF</th>
                   </tr>
                 </thead>
                 <tbody>
