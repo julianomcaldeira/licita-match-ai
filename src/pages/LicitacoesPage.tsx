@@ -860,7 +860,13 @@ export default function LicitacoesPage() {
                               <Trophy className="h-4 w-4 text-warning" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-foreground truncate">{w.razao_social || "—"}</p>
+                              <button
+                                onClick={() => w.razao_social && searchByWinner(w.razao_social)}
+                                className="text-sm font-medium text-primary truncate hover:underline text-left"
+                                title={`Ver todas licitações de ${w.razao_social}`}
+                              >
+                                {w.razao_social || "—"}
+                              </button>
                               <p className="text-xs text-muted-foreground">
                                 {w.cnpj && `CNPJ: ${w.cnpj}`}
                                 {w.numero_item != null && ` · Item ${w.numero_item}`}
