@@ -507,6 +507,19 @@ export default function LicitacoesPage() {
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
+      ) : isError ? (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center justify-center py-20">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-destructive/10">
+            <Database className="h-8 w-8 text-destructive" />
+          </div>
+          <h2 className="mt-4 font-display text-lg font-semibold text-foreground">Erro ao carregar licitações</h2>
+          <p className="mt-2 text-sm text-muted-foreground max-w-md text-center">
+            {(queryError as any)?.message || "A consulta falhou. Tente filtros mais específicos ou tente novamente."}
+          </p>
+          <Button onClick={() => refetch()} variant="outline" className="mt-4 gap-2">
+            <RefreshCw className="h-4 w-4" /> Tentar novamente
+          </Button>
+        </motion.div>
       ) : !hasData ? (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center justify-center py-20">
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">

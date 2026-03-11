@@ -16,7 +16,15 @@ import PlaceholderPage from "@/components/PlaceholderPage";
 import NotFound from "@/pages/NotFound";
 import { Users, FileText, Settings } from "lucide-react";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+      staleTime: 30_000,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
