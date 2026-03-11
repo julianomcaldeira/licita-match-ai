@@ -437,7 +437,6 @@ export default function LicitacoesPage() {
               className="h-9"
             />
           </div>
-          </div>
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Data Início</label>
             <Popover>
