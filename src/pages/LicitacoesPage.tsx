@@ -122,7 +122,9 @@ export default function LicitacoesPage() {
       if (error) throw error;
       return (data || []).map((v: any) => ({ label: `${v.razao_social} (${v.cnpj || "?"})`, value: v.razao_social }));
     },
-    staleTime: 5 * 60_000,
+    staleTime: 10 * 60_000,
+    retry: 1,
+    refetchOnWindowFocus: false,
   });
 
   // Applied filters (only update on search click)
