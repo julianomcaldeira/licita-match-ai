@@ -454,6 +454,16 @@ export default function LicitacoesPage() {
             </Select>
           </div>
           <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Vencedor</label>
+            <Input
+              placeholder="Nome ou CNPJ do vencedor..."
+              value={filterVencedor}
+              onChange={(e) => setFilterVencedor(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              className="h-9"
+            />
+          </div>
+          <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Status</label>
             <Select value={filterSituacao} onValueChange={(v) => setFilterSituacao(v === "__all__" ? "" : v)}>
               <SelectTrigger className="h-9"><SelectValue placeholder="Todos" /></SelectTrigger>
