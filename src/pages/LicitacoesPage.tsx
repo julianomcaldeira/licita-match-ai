@@ -431,7 +431,19 @@ export default function LicitacoesPage() {
       <div className="rounded-xl border border-border bg-card p-4 space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Palavra-chave do Objeto</label>
+            <div className="flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground">Palavra-chave do Objeto</label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-4 w-4 p-0 hover:bg-transparent">
+                    <span className="text-[10px] text-muted-foreground cursor-help">ⓘ</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs">
+                  <p className="text-xs">Use espaços entre palavras para buscar todas juntas (AND). Ex: "serviços consultoria" encontra licitações que contêm ambas as palavras no objeto.</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
             <Input
               placeholder="Ex: computador, limpeza..."
               value={filterSearch}
