@@ -436,12 +436,13 @@ export default function LicitacoesPage() {
           </div>
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Órgão</label>
-            <Input
-              placeholder="Ex: jundiai, marinha..."
+            <ComboboxFilter
               value={filterOrgao}
-              onChange={(e) => setFilterOrgao(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              className="h-9"
+              onChange={setFilterOrgao}
+              options={orgaoOptions}
+              placeholder="Selecionar órgão..."
+              searchPlaceholder="Buscar órgão..."
+              isLoading={orgaosLoading}
             />
           </div>
           <div className="space-y-1">
