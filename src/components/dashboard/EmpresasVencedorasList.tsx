@@ -42,6 +42,9 @@ export default function EmpresasVencedorasList() {
       return data as { razao_social: string; cnpj: string; uf: string; municipio: string; total_vitorias: number; total_valor: number; total_count: number }[];
     },
     placeholderData: (prev) => prev,
+    retry: 1,
+    refetchOnWindowFocus: false,
+    staleTime: 60_000,
   });
 
   const totalCount = data?.[0]?.total_count || 0;

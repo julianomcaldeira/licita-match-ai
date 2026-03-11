@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import ComboboxFilter from "@/components/ComboboxFilter";
+
 
 const UFS = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
 const SITUACOES = ["Divulgada no PNCP", "Revogada", "Anulada", "Suspensa"];
@@ -100,18 +100,6 @@ export default function LicitacoesPage() {
   const [filterSituacao, setFilterSituacao] = useState("");
   
 
-  // Load órgãos for dropdown
-  const { data: orgaoOptions, isLoading: orgaosLoading } = useQuery({
-    queryKey: ["orgaos-dropdown"],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("list_orgaos", { p_limit: 1000, p_offset: 0, p_order_by: "total_licitacoes" });
-      if (error) throw error;
-      return (data || []).map((o: any) => ({ label: `${o.orgao} (${o.uf || "?"})`, value: o.orgao }));
-    },
-    staleTime: 10 * 60_000,
-    retry: 1,
-    refetchOnWindowFocus: false,
-  });
 
 
   // Applied filters (only update on search click)
@@ -398,13 +386,11 @@ export default function LicitacoesPage() {
           </div>
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Órgão</label>
-            <ComboboxFilter
+            <Input
+              placeholder="Ex: jundiai, marinha..."
               value={filterOrgao}
-              onChange={setFilterOrgao}
-              options={orgaoOptions || []}
-              isLoading={orgaosLoading}
-              placeholder="Todos os órgãos"
-              searchPlaceholder="Buscar órgão..."
+              onChange={(e) => setFilterOrgao(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
               className="h-9"
             />
           </div>
