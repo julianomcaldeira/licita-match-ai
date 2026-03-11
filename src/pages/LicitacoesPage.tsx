@@ -103,7 +103,7 @@ export default function LicitacoesPage() {
   const { data: orgaoOptions, isLoading: orgaosLoading } = useQuery({
     queryKey: ["orgaos-dropdown"],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("list_orgaos", { p_limit: 1000, p_offset: 0 });
+      const { data, error } = await supabase.rpc("list_orgaos", { p_limit: 1000, p_offset: 0, p_order_by: "total_licitacoes" });
       if (error) throw error;
       return (data || []).map((o: any) => ({ label: `${o.orgao} (${o.uf || "?"})`, value: o.orgao }));
     },
@@ -114,7 +114,7 @@ export default function LicitacoesPage() {
   const { data: vencedorOptions, isLoading: vencedoresLoading } = useQuery({
     queryKey: ["vencedores-dropdown"],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("list_empresas_vencedoras", { p_limit: 1000, p_offset: 0 });
+      const { data, error } = await supabase.rpc("list_empresas_vencedoras", { p_limit: 1000, p_offset: 0, p_order_by: "total_vitorias" });
       if (error) throw error;
       return (data || []).map((v: any) => ({ label: `${v.razao_social} (${v.cnpj || "?"})`, value: v.razao_social }));
     },
