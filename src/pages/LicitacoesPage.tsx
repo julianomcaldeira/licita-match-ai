@@ -605,7 +605,9 @@ export default function LicitacoesPage() {
                           ) : "—"}
                         </td>
                         <td className="px-4 py-3 text-foreground max-w-[160px]">
-                          <span className="block truncate text-xs text-muted-foreground">Ver detalhes</span>
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {(row as any).vencedor_nome || "Ver detalhes"}
+                          </span>
                         </td>
                         <td className="px-4 py-3 text-muted-foreground text-xs">{formattedDate}</td>
                         <td className="px-4 py-3 text-center text-muted-foreground text-xs font-medium">{row.uf || "—"}</td>
