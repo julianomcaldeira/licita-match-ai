@@ -11,9 +11,10 @@ import Dashboard from "@/pages/Dashboard";
 import LicitacoesPage from "@/pages/LicitacoesPage";
 import EmpresasPage from "@/pages/EmpresasPage";
 import IngestaoMonitorPage from "@/pages/IngestaoMonitorPage";
+import AnalyticsPage from "@/pages/AnalyticsPage";
 import PlaceholderPage from "@/components/PlaceholderPage";
 import NotFound from "@/pages/NotFound";
-import { Users, FileText, BarChart3, Settings } from "lucide-react";
+import { Users, FileText, Settings } from "lucide-react";
 
 const queryClient = new QueryClient();
 
