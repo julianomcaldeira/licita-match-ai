@@ -10,10 +10,10 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  Zap,
   Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import logoImg from "@/assets/logo-ipesquisei.png";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
