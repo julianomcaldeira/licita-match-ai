@@ -217,48 +217,23 @@ export default function LicitacoesPage() {
   const { data: queryResult, isLoading } = useQuery({
     queryKey: ["licitacoes-all", page, appliedFilters],
     queryFn: async () => {
-      // When vencedor or orgao exact filter is applied, use RPC which supports joins
-      if (appliedFilters.vencedor || appliedFilters.orgao) {
-        const { data, error } = await supabase.rpc("search_licitacoes", {
-          p_search: appliedFilters.search || undefined,
-          p_orgao: appliedFilters.orgao || undefined,
-          p_vencedor: appliedFilters.vencedor || undefined,
-          p_date_from: appliedFilters.dateFrom || undefined,
-          p_date_to: appliedFilters.dateTo || undefined,
-          p_uf: appliedFilters.uf || undefined,
-          p_situacao: appliedFilters.situacao || undefined,
-          p_com_vencedor: appliedFilters.comVencedor || undefined,
-          p_limit: PAGE_SIZE,
-          p_offset: page * PAGE_SIZE,
-        });
-        if (error) throw error;
-        const rows = data || [];
-        const totalCount = rows.length > 0 ? (rows[0] as any).total_count : 0;
-        return { rows, totalCount };
-      }
-
-      // Direct query for better performance when no vencedor/orgao filter
-      let query = supabase
-        .from("licitacoes")
-        .select("id, orgao, objeto, modalidade, valor_estimado, valor_homologado, data_publicacao, uf, municipio, situacao, numero_controle_pncp", { count: "estimated" })
-        .order("valor_homologado", { ascending: false, nullsFirst: false })
-        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-
-      if (appliedFilters.dateFrom) query = query.gte("data_publicacao", appliedFilters.dateFrom);
-      if (appliedFilters.dateTo) query = query.lte("data_publicacao", appliedFilters.dateTo);
-      if (appliedFilters.uf) query = query.eq("uf", appliedFilters.uf);
-      if (appliedFilters.situacao) query = query.eq("situacao", appliedFilters.situacao);
-      if (appliedFilters.search) {
-        const terms = appliedFilters.search.split(/\s+/).filter(Boolean);
-        for (const term of terms) {
-          query = query.ilike("objeto", `%${term}%`);
-        }
-      }
-      if (appliedFilters.comVencedor) query = query.not("valor_homologado", "is", null);
-
-      const { data, error, count } = await query;
+      // Always use RPC to get vencedor data via join
+      const { data, error } = await supabase.rpc("search_licitacoes", {
+        p_search: appliedFilters.search || undefined,
+        p_orgao: appliedFilters.orgao || undefined,
+        p_vencedor: appliedFilters.vencedor || undefined,
+        p_date_from: appliedFilters.dateFrom || undefined,
+        p_date_to: appliedFilters.dateTo || undefined,
+        p_uf: appliedFilters.uf || undefined,
+        p_situacao: appliedFilters.situacao || undefined,
+        p_com_vencedor: appliedFilters.comVencedor || undefined,
+        p_limit: PAGE_SIZE,
+        p_offset: page * PAGE_SIZE,
+      });
       if (error) throw error;
-      return { rows: data || [], totalCount: count || 0 };
+      const rows = data || [];
+      const totalCount = rows.length > 0 ? (rows[0] as any).total_count : 0;
+      return { rows, totalCount };
     },
     placeholderData: (prev) => prev,
     staleTime: 60_000,
@@ -605,9 +580,18 @@ export default function LicitacoesPage() {
                           ) : "—"}
                         </td>
                         <td className="px-4 py-3 text-foreground max-w-[160px]">
-                          <span className="block truncate text-xs text-muted-foreground">
-                            {(row as any).vencedor_nome || "Ver detalhes"}
-                          </span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="block truncate text-xs">
+                                {(row as any).vencedor_nome || "—"}
+                              </span>
+                            </TooltipTrigger>
+                            {(row as any).vencedor_nome && (
+                              <TooltipContent side="bottom" className="max-w-sm">
+                                <p>{(row as any).vencedor_nome}</p>
+                              </TooltipContent>
+                            )}
+                          </Tooltip>
                         </td>
                         <td className="px-4 py-3 text-muted-foreground text-xs">{formattedDate}</td>
                         <td className="px-4 py-3 text-center text-muted-foreground text-xs font-medium">{row.uf || "—"}</td>
