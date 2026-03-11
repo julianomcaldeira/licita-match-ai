@@ -133,6 +133,13 @@ export default function LicitacoesPage() {
 
   const hasActiveFilters = appliedFilters.orgao || appliedFilters.search || appliedFilters.dateFrom || appliedFilters.dateTo || appliedFilters.uf || appliedFilters.situacao || appliedFilters.vencedor;
 
+  const searchByWinner = (name: string) => {
+    setFilterVencedor(name);
+    setDetailOpen(false);
+    setPage(0);
+    setAppliedFilters((prev) => ({ ...prev, vencedor: name }));
+  };
+
   // Detail modal state
   const [selectedLicitacao, setSelectedLicitacao] = useState<any | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
