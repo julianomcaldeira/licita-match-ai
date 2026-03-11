@@ -133,6 +133,13 @@ export default function LicitacoesPage() {
 
   const hasActiveFilters = appliedFilters.orgao || appliedFilters.search || appliedFilters.dateFrom || appliedFilters.dateTo || appliedFilters.uf || appliedFilters.situacao || appliedFilters.vencedor;
 
+  const searchByWinner = (name: string) => {
+    setFilterVencedor(name);
+    setDetailOpen(false);
+    setPage(0);
+    setAppliedFilters((prev) => ({ ...prev, vencedor: name }));
+  };
+
   // Detail modal state
   const [selectedLicitacao, setSelectedLicitacao] = useState<any | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -600,11 +607,18 @@ export default function LicitacoesPage() {
                           ) : "—"}
                         </td>
                         {appliedFilters.vencedor && (
-                          <td className="px-4 py-3 max-w-[200px]">
-                            <Tooltip>
-                              <TooltipTrigger asChild><span className="block truncate text-foreground text-xs font-medium">{row.vencedor_nome || "—"}</span></TooltipTrigger>
-                              <TooltipContent side="bottom" className="max-w-sm"><p>{row.vencedor_nome || "—"}</p></TooltipContent>
-                            </Tooltip>
+                          <td className="px-4 py-3 max-w-[200px]" onClick={(e) => e.stopPropagation()}>
+                            {row.vencedor_nome ? (
+                              <button
+                                onClick={() => searchByWinner(row.vencedor_nome)}
+                                className="block truncate text-primary text-xs font-medium hover:underline text-left max-w-full"
+                                title={`Ver todas licitações de ${row.vencedor_nome}`}
+                              >
+                                {row.vencedor_nome}
+                              </button>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
                           </td>
                         )}
                         <td className="px-4 py-3 text-muted-foreground text-xs">{formattedDate}</td>
@@ -846,7 +860,13 @@ export default function LicitacoesPage() {
                               <Trophy className="h-4 w-4 text-warning" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-foreground truncate">{w.razao_social || "—"}</p>
+                              <button
+                                onClick={() => w.razao_social && searchByWinner(w.razao_social)}
+                                className="text-sm font-medium text-primary truncate hover:underline text-left"
+                                title={`Ver todas licitações de ${w.razao_social}`}
+                              >
+                                {w.razao_social || "—"}
+                              </button>
                               <p className="text-xs text-muted-foreground">
                                 {w.cnpj && `CNPJ: ${w.cnpj}`}
                                 {w.numero_item != null && ` · Item ${w.numero_item}`}
