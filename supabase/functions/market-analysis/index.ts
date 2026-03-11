@@ -20,21 +20,11 @@ serve(async (req) => {
 
     const { analysisType, filters, userQuestion } = await req.json();
 
-    // Gather market data based on analysis type and filters
     const dateFrom = filters?.dateFrom || "2023-01-01";
     const dateTo = filters?.dateTo || new Date().toISOString().split("T")[0];
     const uf = filters?.uf || null;
-    const period_months = filters?.period || 6;
 
-    // Fetch relevant data in parallel
-    const [
-      salesTotals,
-      topWinners,
-      topBuyers,
-      monthlySales,
-      totals,
-      recentLicitacoes,
-    ] = await Promise.all([
+    const [salesTotals, topWinners, topBuyers, monthlySales, totals, recentLicitacoes] = await Promise.all([
       supabase.rpc("analytics_sales_totals", { p_date_from: dateFrom, p_date_to: dateTo }),
       supabase.rpc("analytics_top_winners", { p_date_from: dateFrom, p_date_to: dateTo, p_limit: 15 }),
       supabase.rpc("analytics_top_buyers", { p_date_from: dateFrom, p_date_to: dateTo, p_limit: 15 }),
@@ -49,7 +39,6 @@ serve(async (req) => {
         .limit(30),
     ]);
 
-    // Build context summary for the AI
     const salesData = salesTotals.data?.[0] || {};
     const totalsData = totals.data?.[0] || {};
     const winnersData = topWinners.data || [];
@@ -81,33 +70,37 @@ ${recentData.map((l: any, i: number) => `${i + 1}. [${l.uf || "?"}] ${l.orgao} �
 `;
 
     const analysisPrompts: Record<string, string> = {
-      market_overview: "Faça uma análise geral e estratégica do mercado de licitações com base nos dados. Identifique tendências, concentrações de mercado, e oportunidades. Destaque insights acionáveis.",
-      competitive: "Analise o cenário competitivo: quais empresas dominam, qual o nível de concentração, onde há espaço para novos entrantes. Identifique padrões de vitória.",
-      regional: "Faça uma análise regional do mercado. Quais UFs/regiões movimentam mais, onde há oportunidades subexploradas, quais órgãos são os maiores compradores por região.",
-      trend: "Analise as tendências temporais: crescimento/queda mensal, sazonalidade, evolução de valores médios, mudanças no mix de modalidades.",
-      opportunity: "Identifique oportunidades estratégicas: nichos com pouca competição, órgãos com alta demanda, segmentos com crescimento acelerado, licitações com baixo número de participantes.",
-      custom: userQuestion || "Faça uma análise completa e estratégica desses dados de licitações públicas.",
+      market_overview: "Faça uma análise geral e estratégica do mercado de licitações com base nos dados.",
+      competitive: "Analise o cenário competitivo: quais empresas dominam, market share e padrões de vitória.",
+      regional: "Faça uma análise regional: quais UFs movimentam mais, onde há oportunidades subexploradas.",
+      trend: "Analise tendências temporais: crescimento/queda, sazonalidade e evolução de valores.",
+      opportunity: "Identifique oportunidades: nichos com pouca competição e segmentos em crescimento.",
+      custom: userQuestion || "Faça uma análise completa desses dados de licitações públicas.",
     };
 
-    const systemPrompt = `Você é um analista sênior especializado em licitações públicas brasileiras e inteligência de mercado governamental (B2G).
+    const systemPrompt = `Você é um analista sênior de inteligência de mercado B2G (licitações públicas brasileiras).
 
-Suas análises devem ser:
-- Estratégicas e acionáveis (não apenas descritivas)
-- Baseadas exclusivamente nos dados fornecidos
-- Estruturadas com seções claras usando markdown (## títulos, **negrito**, listas)
-- Com insights quantitativos (percentuais, rankings, comparações)
-- Com recomendações práticas ao final
+REGRAS DE FORMATAÇÃO OBRIGATÓRIAS:
+1. Comece SEMPRE com um resumo executivo de 2-3 linhas com os números mais importantes
+2. Use seções com "## " (h2) e subseções com "### " (h3)
+3. Use **negrito** para números, percentuais e nomes de empresas/órgãos
+4. Use tabelas markdown quando comparar 3+ itens (ex: ranking de empresas)
+5. Use listas numeradas para rankings e listas com bullet para insights
+6. Cada seção deve ter no MÁXIMO 4-5 bullets — seja direto
+7. Calcule e mostre: market share (%), ticket médio (R$), variação mensal (%), concentração
+8. Termine com "## 🎯 Ações Recomendadas" com exatamente 3 ações concretas e específicas
 
-Quando aplicável, calcule: market share, ticket médio, concentração (HHI simplificado), taxa de crescimento, sazonalidade.
-Sempre conclua com "🎯 Recomendações Estratégicas" com 3-5 ações concretas.
+REGRAS DE CONTEÚDO:
+- Seja DIRETO e QUANTITATIVO — evite frases genéricas como "o mercado é dinâmico"
+- Sempre compare: "A empresa X tem Y% do mercado, Z vezes mais que a 2ª colocada"
+- Destaque anomalias e outliers — o que foge do padrão é o mais valioso
+- Use emojis estratégicos: 📊 dados, 🏆 rankings, ⚠️ alertas, 💡 insights, 📈 crescimento, 📉 queda
+- Formate valores monetários sempre como "R$ X,XX" com separador de milhar
 
-IMPORTANTE: Responda SEMPRE em português brasileiro. Use formatação markdown rica.`;
+Responda SEMPRE em português brasileiro.`;
 
-    const userPrompt = `${analysisPrompts[analysisType] || analysisPrompts.custom}
+    const userPrompt = `${analysisPrompts[analysisType] || analysisPrompts.custom}\n\n${marketContext}`;
 
-${marketContext}`;
-
-    // Call Lovable AI Gateway with streaming
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
