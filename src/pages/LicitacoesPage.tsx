@@ -99,6 +99,28 @@ export default function LicitacoesPage() {
   const [filterSituacao, setFilterSituacao] = useState("");
   const [filterComVencedor, setFilterComVencedor] = useState(false);
 
+  // Load órgãos for dropdown
+  const { data: orgaoOptions, isLoading: orgaosLoading } = useQuery({
+    queryKey: ["orgaos-dropdown"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("list_orgaos", { p_limit: 1000, p_offset: 0 });
+      if (error) throw error;
+      return (data || []).map((o: any) => ({ label: `${o.orgao} (${o.uf || "?"})`, value: o.orgao }));
+    },
+    staleTime: 5 * 60_000,
+  });
+
+  // Load vencedores for dropdown
+  const { data: vencedorOptions, isLoading: vencedoresLoading } = useQuery({
+    queryKey: ["vencedores-dropdown"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("list_empresas_vencedoras", { p_limit: 1000, p_offset: 0 });
+      if (error) throw error;
+      return (data || []).map((v: any) => ({ label: `${v.razao_social} (${v.cnpj || "?"})`, value: v.razao_social }));
+    },
+    staleTime: 5 * 60_000,
+  });
+
   // Applied filters (only update on search click)
   const [appliedFilters, setAppliedFilters] = useState<{
     vencedor: string; orgao: string; search: string; dateFrom?: string; dateTo?: string; uf?: string; situacao?: string; comVencedor?: boolean;
