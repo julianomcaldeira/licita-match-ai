@@ -117,7 +117,7 @@ Responda em português brasileiro, de forma objetiva e profissional. Use markdow
     });
   } catch (e) {
     console.error("analyze-objeto error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Erro desconhecido" }), {
+    return new Response(JSON.stringify({ error: "Erro interno. Tente novamente." }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
