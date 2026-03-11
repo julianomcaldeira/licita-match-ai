@@ -580,9 +580,18 @@ export default function LicitacoesPage() {
                           ) : "—"}
                         </td>
                         <td className="px-4 py-3 text-foreground max-w-[160px]">
-                          <span className="block truncate text-xs text-muted-foreground">
-                            {(row as any).vencedor_nome || "Ver detalhes"}
-                          </span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="block truncate text-xs">
+                                {(row as any).vencedor_nome || "—"}
+                              </span>
+                            </TooltipTrigger>
+                            {(row as any).vencedor_nome && (
+                              <TooltipContent side="bottom" className="max-w-sm">
+                                <p>{(row as any).vencedor_nome}</p>
+                              </TooltipContent>
+                            )}
+                          </Tooltip>
                         </td>
                         <td className="px-4 py-3 text-muted-foreground text-xs">{formattedDate}</td>
                         <td className="px-4 py-3 text-center text-muted-foreground text-xs font-medium">{row.uf || "—"}</td>
