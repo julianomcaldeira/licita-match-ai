@@ -232,16 +232,17 @@ export default function LicitacoesPage() {
     queryFn: async () => {
       // When vencedor filter is active, use the RPC that supports JOINs
       if (appliedFilters.vencedor) {
+        const hasResultadoStatus = appliedFilters.situacao === "Concluída" || appliedFilters.situacao === "Homologada";
         const { data, error } = await (supabase as any).rpc("search_licitacoes", {
           p_search: appliedFilters.search || null,
           p_orgao: appliedFilters.orgao || null,
           p_date_from: appliedFilters.dateFrom || null,
           p_date_to: appliedFilters.dateTo || null,
           p_uf: appliedFilters.uf || null,
-          p_situacao: appliedFilters.situacao || null,
+          p_situacao: hasResultadoStatus ? null : appliedFilters.situacao || null,
           p_vencedor: appliedFilters.vencedor,
           p_modalidade: null,
-          p_com_vencedor: null,
+          p_com_vencedor: hasResultadoStatus ? true : null,
           p_limit: PAGE_SIZE,
           p_offset: page * PAGE_SIZE,
         });
@@ -267,7 +268,9 @@ export default function LicitacoesPage() {
       if (appliedFilters.uf) {
         query = query.eq("uf", appliedFilters.uf);
       }
-      if (appliedFilters.situacao) {
+      if (appliedFilters.situacao === "Concluída" || appliedFilters.situacao === "Homologada") {
+        query = query.not("valor_homologado", "is", null).gt("valor_homologado", 0);
+      } else if (appliedFilters.situacao) {
         query = query.eq("situacao", appliedFilters.situacao);
       }
       if (appliedFilters.orgao) {
