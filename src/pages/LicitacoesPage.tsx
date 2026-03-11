@@ -415,23 +415,28 @@ export default function LicitacoesPage() {
           </div>
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Órgão</label>
-            <Input
-              placeholder="Nome do órgão..."
+            <ComboboxFilter
               value={filterOrgao}
-              onChange={(e) => setFilterOrgao(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              onChange={setFilterOrgao}
+              options={orgaoOptions || []}
+              isLoading={orgaosLoading}
+              placeholder="Todos os órgãos"
+              searchPlaceholder="Buscar órgão..."
               className="h-9"
             />
           </div>
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Vencedor</label>
-            <Input
-              placeholder="Nome ou CNPJ do vencedor..."
+            <ComboboxFilter
               value={filterVencedor}
-              onChange={(e) => setFilterVencedor(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              onChange={setFilterVencedor}
+              options={vencedorOptions || []}
+              isLoading={vencedoresLoading}
+              placeholder="Todos os vencedores"
+              searchPlaceholder="Buscar vencedor..."
               className="h-9"
             />
+          </div>
           </div>
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Data Início</label>
