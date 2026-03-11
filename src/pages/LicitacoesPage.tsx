@@ -457,12 +457,6 @@ export default function LicitacoesPage() {
             </Select>
           </div>
           <div className="flex items-end gap-2">
-            <label className="flex items-center gap-2 h-9 cursor-pointer select-none">
-              <input type="checkbox" checked={filterComVencedor} onChange={(e) => setFilterComVencedor(e.target.checked)} className="rounded border-input" />
-              <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Só com vencedor</span>
-            </label>
-          </div>
-          <div className="flex items-end gap-2">
             <Button onClick={handleSearch} className="h-9 flex-1 gap-2">
               <Search className="h-3.5 w-3.5" /> Pesquisar
             </Button>
