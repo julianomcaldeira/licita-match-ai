@@ -1,13 +1,14 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   Brain, Loader2, Sparkles, TrendingUp, Target, MapPin, Swords, BarChart3,
-  Send, Calendar, MessageSquare, Clock, Trash2,
+  Calendar, MessageSquare, Clock, Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { format, subMonths } from "date-fns";
 
 const ANALYSIS_TYPES = [
@@ -44,6 +45,70 @@ function saveLastAnalysis(a: SavedAnalysis) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(a)); } catch { /* ignore */ }
 }
 
+/* Custom markdown components for rich rendering */
+const mdComponents = {
+  h2: ({ children, ...props }: any) => (
+    <h2 className="flex items-center gap-2 text-lg font-display font-bold text-foreground mt-8 mb-3 pb-2 border-b border-border" {...props}>
+      {children}
+    </h2>
+  ),
+  h3: ({ children, ...props }: any) => (
+    <h3 className="text-base font-display font-semibold text-foreground mt-5 mb-2" {...props}>
+      {children}
+    </h3>
+  ),
+  p: ({ children, ...props }: any) => (
+    <p className="text-sm leading-relaxed text-muted-foreground mb-3" {...props}>{children}</p>
+  ),
+  strong: ({ children, ...props }: any) => (
+    <strong className="font-semibold text-foreground" {...props}>{children}</strong>
+  ),
+  ul: ({ children, ...props }: any) => (
+    <ul className="my-2 ml-1 space-y-1.5 text-sm text-muted-foreground list-none" {...props}>
+      {children}
+    </ul>
+  ),
+  ol: ({ children, ...props }: any) => (
+    <ol className="my-2 ml-4 space-y-1.5 text-sm text-muted-foreground list-decimal" {...props}>
+      {children}
+    </ol>
+  ),
+  li: ({ children, ...props }: any) => (
+    <li className="text-sm leading-relaxed text-muted-foreground pl-1" {...props}>
+      <span className="inline">{children}</span>
+    </li>
+  ),
+  table: ({ children, ...props }: any) => (
+    <div className="my-4 overflow-x-auto rounded-lg border border-border">
+      <table className="w-full text-sm" {...props}>{children}</table>
+    </div>
+  ),
+  thead: ({ children, ...props }: any) => (
+    <thead className="bg-muted/60" {...props}>{children}</thead>
+  ),
+  th: ({ children, ...props }: any) => (
+    <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-foreground border-b border-border" {...props}>
+      {children}
+    </th>
+  ),
+  td: ({ children, ...props }: any) => (
+    <td className="px-4 py-2 text-sm text-muted-foreground border-b border-border/40" {...props}>
+      {children}
+    </td>
+  ),
+  tr: ({ children, ...props }: any) => (
+    <tr className="hover:bg-muted/30 transition-colors" {...props}>{children}</tr>
+  ),
+  blockquote: ({ children, ...props }: any) => (
+    <blockquote className="my-3 border-l-4 border-primary/40 bg-primary/5 rounded-r-lg pl-4 pr-3 py-3 text-sm text-muted-foreground italic" {...props}>
+      {children}
+    </blockquote>
+  ),
+  hr: (props: any) => (
+    <hr className="my-6 border-border" {...props} />
+  ),
+};
+
 export default function AIMarketAnalysis() {
   const [selectedType, setSelectedType] = useState("market_overview");
   const [customQuestion, setCustomQuestion] = useState("");
@@ -54,7 +119,6 @@ export default function AIMarketAnalysis() {
   const [lastMeta, setLastMeta] = useState<{ type: string; timestamp: string; period: number; uf: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Load persisted analysis on mount
   useEffect(() => {
     const saved = loadLastAnalysis();
     if (saved) {
@@ -146,7 +210,6 @@ export default function AIMarketAnalysis() {
         }
       }
 
-      // Flush remaining
       if (textBuffer.trim()) {
         for (let raw of textBuffer.split("\n")) {
           if (!raw) continue;
@@ -296,44 +359,36 @@ export default function AIMarketAnalysis() {
           className="rounded-xl border border-border bg-card shadow-sm overflow-hidden"
         >
           {/* Header bar */}
-          {lastMeta && !isStreaming && (
-            <div className="flex items-center gap-3 border-b border-border bg-muted/30 px-5 py-2.5">
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
-                <Brain className="h-3.5 w-3.5" />
-                {lastMeta.type}
-              </div>
-              <span className="text-muted-foreground text-[10px]">•</span>
-              <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                <Clock className="h-3 w-3" />
-                {new Date(lastMeta.timestamp).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
-              </div>
-              <span className="text-muted-foreground text-[10px]">•</span>
-              <span className="text-[11px] text-muted-foreground">Últimos {lastMeta.period} meses{lastMeta.uf ? ` · ${lastMeta.uf}` : ""}</span>
-            </div>
-          )}
-
-          {isStreaming && (
-            <div className="flex items-center gap-2 border-b border-border bg-primary/5 px-5 py-2.5">
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-              <span className="text-xs font-semibold text-primary">Gerando análise...</span>
-            </div>
-          )}
+          <div className={`flex items-center gap-3 px-6 py-3 ${isStreaming ? "bg-primary/5 border-b border-primary/20" : "bg-muted/30 border-b border-border"}`}>
+            {isStreaming ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                <span className="text-xs font-semibold text-primary">i-pesquisei está gerando sua análise...</span>
+              </>
+            ) : lastMeta ? (
+              <>
+                <div className="flex items-center gap-1.5">
+                  <Brain className="h-4 w-4 text-primary" />
+                  <span className="text-xs font-bold text-primary">{lastMeta.type}</span>
+                </div>
+                <span className="h-3 w-px bg-border" />
+                <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                  <Clock className="h-3 w-3" />
+                  {new Date(lastMeta.timestamp).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                </div>
+                <span className="h-3 w-px bg-border" />
+                <span className="text-[11px] text-muted-foreground">Últimos {lastMeta.period} meses{lastMeta.uf ? ` · ${lastMeta.uf}` : ""}</span>
+                <span className="ml-auto text-[10px] text-muted-foreground/60 font-medium">Powered by i-pesquisei IA</span>
+              </>
+            ) : null}
+          </div>
 
           {/* Content */}
           <div ref={scrollRef} className="max-h-[650px] overflow-y-auto">
-            <div className="p-6 md:p-8
-              prose prose-sm dark:prose-invert max-w-none
-              prose-headings:text-foreground prose-headings:font-display prose-headings:tracking-tight
-              prose-h2:text-lg prose-h2:mt-8 prose-h2:mb-3 prose-h2:pb-2 prose-h2:border-b prose-h2:border-border
-              prose-h3:text-base prose-h3:mt-5 prose-h3:mb-2
-              prose-p:text-muted-foreground prose-p:leading-relaxed
-              prose-strong:text-foreground prose-strong:font-semibold
-              prose-li:text-muted-foreground prose-li:leading-relaxed
-              prose-ul:my-2 prose-ol:my-2
-              prose-table:text-sm prose-th:text-left prose-th:font-semibold prose-th:text-foreground prose-th:pb-2 prose-th:border-b prose-th:border-border
-              prose-td:py-1.5 prose-td:text-muted-foreground prose-td:border-b prose-td:border-border/50
-            ">
-              <ReactMarkdown>{currentContent}</ReactMarkdown>
+            <div className="px-8 py-6 md:px-10 md:py-8">
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+                {currentContent}
+              </ReactMarkdown>
               {isStreaming && (
                 <span className="inline-block w-2 h-5 bg-primary rounded-sm animate-pulse ml-0.5" />
               )}
@@ -349,7 +404,7 @@ export default function AIMarketAnalysis() {
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 mb-4">
             <Brain className="h-8 w-8 text-primary" />
           </div>
-          <h3 className="font-display text-lg font-semibold text-foreground">Análise de Mercado com IA</h3>
+          <h3 className="font-display text-lg font-semibold text-foreground">i-pesquisei — Análise de Mercado com IA</h3>
           <p className="mt-2 text-sm text-muted-foreground max-w-md">
             Selecione um tipo de análise e clique em "Gerar Análise" para obter insights
             estratégicos baseados nos dados reais de licitações.
