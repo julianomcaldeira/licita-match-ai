@@ -251,7 +251,7 @@ export type Database = {
           {
             foreignKeyName: "licitacao_vencedores_item_id_fkey"
             columns: ["item_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "licitacao_itens"
             referencedColumns: ["id"]
           },
