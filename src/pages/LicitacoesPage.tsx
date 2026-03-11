@@ -109,7 +109,9 @@ export default function LicitacoesPage() {
       if (error) throw error;
       return (data || []).map((o: any) => ({ label: `${o.orgao} (${o.uf || "?"})`, value: o.orgao }));
     },
-    staleTime: 5 * 60_000,
+    staleTime: 10 * 60_000,
+    retry: 1,
+    refetchOnWindowFocus: false,
   });
 
   // Load vencedores for dropdown
