@@ -499,6 +499,7 @@ export default function LicitacoesPage() {
               placeholder="Selecionar vencedor..."
               searchPlaceholder="Buscar vencedor..."
               isLoading={vencedoresLoading}
+              onServerSearch={setVencedorSearch}
             />
           </div>
           <div className="space-y-1">
