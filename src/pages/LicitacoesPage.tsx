@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import ComboboxFilter from "@/components/ComboboxFilter";
 
 const UFS = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
 const SITUACOES = ["Divulgada no PNCP", "Revogada", "Anulada", "Suspensa"];
@@ -97,6 +98,28 @@ export default function LicitacoesPage() {
   const [filterUf, setFilterUf] = useState("");
   const [filterSituacao, setFilterSituacao] = useState("");
   const [filterComVencedor, setFilterComVencedor] = useState(false);
+
+  // Load órgãos for dropdown
+  const { data: orgaoOptions, isLoading: orgaosLoading } = useQuery({
+    queryKey: ["orgaos-dropdown"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("list_orgaos", { p_limit: 1000, p_offset: 0 });
+      if (error) throw error;
+      return (data || []).map((o: any) => ({ label: `${o.orgao} (${o.uf || "?"})`, value: o.orgao }));
+    },
+    staleTime: 5 * 60_000,
+  });
+
+  // Load vencedores for dropdown
+  const { data: vencedorOptions, isLoading: vencedoresLoading } = useQuery({
+    queryKey: ["vencedores-dropdown"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("list_empresas_vencedoras", { p_limit: 1000, p_offset: 0 });
+      if (error) throw error;
+      return (data || []).map((v: any) => ({ label: `${v.razao_social} (${v.cnpj || "?"})`, value: v.razao_social }));
+    },
+    staleTime: 5 * 60_000,
+  });
 
   // Applied filters (only update on search click)
   const [appliedFilters, setAppliedFilters] = useState<{
@@ -194,7 +217,27 @@ export default function LicitacoesPage() {
   const { data: queryResult, isLoading } = useQuery({
     queryKey: ["licitacoes-all", page, appliedFilters],
     queryFn: async () => {
-      // Use estimated count for performance - avoid exact count on huge tables
+      // When vencedor or orgao exact filter is applied, use RPC which supports joins
+      if (appliedFilters.vencedor || appliedFilters.orgao) {
+        const { data, error } = await supabase.rpc("search_licitacoes", {
+          p_search: appliedFilters.search || undefined,
+          p_orgao: appliedFilters.orgao || undefined,
+          p_vencedor: appliedFilters.vencedor || undefined,
+          p_date_from: appliedFilters.dateFrom || undefined,
+          p_date_to: appliedFilters.dateTo || undefined,
+          p_uf: appliedFilters.uf || undefined,
+          p_situacao: appliedFilters.situacao || undefined,
+          p_com_vencedor: appliedFilters.comVencedor || undefined,
+          p_limit: PAGE_SIZE,
+          p_offset: page * PAGE_SIZE,
+        });
+        if (error) throw error;
+        const rows = data || [];
+        const totalCount = rows.length > 0 ? (rows[0] as any).total_count : 0;
+        return { rows, totalCount };
+      }
+
+      // Direct query for better performance when no vencedor/orgao filter
       let query = supabase
         .from("licitacoes")
         .select("id, orgao, objeto, modalidade, valor_estimado, valor_homologado, data_publicacao, uf, municipio, situacao, numero_controle_pncp", { count: "estimated" })
@@ -205,7 +248,6 @@ export default function LicitacoesPage() {
       if (appliedFilters.dateTo) query = query.lte("data_publicacao", appliedFilters.dateTo);
       if (appliedFilters.uf) query = query.eq("uf", appliedFilters.uf);
       if (appliedFilters.situacao) query = query.eq("situacao", appliedFilters.situacao);
-      if (appliedFilters.orgao) query = query.ilike("orgao", `%${appliedFilters.orgao}%`);
       if (appliedFilters.search) {
         const terms = appliedFilters.search.split(/\s+/).filter(Boolean);
         for (const term of terms) {
@@ -373,21 +415,25 @@ export default function LicitacoesPage() {
           </div>
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Órgão</label>
-            <Input
-              placeholder="Nome do órgão..."
+            <ComboboxFilter
               value={filterOrgao}
-              onChange={(e) => setFilterOrgao(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              onChange={setFilterOrgao}
+              options={orgaoOptions || []}
+              isLoading={orgaosLoading}
+              placeholder="Todos os órgãos"
+              searchPlaceholder="Buscar órgão..."
               className="h-9"
             />
           </div>
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Vencedor</label>
-            <Input
-              placeholder="Nome ou CNPJ do vencedor..."
+            <ComboboxFilter
               value={filterVencedor}
-              onChange={(e) => setFilterVencedor(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              onChange={setFilterVencedor}
+              options={vencedorOptions || []}
+              isLoading={vencedoresLoading}
+              placeholder="Todos os vencedores"
+              searchPlaceholder="Buscar vencedor..."
               className="h-9"
             />
           </div>
@@ -559,7 +605,9 @@ export default function LicitacoesPage() {
                           ) : "—"}
                         </td>
                         <td className="px-4 py-3 text-foreground max-w-[160px]">
-                          <span className="block truncate text-xs text-muted-foreground">Ver detalhes</span>
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {(row as any).vencedor_nome || "Ver detalhes"}
+                          </span>
                         </td>
                         <td className="px-4 py-3 text-muted-foreground text-xs">{formattedDate}</td>
                         <td className="px-4 py-3 text-center text-muted-foreground text-xs font-medium">{row.uf || "—"}</td>
