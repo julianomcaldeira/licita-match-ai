@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import ComboboxFilter from "@/components/ComboboxFilter";
 
 
 const UFS = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
@@ -100,8 +101,29 @@ export default function LicitacoesPage() {
   const [filterSituacao, setFilterSituacao] = useState("");
   const [filterVencedor, setFilterVencedor] = useState("");
 
+  // Load orgão options from materialized view
+  const { data: orgaoOptions = [], isLoading: orgaosLoading } = useQuery({
+    queryKey: ["filter-orgaos"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("mv_orgaos").select("orgao").order("total_licitacoes", { ascending: false }).limit(5000);
+      if (error) throw error;
+      return (data || []).filter((r: any) => r.orgao).map((r: any) => ({ label: r.orgao, value: r.orgao }));
+    },
+    staleTime: 300_000,
+  });
 
-  // Applied filters (only update on search click)
+  // Load vencedor options from materialized view
+  const { data: vencedorOptions = [], isLoading: vencedoresLoading } = useQuery({
+    queryKey: ["filter-vencedores"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("mv_empresas_vencedoras").select("razao_social").order("total_vitorias", { ascending: false }).limit(5000);
+      if (error) throw error;
+      return (data || []).filter((r: any) => r.razao_social).map((r: any) => ({ label: r.razao_social, value: r.razao_social }));
+    },
+    staleTime: 300_000,
+  });
+
+
   const [appliedFilters, setAppliedFilters] = useState<{
     orgao: string; search: string; dateFrom?: string; dateTo?: string; uf?: string; situacao?: string; vencedor?: string;
   }>({ orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd") });
@@ -414,12 +436,13 @@ export default function LicitacoesPage() {
           </div>
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Órgão</label>
-            <Input
-              placeholder="Ex: jundiai, marinha..."
+            <ComboboxFilter
               value={filterOrgao}
-              onChange={(e) => setFilterOrgao(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              className="h-9"
+              onChange={setFilterOrgao}
+              options={orgaoOptions}
+              placeholder="Selecionar órgão..."
+              searchPlaceholder="Buscar órgão..."
+              isLoading={orgaosLoading}
             />
           </div>
           <div className="space-y-1">
@@ -462,12 +485,13 @@ export default function LicitacoesPage() {
           </div>
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Vencedor</label>
-            <Input
-              placeholder="Nome ou CNPJ do vencedor..."
+            <ComboboxFilter
               value={filterVencedor}
-              onChange={(e) => setFilterVencedor(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              className="h-9"
+              onChange={setFilterVencedor}
+              options={vencedorOptions}
+              placeholder="Selecionar vencedor..."
+              searchPlaceholder="Buscar vencedor..."
+              isLoading={vencedoresLoading}
             />
           </div>
           <div className="space-y-1">
