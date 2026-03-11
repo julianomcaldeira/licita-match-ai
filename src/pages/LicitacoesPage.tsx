@@ -98,8 +98,7 @@ export default function LicitacoesPage() {
   const [filterDateTo, setFilterDateTo] = useState<Date | undefined>();
   const [filterUf, setFilterUf] = useState("");
   const [filterSituacao, setFilterSituacao] = useState("");
-  
-
+  const [filterVencedor, setFilterVencedor] = useState("");
 
 
   // Applied filters (only update on search click)
