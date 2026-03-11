@@ -114,18 +114,6 @@ export default function LicitacoesPage() {
     refetchOnWindowFocus: false,
   });
 
-  // Load vencedores for dropdown
-  const { data: vencedorOptions, isLoading: vencedoresLoading } = useQuery({
-    queryKey: ["vencedores-dropdown"],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("list_empresas_vencedoras", { p_limit: 1000, p_offset: 0, p_order_by: "total_vitorias" });
-      if (error) throw error;
-      return (data || []).map((v: any) => ({ label: `${v.razao_social} (${v.cnpj || "?"})`, value: v.razao_social }));
-    },
-    staleTime: 10 * 60_000,
-    retry: 1,
-    refetchOnWindowFocus: false,
-  });
 
   // Applied filters (only update on search click)
   const [appliedFilters, setAppliedFilters] = useState<{
