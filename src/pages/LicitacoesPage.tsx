@@ -101,8 +101,29 @@ export default function LicitacoesPage() {
   const [filterSituacao, setFilterSituacao] = useState("");
   const [filterVencedor, setFilterVencedor] = useState("");
 
+  // Load orgão options from materialized view
+  const { data: orgaoOptions = [], isLoading: orgaosLoading } = useQuery({
+    queryKey: ["filter-orgaos"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("mv_orgaos").select("orgao").order("total_licitacoes", { ascending: false }).limit(5000);
+      if (error) throw error;
+      return (data || []).filter((r: any) => r.orgao).map((r: any) => ({ label: r.orgao, value: r.orgao }));
+    },
+    staleTime: 300_000,
+  });
 
-  // Applied filters (only update on search click)
+  // Load vencedor options from materialized view
+  const { data: vencedorOptions = [], isLoading: vencedoresLoading } = useQuery({
+    queryKey: ["filter-vencedores"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("mv_empresas_vencedoras").select("razao_social").order("total_vitorias", { ascending: false }).limit(5000);
+      if (error) throw error;
+      return (data || []).filter((r: any) => r.razao_social).map((r: any) => ({ label: r.razao_social, value: r.razao_social }));
+    },
+    staleTime: 300_000,
+  });
+
+
   const [appliedFilters, setAppliedFilters] = useState<{
     orgao: string; search: string; dateFrom?: string; dateTo?: string; uf?: string; situacao?: string; vencedor?: string;
   }>({ orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd") });
