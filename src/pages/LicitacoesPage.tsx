@@ -554,7 +554,7 @@ export default function LicitacoesPage() {
                     <th className="px-4 py-3 text-right font-medium text-muted-foreground">Valor Est.</th>
                     <th className="px-4 py-3 text-right font-medium text-muted-foreground">Val. Homologado</th>
                      <th className="px-4 py-3 text-right font-medium text-muted-foreground">Economia</th>
-                     {appliedFilters.vencedor && <th className="px-4 py-3 text-left font-medium text-muted-foreground">Vencedor</th>}
+                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Vencedor</th>
                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Data</th>
                      <th className="px-4 py-3 text-center font-medium text-muted-foreground">UF</th>
                   </tr>
