@@ -98,7 +98,7 @@ export default function LicitacoesPage() {
   const [filterDateTo, setFilterDateTo] = useState<Date | undefined>();
   const [filterUf, setFilterUf] = useState("");
   const [filterSituacao, setFilterSituacao] = useState("");
-  const [filterComVencedor, setFilterComVencedor] = useState(false);
+  
 
   // Load órgãos for dropdown
   const { data: orgaoOptions, isLoading: orgaosLoading } = useQuery({
