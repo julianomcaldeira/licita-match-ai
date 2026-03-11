@@ -7,9 +7,9 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-display text-2xl font-bold text-foreground">Analytics</h1>
+        <h1 className="font-display text-2xl font-bold text-foreground">i-pesquisei Analytics</h1>
         <p className="text-sm text-muted-foreground">
-          Métricas de mercado e análise estratégica com IA
+          Inteligência de mercado e análise estratégica com IA
         </p>
       </div>
 
