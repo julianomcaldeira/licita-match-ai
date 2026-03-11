@@ -216,10 +216,9 @@ export default function LicitacoesPage() {
     }
   };
 
-  const { data: queryResult, isLoading } = useQuery({
+  const { data: queryResult, isLoading, isError, error: queryError, refetch } = useQuery({
     queryKey: ["licitacoes-all", page, appliedFilters],
     queryFn: async () => {
-      // Always use RPC to get vencedor data via join
       const { data, error } = await supabase.rpc("search_licitacoes", {
         p_search: appliedFilters.search || undefined,
         p_orgao: appliedFilters.orgao || undefined,
@@ -239,6 +238,9 @@ export default function LicitacoesPage() {
     },
     placeholderData: (prev) => prev,
     staleTime: 60_000,
+    retry: 1,
+    retryDelay: 2000,
+    refetchOnWindowFocus: false,
   });
 
   const licitacoes = queryResult?.rows || [];
