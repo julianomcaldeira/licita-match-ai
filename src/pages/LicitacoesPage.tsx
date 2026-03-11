@@ -91,7 +91,7 @@ export default function LicitacoesPage() {
   const queryClient = useQueryClient();
 
   // Filter state
-  const [filterVencedor, setFilterVencedor] = useState("");
+  const [filterOrgao, setFilterOrgao] = useState("");
   const [filterOrgao, setFilterOrgao] = useState("");
   const [filterSearch, setFilterSearch] = useState("");
   const defaultDateFrom = new Date(2023, 0, 1);
