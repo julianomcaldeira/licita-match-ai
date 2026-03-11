@@ -223,22 +223,39 @@ export default function LicitacoesPage() {
   const { data: queryResult, isLoading, isError, error: queryError, refetch } = useQuery({
     queryKey: ["licitacoes-all", page, appliedFilters],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("search_licitacoes", {
-        p_search: appliedFilters.search || undefined,
-        p_orgao: appliedFilters.orgao || undefined,
-        p_vencedor: appliedFilters.vencedor || undefined,
-        p_date_from: appliedFilters.dateFrom || undefined,
-        p_date_to: appliedFilters.dateTo || undefined,
-        p_uf: appliedFilters.uf || undefined,
-        p_situacao: appliedFilters.situacao || undefined,
-        p_com_vencedor: appliedFilters.comVencedor || undefined,
-        p_limit: PAGE_SIZE,
-        p_offset: page * PAGE_SIZE,
-      });
+      // Use direct table query instead of slow RPC to avoid statement timeout
+      let query = supabase
+        .from("licitacoes")
+        .select("id, orgao, objeto, modalidade, valor_estimado, valor_homologado, data_publicacao, uf, municipio, situacao, numero_controle_pncp", { count: "estimated" })
+        .order("valor_homologado", { ascending: false, nullsFirst: false })
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+      if (appliedFilters.dateFrom) {
+        query = query.gte("data_publicacao", appliedFilters.dateFrom);
+      }
+      if (appliedFilters.dateTo) {
+        query = query.lte("data_publicacao", appliedFilters.dateTo);
+      }
+      if (appliedFilters.uf) {
+        query = query.eq("uf", appliedFilters.uf);
+      }
+      if (appliedFilters.situacao) {
+        query = query.eq("situacao", appliedFilters.situacao);
+      }
+      if (appliedFilters.orgao) {
+        query = query.ilike("orgao", `%${appliedFilters.orgao}%`);
+      }
+      if (appliedFilters.search) {
+        // Support multiple keywords with AND logic
+        const keywords = appliedFilters.search.split(/\s+/).filter(Boolean);
+        for (const kw of keywords) {
+          query = query.ilike("objeto", `%${kw}%`);
+        }
+      }
+
+      const { data, error, count } = await query;
       if (error) throw error;
-      const rows = data || [];
-      const totalCount = rows.length > 0 ? (rows[0] as any).total_count : 0;
-      return { rows, totalCount };
+      return { rows: data || [], totalCount: count || 0 };
     },
     placeholderData: (prev) => prev,
     staleTime: 60_000,
