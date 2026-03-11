@@ -195,7 +195,28 @@ export default function LicitacoesPage() {
   const { data: queryResult, isLoading, isError, error: queryError, refetch } = useQuery({
     queryKey: ["licitacoes-all", page, appliedFilters],
     queryFn: async () => {
-      // Use direct table query instead of slow RPC to avoid statement timeout
+      // When vencedor filter is active, use the RPC that supports JOINs
+      if (appliedFilters.vencedor) {
+        const { data, error } = await (supabase as any).rpc("search_licitacoes", {
+          p_search: appliedFilters.search || null,
+          p_orgao: appliedFilters.orgao || null,
+          p_date_from: appliedFilters.dateFrom || null,
+          p_date_to: appliedFilters.dateTo || null,
+          p_uf: appliedFilters.uf || null,
+          p_situacao: appliedFilters.situacao || null,
+          p_vencedor: appliedFilters.vencedor,
+          p_modalidade: null,
+          p_com_vencedor: null,
+          p_limit: PAGE_SIZE,
+          p_offset: page * PAGE_SIZE,
+        });
+        if (error) throw error;
+        const rows = data || [];
+        const totalCount = rows[0]?.total_count || 0;
+        return { rows, totalCount };
+      }
+
+      // Direct table query for fast results without vencedor filter
       let query = supabase
         .from("licitacoes")
         .select("id, orgao, objeto, modalidade, valor_estimado, valor_homologado, data_publicacao, uf, municipio, situacao, numero_controle_pncp", { count: "estimated" })
@@ -218,7 +239,6 @@ export default function LicitacoesPage() {
         query = query.ilike("orgao", `%${appliedFilters.orgao}%`);
       }
       if (appliedFilters.search) {
-        // Support multiple keywords with AND logic
         const keywords = appliedFilters.search.split(/\s+/).filter(Boolean);
         for (const kw of keywords) {
           query = query.ilike("objeto", `%${kw}%`);
