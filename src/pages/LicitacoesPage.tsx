@@ -91,7 +91,6 @@ export default function LicitacoesPage() {
   const queryClient = useQueryClient();
 
   // Filter state
-  const [filterVencedor, setFilterVencedor] = useState("");
   const [filterOrgao, setFilterOrgao] = useState("");
   const [filterSearch, setFilterSearch] = useState("");
   const defaultDateFrom = new Date(2023, 0, 1);
@@ -99,7 +98,7 @@ export default function LicitacoesPage() {
   const [filterDateTo, setFilterDateTo] = useState<Date | undefined>();
   const [filterUf, setFilterUf] = useState("");
   const [filterSituacao, setFilterSituacao] = useState("");
-  const [filterComVencedor, setFilterComVencedor] = useState(false);
+  
 
   // Load órgãos for dropdown
   const { data: orgaoOptions, isLoading: orgaosLoading } = useQuery({
@@ -114,52 +113,36 @@ export default function LicitacoesPage() {
     refetchOnWindowFocus: false,
   });
 
-  // Load vencedores for dropdown
-  const { data: vencedorOptions, isLoading: vencedoresLoading } = useQuery({
-    queryKey: ["vencedores-dropdown"],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("list_empresas_vencedoras", { p_limit: 1000, p_offset: 0, p_order_by: "total_vitorias" });
-      if (error) throw error;
-      return (data || []).map((v: any) => ({ label: `${v.razao_social} (${v.cnpj || "?"})`, value: v.razao_social }));
-    },
-    staleTime: 10 * 60_000,
-    retry: 1,
-    refetchOnWindowFocus: false,
-  });
 
   // Applied filters (only update on search click)
   const [appliedFilters, setAppliedFilters] = useState<{
-    vencedor: string; orgao: string; search: string; dateFrom?: string; dateTo?: string; uf?: string; situacao?: string; comVencedor?: boolean;
-  }>({ vencedor: "", orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd") });
+    orgao: string; search: string; dateFrom?: string; dateTo?: string; uf?: string; situacao?: string;
+  }>({ orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd") });
 
   const handleSearch = () => {
     setPage(0);
     setAppliedFilters({
-      vencedor: filterVencedor.trim(),
       orgao: filterOrgao.trim(),
       search: filterSearch.trim(),
       dateFrom: filterDateFrom ? format(filterDateFrom, "yyyy-MM-dd") : undefined,
       dateTo: filterDateTo ? format(filterDateTo, "yyyy-MM-dd") : undefined,
       uf: filterUf || undefined,
       situacao: filterSituacao || undefined,
-      comVencedor: filterComVencedor || undefined,
     });
   };
 
   const handleClearFilters = () => {
-    setFilterVencedor("");
     setFilterOrgao("");
     setFilterSearch("");
     setFilterDateFrom(defaultDateFrom);
     setFilterDateTo(undefined);
     setFilterUf("");
     setFilterSituacao("");
-    setFilterComVencedor(false);
     setPage(0);
-    setAppliedFilters({ vencedor: "", orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd") });
+    setAppliedFilters({ orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd") });
   };
 
-  const hasActiveFilters = appliedFilters.vencedor || appliedFilters.orgao || appliedFilters.search || appliedFilters.dateFrom || appliedFilters.dateTo || appliedFilters.uf || appliedFilters.situacao || appliedFilters.comVencedor;
+  const hasActiveFilters = appliedFilters.orgao || appliedFilters.search || appliedFilters.dateFrom || appliedFilters.dateTo || appliedFilters.uf || appliedFilters.situacao;
 
   // Detail modal state
   const [selectedLicitacao, setSelectedLicitacao] = useState<any | null>(null);
@@ -223,22 +206,39 @@ export default function LicitacoesPage() {
   const { data: queryResult, isLoading, isError, error: queryError, refetch } = useQuery({
     queryKey: ["licitacoes-all", page, appliedFilters],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("search_licitacoes", {
-        p_search: appliedFilters.search || undefined,
-        p_orgao: appliedFilters.orgao || undefined,
-        p_vencedor: appliedFilters.vencedor || undefined,
-        p_date_from: appliedFilters.dateFrom || undefined,
-        p_date_to: appliedFilters.dateTo || undefined,
-        p_uf: appliedFilters.uf || undefined,
-        p_situacao: appliedFilters.situacao || undefined,
-        p_com_vencedor: appliedFilters.comVencedor || undefined,
-        p_limit: PAGE_SIZE,
-        p_offset: page * PAGE_SIZE,
-      });
+      // Use direct table query instead of slow RPC to avoid statement timeout
+      let query = supabase
+        .from("licitacoes")
+        .select("id, orgao, objeto, modalidade, valor_estimado, valor_homologado, data_publicacao, uf, municipio, situacao, numero_controle_pncp", { count: "estimated" })
+        .order("valor_homologado", { ascending: false, nullsFirst: false })
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+      if (appliedFilters.dateFrom) {
+        query = query.gte("data_publicacao", appliedFilters.dateFrom);
+      }
+      if (appliedFilters.dateTo) {
+        query = query.lte("data_publicacao", appliedFilters.dateTo);
+      }
+      if (appliedFilters.uf) {
+        query = query.eq("uf", appliedFilters.uf);
+      }
+      if (appliedFilters.situacao) {
+        query = query.eq("situacao", appliedFilters.situacao);
+      }
+      if (appliedFilters.orgao) {
+        query = query.ilike("orgao", `%${appliedFilters.orgao}%`);
+      }
+      if (appliedFilters.search) {
+        // Support multiple keywords with AND logic
+        const keywords = appliedFilters.search.split(/\s+/).filter(Boolean);
+        for (const kw of keywords) {
+          query = query.ilike("objeto", `%${kw}%`);
+        }
+      }
+
+      const { data, error, count } = await query;
       if (error) throw error;
-      const rows = data || [];
-      const totalCount = rows.length > 0 ? (rows[0] as any).total_count : 0;
-      return { rows, totalCount };
+      return { rows: data || [], totalCount: count || 0 };
     },
     placeholderData: (prev) => prev,
     staleTime: 60_000,
@@ -409,18 +409,6 @@ export default function LicitacoesPage() {
             />
           </div>
           <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Vencedor</label>
-            <ComboboxFilter
-              value={filterVencedor}
-              onChange={setFilterVencedor}
-              options={vencedorOptions || []}
-              isLoading={vencedoresLoading}
-              placeholder="Todos os vencedores"
-              searchPlaceholder="Buscar vencedor..."
-              className="h-9"
-            />
-          </div>
-          <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Data Início</label>
             <Popover>
               <PopoverTrigger asChild>
@@ -467,12 +455,6 @@ export default function LicitacoesPage() {
                 {SITUACOES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
-          </div>
-          <div className="flex items-end gap-2">
-            <label className="flex items-center gap-2 h-9 cursor-pointer select-none">
-              <input type="checkbox" checked={filterComVencedor} onChange={(e) => setFilterComVencedor(e.target.checked)} className="rounded border-input" />
-              <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Só com vencedor</span>
-            </label>
           </div>
           <div className="flex items-end gap-2">
             <Button onClick={handleSearch} className="h-9 flex-1 gap-2">
@@ -548,7 +530,6 @@ export default function LicitacoesPage() {
                     <th className="px-4 py-3 text-right font-medium text-muted-foreground">Valor Est.</th>
                     <th className="px-4 py-3 text-right font-medium text-muted-foreground">Val. Homologado</th>
                     <th className="px-4 py-3 text-right font-medium text-muted-foreground">Economia</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Vencedor</th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Data</th>
                     <th className="px-4 py-3 text-center font-medium text-muted-foreground">UF</th>
                   </tr>
@@ -599,20 +580,6 @@ export default function LicitacoesPage() {
                               {formatCurrency(row.valor_estimado - row.valor_homologado)}
                             </span>
                           ) : "—"}
-                        </td>
-                        <td className="px-4 py-3 text-foreground max-w-[160px]">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="block truncate text-xs">
-                                {(row as any).vencedor_nome || "—"}
-                              </span>
-                            </TooltipTrigger>
-                            {(row as any).vencedor_nome && (
-                              <TooltipContent side="bottom" className="max-w-sm">
-                                <p>{(row as any).vencedor_nome}</p>
-                              </TooltipContent>
-                            )}
-                          </Tooltip>
                         </td>
                         <td className="px-4 py-3 text-muted-foreground text-xs">{formattedDate}</td>
                         <td className="px-4 py-3 text-center text-muted-foreground text-xs font-medium">{row.uf || "—"}</td>

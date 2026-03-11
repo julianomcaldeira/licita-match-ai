@@ -76,7 +76,7 @@ export default function AppSidebar() {
       </nav>
 
       {/* Collapse toggle */}
-      <div className="border-t border-sidebar-border p-3">
+      <div className="border-t border-sidebar-border p-3 space-y-2">
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm text-sidebar-foreground/60 transition hover:bg-sidebar-accent/30 hover:text-sidebar-foreground"
@@ -84,6 +84,11 @@ export default function AppSidebar() {
           {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           {!collapsed && <span>Recolher</span>}
         </button>
+        {!collapsed && (
+          <p className="text-center text-[10px] text-sidebar-foreground/40 font-medium">
+            by <span className="text-sidebar-foreground/60 font-semibold">StartGi</span>
+          </p>
+        )}
       </div>
     </aside>
   );
