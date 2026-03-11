@@ -117,37 +117,33 @@ export default function LicitacoesPage() {
 
   // Applied filters (only update on search click)
   const [appliedFilters, setAppliedFilters] = useState<{
-    vencedor: string; orgao: string; search: string; dateFrom?: string; dateTo?: string; uf?: string; situacao?: string; comVencedor?: boolean;
-  }>({ vencedor: "", orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd") });
+    orgao: string; search: string; dateFrom?: string; dateTo?: string; uf?: string; situacao?: string;
+  }>({ orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd") });
 
   const handleSearch = () => {
     setPage(0);
     setAppliedFilters({
-      vencedor: filterVencedor.trim(),
       orgao: filterOrgao.trim(),
       search: filterSearch.trim(),
       dateFrom: filterDateFrom ? format(filterDateFrom, "yyyy-MM-dd") : undefined,
       dateTo: filterDateTo ? format(filterDateTo, "yyyy-MM-dd") : undefined,
       uf: filterUf || undefined,
       situacao: filterSituacao || undefined,
-      comVencedor: filterComVencedor || undefined,
     });
   };
 
   const handleClearFilters = () => {
-    setFilterVencedor("");
     setFilterOrgao("");
     setFilterSearch("");
     setFilterDateFrom(defaultDateFrom);
     setFilterDateTo(undefined);
     setFilterUf("");
     setFilterSituacao("");
-    setFilterComVencedor(false);
     setPage(0);
-    setAppliedFilters({ vencedor: "", orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd") });
+    setAppliedFilters({ orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd") });
   };
 
-  const hasActiveFilters = appliedFilters.vencedor || appliedFilters.orgao || appliedFilters.search || appliedFilters.dateFrom || appliedFilters.dateTo || appliedFilters.uf || appliedFilters.situacao || appliedFilters.comVencedor;
+  const hasActiveFilters = appliedFilters.orgao || appliedFilters.search || appliedFilters.dateFrom || appliedFilters.dateTo || appliedFilters.uf || appliedFilters.situacao;
 
   // Detail modal state
   const [selectedLicitacao, setSelectedLicitacao] = useState<any | null>(null);
