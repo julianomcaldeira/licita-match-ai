@@ -397,9 +397,8 @@ async function processWinner(supabase: any, lic: any): Promise<number> {
                   item_id: dbItem.id, razao_social: r.nomeRazaoSocialFornecedor || "Não informado",
                   cnpj: r.niFornecedor || null, valor_final: r.valorTotalHomologado || r.valorUnitarioHomologado || null,
                   percentual_desconto: r.percentualDesconto || null,
-                }, { onConflict: "item_id" });
+                }, { onConflict: "item_id,cnpj" });
                 if (!winErr) winnersFound++;
-                break;
               }
             }
           } else { await rResp.text(); }
@@ -724,7 +723,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error:", error);
     return new Response(
-      JSON.stringify({ success: false, error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ success: false, error: "Erro interno na ingestão. Tente novamente." }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
