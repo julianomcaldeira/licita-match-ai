@@ -449,6 +449,7 @@ export default function LicitacoesPage() {
               placeholder="Selecionar órgão..."
               searchPlaceholder="Buscar órgão..."
               isLoading={orgaosLoading}
+              onServerSearch={setOrgaoSearch}
             />
           </div>
           <div className="space-y-1">
