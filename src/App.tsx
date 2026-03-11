@@ -33,7 +33,7 @@ const App = () => (
               <Route path="/empresas" element={<EmpresasPage />} />
               <Route path="/usuarios" element={<PlaceholderPage title="Usuários" description="Gerencie usuários e permissões por empresa" icon={Users} />} />
               <Route path="/relatorios" element={<PlaceholderPage title="Relatórios" description="Exporte dados em CSV e PDF com filtros avançados" icon={FileText} />} />
-              <Route path="/analytics" element={<PlaceholderPage title="Analytics" description="Métricas globais, consumo de tokens e atividade por empresa" icon={BarChart3} />} />
+              <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/monitor-ingestao" element={<IngestaoMonitorPage />} />
               <Route path="/configuracoes" element={<PlaceholderPage title="Configurações" description="Parâmetros gerais do sistema e integrações" icon={Settings} />} />
             </Route>
