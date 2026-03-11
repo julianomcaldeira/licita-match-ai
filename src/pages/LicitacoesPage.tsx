@@ -126,11 +126,12 @@ export default function LicitacoesPage() {
     setFilterDateTo(undefined);
     setFilterUf("");
     setFilterSituacao("");
+    setFilterVencedor("");
     setPage(0);
     setAppliedFilters({ orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd") });
   };
 
-  const hasActiveFilters = appliedFilters.orgao || appliedFilters.search || appliedFilters.dateFrom || appliedFilters.dateTo || appliedFilters.uf || appliedFilters.situacao;
+  const hasActiveFilters = appliedFilters.orgao || appliedFilters.search || appliedFilters.dateFrom || appliedFilters.dateTo || appliedFilters.uf || appliedFilters.situacao || appliedFilters.vencedor;
 
   // Detail modal state
   const [selectedLicitacao, setSelectedLicitacao] = useState<any | null>(null);
