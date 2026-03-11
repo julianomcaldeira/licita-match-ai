@@ -103,7 +103,7 @@ export default function LicitacoesPage() {
 
   // Applied filters (only update on search click)
   const [appliedFilters, setAppliedFilters] = useState<{
-    orgao: string; search: string; dateFrom?: string; dateTo?: string; uf?: string; situacao?: string;
+    orgao: string; search: string; dateFrom?: string; dateTo?: string; uf?: string; situacao?: string; vencedor?: string;
   }>({ orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd") });
 
   const handleSearch = () => {
