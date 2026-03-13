@@ -234,12 +234,13 @@ const [filtersExpanded, setFiltersExpanded] = useState(false);
     }
   };
 
+  const useRpc = !!(appliedFilters.vencedor || appliedFilters.search);
+
   const { data: queryResult, isLoading, isError, error: queryError, refetch } = useQuery({
     queryKey: ["licitacoes-all", page, appliedFilters],
     queryFn: async () => {
-      // When vencedor filter is active, use the RPC that supports JOINs
-      if (appliedFilters.vencedor) {
-        const hasResultadoStatus = appliedFilters.situacao === "Concluída" || appliedFilters.situacao === "Homologada";
+      if (useRpc) {
+        const hasResultadoStatus = appliedFilters.situacao === "Concluída";
         const { data, error } = await (supabase as any).rpc("search_licitacoes", {
           p_search: appliedFilters.search || null,
           p_orgao: appliedFilters.orgao || null,
@@ -247,7 +248,7 @@ const [filtersExpanded, setFiltersExpanded] = useState(false);
           p_date_to: appliedFilters.dateTo || null,
           p_uf: appliedFilters.uf || null,
           p_situacao: hasResultadoStatus ? null : appliedFilters.situacao || null,
-          p_vencedor: appliedFilters.vencedor,
+          p_vencedor: appliedFilters.vencedor || null,
           p_modalidade: null,
           p_com_vencedor: hasResultadoStatus ? true : null,
           p_limit: PAGE_SIZE,
@@ -259,7 +260,7 @@ const [filtersExpanded, setFiltersExpanded] = useState(false);
         return { rows, totalCount };
       }
 
-      // Direct table query for fast results without vencedor filter
+      // Direct table query when no text search or vencedor filter
       let query = supabase
         .from("licitacoes")
         .select("id, orgao, objeto, modalidade, valor_estimado, valor_homologado, data_publicacao, uf, municipio, situacao, numero_controle_pncp", { count: "estimated" })
@@ -275,19 +276,13 @@ const [filtersExpanded, setFiltersExpanded] = useState(false);
       if (appliedFilters.uf) {
         query = query.eq("uf", appliedFilters.uf);
       }
-      if (appliedFilters.situacao === "Concluída" || appliedFilters.situacao === "Homologada") {
+      if (appliedFilters.situacao === "Concluída") {
         query = query.not("valor_homologado", "is", null).gt("valor_homologado", 0);
       } else if (appliedFilters.situacao) {
         query = query.eq("situacao", appliedFilters.situacao);
       }
       if (appliedFilters.orgao) {
         query = query.ilike("orgao", `%${appliedFilters.orgao}%`);
-      }
-      if (appliedFilters.search) {
-        const keywords = appliedFilters.search.split(/\s+/).filter(Boolean);
-        for (const kw of keywords) {
-          query = query.ilike("objeto", `%${kw}%`);
-        }
       }
 
       const { data, error, count } = await query;
