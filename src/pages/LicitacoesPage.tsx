@@ -92,7 +92,8 @@ interface IngestProgress {
   winnersFound?: number;
 }
 
-const [filtersExpanded, setFiltersExpanded] = useState(false);
+export default function LicitacoesPage() {
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [page, setPage] = useState(0);
   const [progress, setProgress] = useState<IngestProgress | null>(null);
   const abortRef = useRef(false);
