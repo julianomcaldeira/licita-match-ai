@@ -434,11 +434,12 @@ export default function LicitacoesPage() {
       </div>
 
       {/* Filters */}
-      <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="rounded-xl border border-border bg-card p-4 space-y-4">
+        {/* Row 1: Keyword + Status radio buttons */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-4 items-end">
           <div className="space-y-1">
             <div className="flex items-center gap-1">
-              <label className="text-xs font-medium text-muted-foreground">Palavra-chave do Objeto</label>
+              <label className="text-xs font-medium text-muted-foreground">Palavra-chave</label>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-4 w-4 p-0 hover:bg-transparent">
@@ -446,12 +447,12 @@ export default function LicitacoesPage() {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="max-w-xs">
-                  <p className="text-xs">Use espaços entre palavras para buscar todas juntas (AND). Ex: "serviços consultoria" encontra licitações que contêm ambas as palavras no objeto.</p>
+                  <p className="text-xs">Busca no objeto E nos itens da licitação. Use espaços para buscar todas as palavras (AND). Ex: "plataforma ead"</p>
                 </TooltipContent>
               </Tooltip>
             </div>
             <Input
-              placeholder="Ex: computador, limpeza..."
+              placeholder="Ex: plataforma ead, computador, consultoria..."
               value={filterSearch}
               onChange={(e) => setFilterSearch(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
@@ -459,87 +460,127 @@ export default function LicitacoesPage() {
             />
           </div>
           <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Órgão</label>
-            <ComboboxFilter
-              value={filterOrgao}
-              onChange={setFilterOrgao}
-              options={orgaoOptions}
-              placeholder="Selecionar órgão..."
-              searchPlaceholder="Buscar órgão..."
-              isLoading={orgaosLoading}
-              onServerSearch={setOrgaoSearch}
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Data Início</label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className={cn("h-9 w-full justify-start text-left font-normal", !filterDateFrom && "text-muted-foreground")}>
-                  <CalendarIcon className="mr-2 h-3.5 w-3.5" />
-                  {filterDateFrom ? format(filterDateFrom, "dd/MM/yyyy") : "Selecionar..."}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={filterDateFrom} onSelect={setFilterDateFrom} locale={ptBR} initialFocus className="p-3 pointer-events-auto" />
-              </PopoverContent>
-            </Popover>
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Data Fim</label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className={cn("h-9 w-full justify-start text-left font-normal", !filterDateTo && "text-muted-foreground")}>
-                  <CalendarIcon className="mr-2 h-3.5 w-3.5" />
-                  {filterDateTo ? format(filterDateTo, "dd/MM/yyyy") : "Selecionar..."}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={filterDateTo} onSelect={setFilterDateTo} locale={ptBR} initialFocus className="p-3 pointer-events-auto" />
-              </PopoverContent>
-            </Popover>
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Estado (UF)</label>
-            <Select value={filterUf} onValueChange={(v) => setFilterUf(v === "__all__" ? "" : v)}>
-              <SelectTrigger className="h-9"><SelectValue placeholder="Todos" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Todos</SelectItem>
-                {UFS.map(uf => <SelectItem key={uf} value={uf}>{uf}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Vencedor</label>
-            <ComboboxFilter
-              value={filterVencedor}
-              onChange={setFilterVencedor}
-              options={vencedorOptions}
-              placeholder="Selecionar vencedor..."
-              searchPlaceholder="Buscar vencedor..."
-              isLoading={vencedoresLoading}
-              onServerSearch={setVencedorSearch}
-            />
-          </div>
-          <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Status</label>
-            <Select value={filterSituacao} onValueChange={(v) => setFilterSituacao(v === "__all__" ? "" : v)}>
-              <SelectTrigger className="h-9"><SelectValue placeholder="Todos" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Todos</SelectItem>
-                {SITUACOES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <div className="flex flex-wrap gap-1.5">
+              {STATUS_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setFilterSituacao(opt.value)}
+                  className={cn(
+                    "rounded-full px-3 py-1.5 text-xs font-medium border transition-colors",
+                    filterSituacao === opt.value
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-card text-muted-foreground border-border hover:bg-secondary hover:text-foreground"
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="flex items-end gap-2">
-            <Button onClick={handleSearch} className="h-9 flex-1 gap-2">
-              <Search className="h-3.5 w-3.5" /> Pesquisar
-            </Button>
+        </div>
+
+        {/* Expandable filters section */}
+        <div>
+          <button
+            onClick={() => setFiltersExpanded(!filtersExpanded)}
+            className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            FILTROS AVANÇADOS
+            <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", filtersExpanded && "rotate-180")} />
+          </button>
+
+          <AnimatePresence>
+            {filtersExpanded && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Órgão</label>
+                    <ComboboxFilter
+                      value={filterOrgao}
+                      onChange={setFilterOrgao}
+                      options={orgaoOptions}
+                      placeholder="Selecionar órgão..."
+                      searchPlaceholder="Buscar órgão..."
+                      isLoading={orgaosLoading}
+                      onServerSearch={setOrgaoSearch}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Data Início</label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className={cn("h-9 w-full justify-start text-left font-normal", !filterDateFrom && "text-muted-foreground")}>
+                          <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                          {filterDateFrom ? format(filterDateFrom, "dd/MM/yyyy") : "Selecionar..."}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar mode="single" selected={filterDateFrom} onSelect={setFilterDateFrom} locale={ptBR} initialFocus className="p-3 pointer-events-auto" />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Data Fim</label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className={cn("h-9 w-full justify-start text-left font-normal", !filterDateTo && "text-muted-foreground")}>
+                          <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                          {filterDateTo ? format(filterDateTo, "dd/MM/yyyy") : "Selecionar..."}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar mode="single" selected={filterDateTo} onSelect={setFilterDateTo} locale={ptBR} initialFocus className="p-3 pointer-events-auto" />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Estado (UF)</label>
+                    <Select value={filterUf} onValueChange={(v) => setFilterUf(v === "__all__" ? "" : v)}>
+                      <SelectTrigger className="h-9"><SelectValue placeholder="Todos" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all__">Todos</SelectItem>
+                        {UFS.map(uf => <SelectItem key={uf} value={uf}>{uf}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Vencedor</label>
+                    <ComboboxFilter
+                      value={filterVencedor}
+                      onChange={setFilterVencedor}
+                      options={vencedorOptions}
+                      placeholder="Selecionar vencedor..."
+                      searchPlaceholder="Buscar vencedor..."
+                      isLoading={vencedoresLoading}
+                      onServerSearch={setVencedorSearch}
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Search + Clear buttons */}
+        <div className="flex items-center justify-between pt-1 border-t border-border">
+          <div className="text-xs text-muted-foreground">
             {hasActiveFilters && (
-              <Button variant="ghost" size="sm" onClick={handleClearFilters} className="h-9 px-2 text-muted-foreground">
-                <X className="h-3.5 w-3.5" />
-              </Button>
+              <button onClick={handleClearFilters} className="text-primary hover:underline font-medium">
+                Limpar filtros
+              </button>
             )}
           </div>
+          <Button onClick={handleSearch} className="h-9 gap-2 px-6">
+            <Search className="h-3.5 w-3.5" /> Pesquisar
+          </Button>
         </div>
       </div>
 
