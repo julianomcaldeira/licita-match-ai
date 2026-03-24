@@ -251,13 +251,19 @@ export default function LicitacoesPage() {
           p_situacao: hasResultadoStatus ? null : appliedFilters.situacao || null,
           p_vencedor: appliedFilters.vencedor || null,
           p_modalidade: null,
-          p_com_vencedor: hasResultadoStatus ? true : false,
-          p_limit: PAGE_SIZE,
+          p_com_vencedor: hasResultadoStatus,
+          p_limit: PAGE_SIZE + 1,
           p_offset: page * PAGE_SIZE,
         });
         if (error) throw error;
-        const rows = data || [];
-        const totalCount = rows[0]?.total_count || 0;
+
+        const fetchedRows = (data || []) as any[];
+        const hasMore = fetchedRows.length > PAGE_SIZE;
+        const rows = hasMore ? fetchedRows.slice(0, PAGE_SIZE) : fetchedRows;
+        const totalCount = hasMore
+          ? (page + 2) * PAGE_SIZE
+          : page * PAGE_SIZE + rows.length;
+
         return { rows, totalCount };
       }
 
