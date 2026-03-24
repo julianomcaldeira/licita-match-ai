@@ -251,7 +251,7 @@ export default function LicitacoesPage() {
           p_situacao: hasResultadoStatus ? null : appliedFilters.situacao || null,
           p_vencedor: appliedFilters.vencedor || null,
           p_modalidade: null,
-          p_com_vencedor: hasResultadoStatus ? true : null,
+          p_com_vencedor: hasResultadoStatus ? true : false,
           p_limit: PAGE_SIZE,
           p_offset: page * PAGE_SIZE,
         });
