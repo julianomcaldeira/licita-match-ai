@@ -281,24 +281,12 @@ async function handleCron(supabase: any) {
 
   for (const mod of MODALIDADES) {
     const existing = syncMap[mod];
-    let startDate: string;
-
-    if (existing) {
-      const lastDate = existing.last_date_processed;
-      const y = parseInt(lastDate.substring(0, 4));
-      const m = parseInt(lastDate.substring(4, 6)) - 1;
-      const d = parseInt(lastDate.substring(6, 8));
-      const nextDay = new Date(y, m, d + 1);
-      startDate = fmtDate(nextDay);
-    } else {
-      startDate = yesterdayStr;
-    }
-
-    if (startDate > yesterdayStr) {
+    if (existing?.last_date_processed === yesterdayStr) {
       console.log(`Mod ${mod}: already up to date (last: ${existing?.last_date_processed})`);
       continue;
     }
 
+    const startDate = yesterdayStr;
     console.log(`Mod ${mod}: fetching ${startDate} → ${yesterdayStr}`);
     const result = await fetchAllPages(supabase, mod, startDate, yesterdayStr, true);
     totalIngested += result.total;
@@ -694,25 +682,52 @@ async function authenticateAdmin(req: Request): Promise<{ userId: string } | nul
   return { userId };
 }
 
+function isSchedulerMode(mode: string): boolean {
+  return mode === "cron" || mode === "winners" || mode === "bulk-backfill" || mode === "backfill";
+}
+
+function hasSchedulerToken(req: Request): boolean {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) return false;
+
+  const token = authHeader.replace("Bearer ", "").trim();
+  if (!token) return false;
+
+  const tokenParts = token.split(".");
+  if (tokenParts.length < 2) return false;
+
+  try {
+    const base64 = tokenParts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+    const claims = JSON.parse(atob(padded));
+    return claims?.role === "anon";
+  } catch {
+    return false;
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Auth + admin check
-  const auth = await authenticateAdmin(req);
-  if (!auth) {
-    return new Response(JSON.stringify({ error: "Não autorizado. Acesso restrito a administradores." }), {
-      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+  const body = await req.json().catch(() => ({}));
+  const requestedMode = typeof body.mode === "string" ? body.mode : "ingest";
+  const mode = requestedMode === "backfill" ? "bulk-backfill" : requestedMode;
+
+  const schedulerAuthorized = isSchedulerMode(requestedMode) && hasSchedulerToken(req);
+  if (!schedulerAuthorized) {
+    const auth = await authenticateAdmin(req);
+    if (!auth) {
+      return new Response(JSON.stringify({ error: "Não autorizado. Acesso restrito a administradores." }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-  const body = await req.json().catch(() => ({}));
-  const mode = body.mode || "ingest";
 
   try {
     if (mode === "winners") return await handleWinners(supabase, body);

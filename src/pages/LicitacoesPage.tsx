@@ -242,29 +242,73 @@ export default function LicitacoesPage() {
     queryFn: async () => {
       if (useRpc) {
         const hasResultadoStatus = appliedFilters.situacao === "Concluída";
-        const { data, error } = await (supabase as any).rpc("search_licitacoes", {
-          p_search: appliedFilters.search || null,
-          p_orgao: appliedFilters.orgao || null,
-          p_date_from: appliedFilters.dateFrom || null,
-          p_date_to: appliedFilters.dateTo || null,
-          p_uf: appliedFilters.uf || null,
-          p_situacao: hasResultadoStatus ? null : appliedFilters.situacao || null,
-          p_vencedor: appliedFilters.vencedor || null,
-          p_modalidade: null,
-          p_com_vencedor: hasResultadoStatus,
-          p_limit: PAGE_SIZE + 1,
-          p_offset: page * PAGE_SIZE,
-        });
-        if (error) throw error;
+        try {
+          const { data, error } = await (supabase as any).rpc("search_licitacoes", {
+            p_search: appliedFilters.search || null,
+            p_orgao: appliedFilters.orgao || null,
+            p_date_from: appliedFilters.dateFrom || null,
+            p_date_to: appliedFilters.dateTo || null,
+            p_uf: appliedFilters.uf || null,
+            p_situacao: hasResultadoStatus ? null : appliedFilters.situacao || null,
+            p_vencedor: appliedFilters.vencedor || null,
+            p_modalidade: null,
+            p_com_vencedor: hasResultadoStatus,
+            p_limit: PAGE_SIZE + 1,
+            p_offset: page * PAGE_SIZE,
+          });
+          if (error) throw error;
 
-        const fetchedRows = (data || []) as any[];
-        const hasMore = fetchedRows.length > PAGE_SIZE;
-        const rows = hasMore ? fetchedRows.slice(0, PAGE_SIZE) : fetchedRows;
-        const totalCount = hasMore
-          ? (page + 2) * PAGE_SIZE
-          : page * PAGE_SIZE + rows.length;
+          const fetchedRows = (data || []) as any[];
+          const hasMore = fetchedRows.length > PAGE_SIZE;
+          const rows = hasMore ? fetchedRows.slice(0, PAGE_SIZE) : fetchedRows;
+          const totalCount = hasMore
+            ? (page + 2) * PAGE_SIZE
+            : page * PAGE_SIZE + rows.length;
 
-        return { rows, totalCount };
+          return { rows, totalCount };
+        } catch (rpcError) {
+          console.error("search_licitacoes falhou, usando fallback por objeto:", rpcError);
+
+          if (appliedFilters.vencedor) {
+            throw rpcError;
+          }
+
+          let fallbackQuery = supabase
+            .from("licitacoes")
+            .select("id, orgao, objeto, modalidade, valor_estimado, valor_homologado, data_publicacao, uf, municipio, situacao, numero_controle_pncp", { count: "estimated" })
+            .order("valor_homologado", { ascending: false, nullsFirst: false })
+            .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+          const words = (appliedFilters.search || "").toLowerCase().split(/\s+/).filter(Boolean);
+          for (const word of words) {
+            fallbackQuery = fallbackQuery.ilike("objeto", `%${word}%`);
+          }
+
+          if (appliedFilters.dateFrom) {
+            fallbackQuery = fallbackQuery.gte("data_publicacao", appliedFilters.dateFrom);
+          }
+          if (appliedFilters.dateTo) {
+            fallbackQuery = fallbackQuery.lte("data_publicacao", appliedFilters.dateTo);
+          }
+          if (appliedFilters.uf) {
+            fallbackQuery = fallbackQuery.eq("uf", appliedFilters.uf);
+          }
+          if (hasResultadoStatus) {
+            fallbackQuery = fallbackQuery.not("valor_homologado", "is", null).gt("valor_homologado", 0);
+          } else if (appliedFilters.situacao) {
+            fallbackQuery = fallbackQuery.eq("situacao", appliedFilters.situacao);
+          }
+          if (appliedFilters.orgao) {
+            fallbackQuery = fallbackQuery.ilike("orgao", `%${appliedFilters.orgao}%`);
+          }
+
+          const { data: fallbackRows, error: fallbackError, count } = await fallbackQuery;
+          if (fallbackError) {
+            throw rpcError;
+          }
+
+          return { rows: fallbackRows || [], totalCount: count || 0 };
+        }
       }
 
       // Direct table query when no text search or vencedor filter
