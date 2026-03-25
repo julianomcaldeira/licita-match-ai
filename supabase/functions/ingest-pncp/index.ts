@@ -281,24 +281,12 @@ async function handleCron(supabase: any) {
 
   for (const mod of MODALIDADES) {
     const existing = syncMap[mod];
-    let startDate: string;
-
-    if (existing) {
-      const lastDate = existing.last_date_processed;
-      const y = parseInt(lastDate.substring(0, 4));
-      const m = parseInt(lastDate.substring(4, 6)) - 1;
-      const d = parseInt(lastDate.substring(6, 8));
-      const nextDay = new Date(y, m, d + 1);
-      startDate = fmtDate(nextDay);
-    } else {
-      startDate = yesterdayStr;
-    }
-
-    if (startDate > yesterdayStr) {
+    if (existing?.last_date_processed === yesterdayStr) {
       console.log(`Mod ${mod}: already up to date (last: ${existing?.last_date_processed})`);
       continue;
     }
 
+    const startDate = yesterdayStr;
     console.log(`Mod ${mod}: fetching ${startDate} → ${yesterdayStr}`);
     const result = await fetchAllPages(supabase, mod, startDate, yesterdayStr, true);
     totalIngested += result.total;
