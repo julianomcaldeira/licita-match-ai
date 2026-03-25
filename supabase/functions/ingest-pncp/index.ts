@@ -703,9 +703,19 @@ function hasSchedulerToken(req: Request): boolean {
   if (!authHeader?.startsWith("Bearer ")) return false;
 
   const token = authHeader.replace("Bearer ", "").trim();
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || "";
+  if (!token) return false;
 
-  return !!token && !!anonKey && token === anonKey;
+  const tokenParts = token.split(".");
+  if (tokenParts.length < 2) return false;
+
+  try {
+    const base64 = tokenParts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+    const claims = JSON.parse(atob(padded));
+    return claims?.role === "anon";
+  } catch {
+    return false;
+  }
 }
 
 serve(async (req) => {
