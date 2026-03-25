@@ -694,25 +694,42 @@ async function authenticateAdmin(req: Request): Promise<{ userId: string } | nul
   return { userId };
 }
 
+function isSchedulerMode(mode: string): boolean {
+  return mode === "cron" || mode === "winners" || mode === "bulk-backfill" || mode === "backfill";
+}
+
+function hasSchedulerToken(req: Request): boolean {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) return false;
+
+  const token = authHeader.replace("Bearer ", "").trim();
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || "";
+
+  return !!token && !!anonKey && token === anonKey;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Auth + admin check
-  const auth = await authenticateAdmin(req);
-  if (!auth) {
-    return new Response(JSON.stringify({ error: "Não autorizado. Acesso restrito a administradores." }), {
-      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+  const body = await req.json().catch(() => ({}));
+  const requestedMode = typeof body.mode === "string" ? body.mode : "ingest";
+  const mode = requestedMode === "backfill" ? "bulk-backfill" : requestedMode;
+
+  const schedulerAuthorized = isSchedulerMode(requestedMode) && hasSchedulerToken(req);
+  if (!schedulerAuthorized) {
+    const auth = await authenticateAdmin(req);
+    if (!auth) {
+      return new Response(JSON.stringify({ error: "Não autorizado. Acesso restrito a administradores." }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-  const body = await req.json().catch(() => ({}));
-  const mode = body.mode || "ingest";
 
   try {
     if (mode === "winners") return await handleWinners(supabase, body);
