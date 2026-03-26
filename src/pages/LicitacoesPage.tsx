@@ -237,7 +237,7 @@ export default function LicitacoesPage() {
 
   const useRpc = !!(appliedFilters.vencedor || appliedFilters.search);
 
-  const { data: queryResult, isLoading, isError, error: queryError, refetch } = useQuery({
+  const { data: queryResult, isLoading, isFetching, isError, error: queryError, refetch } = useQuery({
     queryKey: ["licitacoes-all", page, appliedFilters],
     queryFn: async () => {
       if (useRpc) {
@@ -628,13 +628,38 @@ export default function LicitacoesPage() {
               </button>
             )}
           </div>
-          <Button onClick={handleSearch} className="h-9 gap-2 px-6">
-            <Search className="h-3.5 w-3.5" /> Pesquisar
+          <Button onClick={handleSearch} disabled={isFetching} className="h-9 gap-2 px-6">
+            {isFetching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+            {isFetching ? "Pesquisando..." : "Pesquisar"}
           </Button>
         </div>
       </div>
 
-      {/* Progress bar */}
+      {/* Search loading bar */}
+      <AnimatePresence>
+        {isFetching && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-2"
+          >
+            <div className="flex items-center gap-2 text-sm font-medium text-primary">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Pesquisando licitações...
+            </div>
+            <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
+              <motion.div
+                className="h-full rounded-full bg-primary"
+                animate={{ width: ["0%", "70%", "90%", "95%"] }}
+                transition={{ duration: 8, ease: "easeOut" }}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Ingest progress bar */}
       {progress && (
         <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="rounded-lg border border-border bg-card p-3 space-y-1.5">
           <div className="flex items-center justify-between text-xs">
