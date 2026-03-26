@@ -137,6 +137,31 @@ export default function LicitacoesPage() {
     staleTime: 60_000,
   });
 
+  // Vencedor stats query - fires when a vencedor is selected
+  const { data: vencedorStats } = useQuery({
+    queryKey: ["vencedor-stats", filterVencedor],
+    queryFn: async () => {
+      if (!filterVencedor) return null;
+      const { data, error } = await supabase.rpc("search_licitacoes", {
+        p_vencedor: filterVencedor,
+        p_date_from: "2023-01-01",
+        p_limit: 1000,
+        p_offset: 0,
+      });
+      if (error) return null;
+      const rows = (data || []) as any[];
+      if (!rows.length) return { total: 0, primeira: null, ultima: null };
+      const dates = rows.map((r: any) => r.data_publicacao).filter(Boolean).sort();
+      return {
+        total: rows.length >= 1000 ? "1000+" : rows.length,
+        primeira: dates[0] || null,
+        ultima: dates[dates.length - 1] || null,
+      };
+    },
+    enabled: !!filterVencedor,
+    staleTime: 120_000,
+  });
+
 
   const [appliedFilters, setAppliedFilters] = useState<{
     orgao: string; search: string; dateFrom?: string; dateTo?: string; uf?: string; situacao?: string; vencedor?: string;
@@ -612,6 +637,20 @@ export default function LicitacoesPage() {
                       isLoading={vencedoresLoading}
                       onServerSearch={setVencedorSearch}
                     />
+                    {filterVencedor && vencedorStats && (
+                      <div className="flex items-center gap-2 flex-wrap mt-1">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                          <Trophy className="h-3 w-3" />
+                          {vencedorStats.total} vitória{vencedorStats.total !== 1 ? "s" : ""}
+                        </span>
+                        {vencedorStats.primeira && vencedorStats.ultima && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-muted border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            {vencedorStats.primeira.split("-").reverse().join("/")} — {vencedorStats.ultima.split("-").reverse().join("/")}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </motion.div>
