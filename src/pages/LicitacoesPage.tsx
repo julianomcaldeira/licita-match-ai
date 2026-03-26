@@ -637,6 +637,20 @@ export default function LicitacoesPage() {
                       isLoading={vencedoresLoading}
                       onServerSearch={setVencedorSearch}
                     />
+                    {filterVencedor && vencedorStats && (
+                      <div className="flex items-center gap-2 flex-wrap mt-1">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                          <Trophy className="h-3 w-3" />
+                          {vencedorStats.total} vitória{vencedorStats.total !== 1 ? "s" : ""}
+                        </span>
+                        {vencedorStats.primeira && vencedorStats.ultima && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-muted border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            {vencedorStats.primeira.split("-").reverse().join("/")} — {vencedorStats.ultima.split("-").reverse().join("/")}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </motion.div>
