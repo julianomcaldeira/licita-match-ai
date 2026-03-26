@@ -628,8 +628,9 @@ export default function LicitacoesPage() {
               </button>
             )}
           </div>
-          <Button onClick={handleSearch} className="h-9 gap-2 px-6">
-            <Search className="h-3.5 w-3.5" /> Pesquisar
+          <Button onClick={handleSearch} disabled={isFetching} className="h-9 gap-2 px-6">
+            {isFetching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+            {isFetching ? "Pesquisando..." : "Pesquisar"}
           </Button>
         </div>
       </div>
