@@ -703,8 +703,28 @@ export default function LicitacoesPage() {
           </div>
           <h2 className="mt-4 font-display text-lg font-semibold text-foreground">Nenhuma licitação encontrada</h2>
           <p className="mt-2 text-sm text-muted-foreground max-w-md text-center">
-            Use o menu "Ingestão" para buscar dados do PNCP.
+            {appliedFilters.vencedor
+              ? `Não há resultados para "${appliedFilters.vencedor}" no período selecionado. Tente ampliar o intervalo de datas para o histórico completo.`
+              : "Use o menu \"Ingestão\" para buscar dados do PNCP."}
           </p>
+          {appliedFilters.vencedor && (
+            <Button
+              variant="outline"
+              className="mt-4"
+              onClick={() => {
+                setFilterDateFrom(defaultDateFrom);
+                setFilterDateTo(undefined);
+                setPage(0);
+                setAppliedFilters((prev) => ({
+                  ...prev,
+                  dateFrom: format(defaultDateFrom, "yyyy-MM-dd"),
+                  dateTo: undefined,
+                }));
+              }}
+            >
+              Ver histórico completo
+            </Button>
+          )}
         </motion.div>
       ) : (
         <>
