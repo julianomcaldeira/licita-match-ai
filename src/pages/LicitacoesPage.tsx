@@ -137,6 +137,31 @@ export default function LicitacoesPage() {
     staleTime: 60_000,
   });
 
+  // Vencedor stats query - fires when a vencedor is selected
+  const { data: vencedorStats } = useQuery({
+    queryKey: ["vencedor-stats", filterVencedor],
+    queryFn: async () => {
+      if (!filterVencedor) return null;
+      const { data, error } = await supabase.rpc("search_licitacoes", {
+        p_vencedor: filterVencedor,
+        p_date_from: "2023-01-01",
+        p_limit: 1000,
+        p_offset: 0,
+      });
+      if (error) return null;
+      const rows = (data || []) as any[];
+      if (!rows.length) return { total: 0, primeira: null, ultima: null };
+      const dates = rows.map((r: any) => r.data_publicacao).filter(Boolean).sort();
+      return {
+        total: rows.length >= 1000 ? "1000+" : rows.length,
+        primeira: dates[0] || null,
+        ultima: dates[dates.length - 1] || null,
+      };
+    },
+    enabled: !!filterVencedor,
+    staleTime: 120_000,
+  });
+
 
   const [appliedFilters, setAppliedFilters] = useState<{
     orgao: string; search: string; dateFrom?: string; dateTo?: string; uf?: string; situacao?: string; vencedor?: string;
