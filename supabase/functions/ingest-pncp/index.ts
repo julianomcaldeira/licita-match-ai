@@ -9,7 +9,7 @@ const corsHeaders = {
 
 const PNCP_CONSULTA_URL = "https://pncp.gov.br/api/consulta/v1";
 const PNCP_DATA_URL = "https://pncp.gov.br/api/pncp/v1";
-const PAGE_SIZE = 50; // PNCP API max is now 50 (was 500 before API change)
+const PAGE_SIZE = 50;
 const MODALIDADES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
 
 interface PNCPContratacao {
@@ -36,6 +36,14 @@ function fmtDate(d: Date): string {
 
 function fmtDateISO(yyyymmdd: string): string {
   return yyyymmdd.replace(/(\d{4})(\d{2})(\d{2})/, "$1-$2-$3");
+}
+
+function addDays(yyyymmdd: string, days: number): string {
+  const y = parseInt(yyyymmdd.substring(0, 4));
+  const m = parseInt(yyyymmdd.substring(4, 6)) - 1;
+  const d = parseInt(yyyymmdd.substring(6, 8));
+  const dt = new Date(y, m, d + days);
+  return fmtDate(dt);
 }
 
 async function fetchWithRetry(url: string, retries = 3, delayMs = 2000): Promise<Response> {
@@ -92,7 +100,8 @@ function mapContratacao(c: PNCPContratacao) {
 }
 
 /**
- * Fetch one date range + modalidade combo, all pages
+ * Fetch one date range + modalidade combo, all pages.
+ * Returns actual page count to detect incomplete fetches.
  */
 async function fetchAllPages(
   supabase: any,
@@ -101,23 +110,24 @@ async function fetchAllPages(
   dataFinal: string,
   fetchWinners = false,
   cnpj?: string
-): Promise<{ total: number; winners: number; errors: string[] }> {
+): Promise<{ total: number; winners: number; errors: string[]; pagesOk: number }> {
   let pagina = 1;
   let hasMore = true;
   let total = 0;
   let winnersFound = 0;
+  let pagesOk = 0;
   const errors: string[] = [];
 
   while (hasMore) {
     try {
       let url = `${PNCP_CONSULTA_URL}/contratacoes/publicacao?dataInicial=${dataInicial}&dataFinal=${dataFinal}&codigoModalidadeContratacao=${modalidade}&pagina=${pagina}&tamanhoPagina=${PAGE_SIZE}`;
       if (cnpj) url += `&cnpj=${cnpj}`;
-      
+
       const response = await fetchWithRetry(url);
       if (!response.ok) {
         const errBody = await response.text();
         console.error(`API error mod ${modalidade} page ${pagina}: ${response.status} - ${errBody.slice(0, 200)}`);
-        errors.push(`Mod ${modalidade} pag ${pagina}: HTTP ${response.status} - ${errBody.slice(0, 100)}`);
+        errors.push(`Mod ${modalidade} pag ${pagina}: HTTP ${response.status}`);
         hasMore = false;
         continue;
       }
@@ -140,7 +150,7 @@ async function fetchAllPages(
           } else {
             total += batch.length;
             if (upserted) {
-              const PARALLEL = 10;
+              const PARALLEL = 15;
               for (let j = 0; j < upserted.length; j += PARALLEL) {
                 const winBatch = upserted.slice(j, j + PARALLEL);
                 const results = await Promise.allSettled(
@@ -159,6 +169,7 @@ async function fetchAllPages(
         }
       }
 
+      pagesOk++;
       hasMore = contratacoes.length >= PAGE_SIZE;
       pagina++;
     } catch (e) {
@@ -167,148 +178,171 @@ async function fetchAllPages(
     }
   }
 
-  return { total, winners: winnersFound, errors };
+  return { total, winners: winnersFound, errors, pagesOk };
 }
 
 /**
- * MODE "orgao": Search and ingest all licitações from a specific organ by CNPJ or name
- * This queries the PNCP API with the cnpj filter to fetch ALL records for that organ
+ * Process a single licitação for winners (items + results)
  */
-async function handleOrgao(supabase: any, body: any) {
-  const { cnpj, nome, dataInicial = "20230101" } = body;
-  
-  if (!cnpj && !nome) {
-    return new Response(
-      JSON.stringify({ success: false, error: "Informe o CNPJ ou nome do órgão" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+async function processWinner(supabase: any, lic: any): Promise<number> {
+  const raw = lic.raw_json;
+  const cnpj = raw?.orgaoEntidade?.cnpj || raw?.unidadeOrgao?.cnpj;
+  const ano = raw?.anoCompra;
+  const seq = raw?.sequencialCompra;
+  let winnersFound = 0;
+
+  if (!cnpj || !ano || !seq) {
+    await supabase.from("licitacao_itens").upsert({
+      licitacao_id: lic.id, descricao: raw?.objetoCompra || "Item geral", numero_item: 0,
+    }, { onConflict: "licitacao_id,numero_item" });
+    return 0;
   }
 
-  // If only name provided, try to find CNPJ via PNCP search
-  let orgaoCnpj = cnpj;
-  let orgaoNome = nome || "";
-  
-  if (!orgaoCnpj && nome) {
-    // Search PNCP for the organ
-    try {
-      const searchUrl = `${PNCP_CONSULTA_URL}/contratacoes/publicacao?dataInicial=20260101&dataFinal=${fmtDate(new Date())}&pagina=1&tamanhoPagina=5&codigoModalidadeContratacao=5`;
-      // We can't search by name directly, we need to try different approaches
-      // Let's try the orgaos endpoint
-      const orgaoResp = await fetchWithRetry(`${PNCP_DATA_URL}/orgaos?razaoSocial=${encodeURIComponent(nome)}&pagina=1&tamanhoPagina=10`);
-      if (orgaoResp.ok) {
-        const orgaos = await orgaoResp.json();
-        const orgaoList = Array.isArray(orgaos) ? orgaos : orgaos?.data || [];
-        if (orgaoList.length > 0) {
-          orgaoCnpj = orgaoList[0].cnpj;
-          orgaoNome = orgaoList[0].razaoSocial || nome;
-          console.log(`Found organ: ${orgaoNome} (CNPJ: ${orgaoCnpj})`);
-        }
-      }
-    } catch (e) {
-      console.warn("Error searching for organ:", e);
+  try {
+    const itensResp = await fetch(`${PNCP_DATA_URL}/orgaos/${cnpj}/compras/${ano}/${seq}/itens`, { headers: { Accept: "application/json" } });
+    if (!itensResp.ok) {
+      await itensResp.text();
+      await supabase.from("licitacao_itens").upsert({
+        licitacao_id: lic.id, descricao: raw?.objetoCompra || "Item geral", numero_item: 0,
+      }, { onConflict: "licitacao_id,numero_item" });
+      return 0;
     }
+
+    const itens = await itensResp.json();
+    if (!Array.isArray(itens) || itens.length === 0) {
+      await supabase.from("licitacao_itens").upsert({
+        licitacao_id: lic.id, descricao: raw?.objetoCompra || "Item geral", numero_item: 0,
+      }, { onConflict: "licitacao_id,numero_item" });
+      return 0;
+    }
+
+    // Batch upsert all items at once
+    const itemRows = itens
+      .filter((item: any) => item.numeroItem || item.sequencialItem)
+      .map((item: any) => ({
+        licitacao_id: lic.id,
+        descricao: item.descricao || item.materialOuServico || "Item",
+        numero_item: item.numeroItem || item.sequencialItem,
+        quantidade: item.quantidade || null,
+        unidade: item.unidadeMedida || null,
+        valor_unitario_estimado: item.valorUnitarioEstimado || null,
+      }));
+
+    if (itemRows.length === 0) {
+      await supabase.from("licitacao_itens").upsert({
+        licitacao_id: lic.id, descricao: raw?.objetoCompra || "Item geral", numero_item: 0,
+      }, { onConflict: "licitacao_id,numero_item" });
+      return 0;
+    }
+
+    const { data: dbItems } = await supabase
+      .from("licitacao_itens")
+      .upsert(itemRows, { onConflict: "licitacao_id,numero_item" })
+      .select("id, numero_item");
+
+    if (!dbItems || dbItems.length === 0) return 0;
+
+    // Build map of numero_item -> db id
+    const itemIdMap: Record<number, string> = {};
+    for (const di of dbItems) {
+      itemIdMap[di.numero_item] = di.id;
+    }
+
+    // Fetch results for items that have them, in parallel batches
+    const itemsWithResults = itens.filter((item: any) => item.temResultado && (item.numeroItem || item.sequencialItem));
+    const PARALLEL_RESULTS = 15;
+
+    for (let i = 0; i < itemsWithResults.length; i += PARALLEL_RESULTS) {
+      const batch = itemsWithResults.slice(i, i + PARALLEL_RESULTS);
+      const results = await Promise.allSettled(
+        batch.map(async (item: any) => {
+          const seqItem = item.numeroItem || item.sequencialItem;
+          const dbItemId = itemIdMap[seqItem];
+          if (!dbItemId) return 0;
+
+          try {
+            const rResp = await fetch(
+              `${PNCP_DATA_URL}/orgaos/${cnpj}/compras/${ano}/${seq}/itens/${seqItem}/resultados`,
+              { headers: { Accept: "application/json" } }
+            );
+            if (!rResp.ok) { await rResp.text(); return 0; }
+            const resultados = await rResp.json();
+            const rList = Array.isArray(resultados) ? resultados : [resultados];
+            let count = 0;
+
+            // Batch upsert winners
+            const winnerRows = rList
+              .filter((r: any) => r?.nomeRazaoSocialFornecedor || r?.niFornecedor)
+              .map((r: any) => ({
+                item_id: dbItemId,
+                razao_social: r.nomeRazaoSocialFornecedor || "Não informado",
+                cnpj: r.niFornecedor || null,
+                valor_final: r.valorTotalHomologado || r.valorUnitarioHomologado || null,
+                percentual_desconto: r.percentualDesconto || null,
+              }));
+
+            if (winnerRows.length > 0) {
+              const { error: winErr } = await supabase
+                .from("licitacao_vencedores")
+                .upsert(winnerRows, { onConflict: "item_id,cnpj" });
+              if (!winErr) count = winnerRows.length;
+            }
+            return count;
+          } catch { return 0; }
+        })
+      );
+
+      for (const r of results) {
+        if (r.status === "fulfilled") winnersFound += r.value;
+      }
+    }
+  } catch (e) {
+    console.warn(`Error processing ${lic.numero_controle_pncp}:`, e);
   }
 
-  if (!orgaoCnpj) {
-    return new Response(
-      JSON.stringify({ success: false, error: `Órgão "${nome}" não encontrado na API do PNCP. Tente informar o CNPJ diretamente.` }),
-      { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-
-  const today = fmtDate(new Date());
-  let totalIngested = 0;
-  let totalWinners = 0;
-  const allErrors: string[] = [];
-
-  console.log(`Fetching all licitações for CNPJ ${orgaoCnpj} (${orgaoNome}) from ${dataInicial} to ${today}`);
-
-  // Process all modalidades for this CNPJ
-  for (const mod of MODALIDADES) {
-    console.log(`  Mod ${mod}: fetching...`);
-    const result = await fetchAllPages(supabase, mod, dataInicial, today, true, orgaoCnpj);
-    totalIngested += result.total;
-    totalWinners += result.winners;
-    allErrors.push(...result.errors);
-    console.log(`  Mod ${mod}: ${result.total} records, ${result.winners} winners`);
-  }
-
-  // Log
-  await supabase.from("ingestao_logs").insert({
-    fonte: "PNCP",
-    endpoint: `orgao/${orgaoCnpj}`,
-    status: allErrors.length > 0 ? "parcial" : "sucesso",
-    registros_processados: totalIngested,
-    data_inicio: fmtDateISO(dataInicial),
-    data_fim: fmtDateISO(today),
-    erro: allErrors.length > 0 ? allErrors.join("; ").slice(0, 1000) : null,
-  });
-
-  return new Response(
-    JSON.stringify({ 
-      success: true, 
-      orgao: orgaoNome, 
-      cnpj: orgaoCnpj,
-      totalIngested, 
-      totalWinners, 
-      errors: allErrors.length 
-    }),
-    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-  );
+  return winnersFound;
 }
 
 /**
- * MODE "cron": Incremental daily ingestion
+ * MODE "cron": Fetch last 7 days for ALL modalidades (covers gaps from missed days)
  */
 async function handleCron(supabase: any) {
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = fmtDate(yesterday);
+  const today = new Date();
+  const weekAgo = new Date(today);
+  weekAgo.setDate(today.getDate() - 7);
+  const startStr = fmtDate(weekAgo);
+  const endStr = fmtDate(today);
 
   let totalIngested = 0;
   let totalWinners = 0;
   const errors: string[] = [];
 
-  const { data: syncRows } = await supabase
-    .from("sync_status")
-    .select("*")
-    .eq("api_source", "pncp");
-
-  const syncMap: Record<number, { last_date_processed: string; total_synced: number }> = {};
-  for (const row of syncRows || []) {
-    syncMap[row.modalidade] = { last_date_processed: row.last_date_processed, total_synced: row.total_synced };
-  }
-
   for (const mod of MODALIDADES) {
-    const existing = syncMap[mod];
-    if (existing?.last_date_processed === yesterdayStr) {
-      console.log(`Mod ${mod}: already up to date (last: ${existing?.last_date_processed})`);
-      continue;
-    }
-
-    const startDate = yesterdayStr;
-    console.log(`Mod ${mod}: fetching ${startDate} → ${yesterdayStr}`);
-    const result = await fetchAllPages(supabase, mod, startDate, yesterdayStr, true);
+    console.log(`Cron: Mod ${mod} ${startStr} → ${endStr}`);
+    const result = await fetchAllPages(supabase, mod, startStr, endStr, true);
     totalIngested += result.total;
     totalWinners += result.winners;
     errors.push(...result.errors);
 
-    await supabase.from("sync_status").upsert({
-      api_source: "pncp",
-      modalidade: mod,
-      last_date_processed: yesterdayStr,
-      total_synced: (existing?.total_synced || 0) + result.total,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: "api_source,modalidade" });
+    // Only update sync_status if we had no errors
+    if (result.errors.length === 0) {
+      await supabase.from("sync_status").upsert({
+        api_source: "pncp",
+        modalidade: mod,
+        last_date_processed: endStr,
+        total_synced: result.total,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "api_source,modalidade" });
+    }
   }
 
   await supabase.from("ingestao_logs").insert({
     fonte: "PNCP",
-    endpoint: "cron-diario",
+    endpoint: "cron-diario-7d",
     status: errors.length > 0 ? "parcial" : "sucesso",
     registros_processados: totalIngested,
-    data_inicio: fmtDateISO(yesterdayStr),
-    data_fim: fmtDateISO(yesterdayStr),
+    data_inicio: fmtDateISO(startStr),
+    data_fim: fmtDateISO(endStr),
     erro: errors.length > 0 ? errors.join("; ").slice(0, 1000) : null,
   });
 
@@ -321,191 +355,11 @@ async function handleCron(supabase: any) {
 }
 
 /**
- * Process a single licitação for winners
+ * MODE "winners": Process licitações without items/winners
+ * Increased batch size and parallelism for faster processing
  */
-async function processWinner(supabase: any, lic: any): Promise<number> {
-  const raw = lic.raw_json;
-  const cnpj = raw?.orgaoEntidade?.cnpj || raw?.unidadeOrgao?.cnpj;
-  const ano = raw?.anoCompra;
-  const seq = raw?.sequencialCompra;
-  let winnersFound = 0;
-
-  if (!cnpj || !ano || !seq) {
-    await supabase.from("licitacao_itens").insert({
-      licitacao_id: lic.id, descricao: raw?.objetoCompra || "Item geral", numero_item: 0,
-    });
-    return 0;
-  }
-
-  try {
-    const itensResp = await fetch(`${PNCP_DATA_URL}/orgaos/${cnpj}/compras/${ano}/${seq}/itens`, { headers: { Accept: "application/json" } });
-    if (!itensResp.ok) {
-      await itensResp.text();
-      await supabase.from("licitacao_itens").insert({
-        licitacao_id: lic.id, descricao: raw?.objetoCompra || "Item geral", numero_item: 0,
-      });
-      return 0;
-    }
-
-    const itens = await itensResp.json();
-    if (!Array.isArray(itens) || itens.length === 0) {
-      await supabase.from("licitacao_itens").insert({
-        licitacao_id: lic.id, descricao: raw?.objetoCompra || "Item geral", numero_item: 0,
-      });
-      return 0;
-    }
-
-    for (const item of itens) {
-      const seqItem = item.numeroItem || item.sequencialItem;
-      if (!seqItem) continue;
-
-      const { data: dbItem } = await supabase
-        .from("licitacao_itens")
-        .upsert({
-          licitacao_id: lic.id, descricao: item.descricao || item.materialOuServico || "Item",
-          numero_item: seqItem, quantidade: item.quantidade || null,
-          unidade: item.unidadeMedida || null, valor_unitario_estimado: item.valorUnitarioEstimado || null,
-        }, { onConflict: "licitacao_id,numero_item" })
-        .select("id").single();
-
-      if (!dbItem) continue;
-
-      if (item.temResultado) {
-        try {
-          const rResp = await fetch(
-            `${PNCP_DATA_URL}/orgaos/${cnpj}/compras/${ano}/${seq}/itens/${seqItem}/resultados`,
-            { headers: { Accept: "application/json" } }
-          );
-          if (rResp.ok) {
-            const resultados = await rResp.json();
-            const rList = Array.isArray(resultados) ? resultados : [resultados];
-            for (const r of rList) {
-              if (r?.nomeRazaoSocialFornecedor || r?.niFornecedor) {
-                const { error: winErr } = await supabase.from("licitacao_vencedores").upsert({
-                  item_id: dbItem.id, razao_social: r.nomeRazaoSocialFornecedor || "Não informado",
-                  cnpj: r.niFornecedor || null, valor_final: r.valorTotalHomologado || r.valorUnitarioHomologado || null,
-                  percentual_desconto: r.percentualDesconto || null,
-                }, { onConflict: "item_id,cnpj" });
-                if (!winErr) winnersFound++;
-              }
-            }
-          } else { await rResp.text(); }
-        } catch { /* skip */ }
-      }
-    }
-  } catch (e) {
-    console.warn(`Error fetching winners for ${lic.numero_controle_pncp}:`, e);
-  }
-
-  return winnersFound;
-}
-
-/**
- * MODE "ingest" (manual): Bulk ingestion with improved throughput
- */
-async function handleIngest(supabase: any, body: any) {
-  const modalidade: number = body.modalidade || 6;
-  const forceStartDate: string | undefined = body.dataInicial;
-
-  const { data: syncRow } = await supabase
-    .from("sync_status")
-    .select("*")
-    .eq("api_source", "pncp")
-    .eq("modalidade", modalidade)
-    .maybeSingle();
-
-  let startDate: string;
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const endDate = fmtDate(yesterday);
-
-  if (forceStartDate) {
-    startDate = forceStartDate;
-  } else if (syncRow) {
-    const lastDate = syncRow.last_date_processed;
-    const y = parseInt(lastDate.substring(0, 4));
-    const m = parseInt(lastDate.substring(4, 6)) - 1;
-    const d = parseInt(lastDate.substring(6, 8));
-    const nextDay = new Date(y, m, d + 1);
-    startDate = fmtDate(nextDay);
-  } else {
-    startDate = "20230101";
-  }
-
-  const dataFinal = body.dataFinal || endDate;
-
-  if (startDate > dataFinal) {
-    console.log(`Mod ${modalidade}: already up to date (last: ${syncRow?.last_date_processed})`);
-    return new Response(
-      JSON.stringify({ success: true, totalProcessed: 0, hasMore: false, modalidade, message: "Already up to date" }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-
-  const startY = parseInt(startDate.substring(0, 4));
-  const startM = parseInt(startDate.substring(4, 6));
-  const endY = parseInt(dataFinal.substring(0, 4));
-  const endM = parseInt(dataFinal.substring(4, 6));
-
-  let totalProcessed = 0;
-  const allErrors: string[] = [];
-  let lastProcessedDate = startDate;
-  let hasMore = false;
-
-  // Process only 1 month per call to avoid edge function timeout (60s)
-  let monthsProcessed = 0;
-  const MAX_MONTHS_PER_CALL = 1;
-
-  for (let y = startY; y <= endY; y++) {
-    const mStart = (y === startY) ? startM : 1;
-    const mEnd = (y === endY) ? endM : 12;
-    for (let m = mStart; m <= mEnd; m++) {
-      if (monthsProcessed >= MAX_MONTHS_PER_CALL) {
-        hasMore = true;
-        break;
-      }
-
-      const monthStart = `${y}${String(m).padStart(2, "0")}${m === startM && y === startY ? startDate.substring(6, 8) : "01"}`;
-      const lastDay = new Date(y, m, 0).getDate();
-      let monthEnd = `${y}${String(m).padStart(2, "0")}${String(lastDay).padStart(2, "0")}`;
-      if (monthEnd > dataFinal) monthEnd = dataFinal;
-
-      console.log(`Mod ${modalidade}: fetching ${monthStart} → ${monthEnd}`);
-      const result = await fetchAllPages(supabase, modalidade, monthStart, monthEnd, false);
-      totalProcessed += result.total;
-      allErrors.push(...result.errors);
-      lastProcessedDate = monthEnd;
-      monthsProcessed++;
-    }
-    if (hasMore) break;
-  }
-
-  await supabase.from("sync_status").upsert({
-    api_source: "pncp",
-    modalidade,
-    last_date_processed: lastProcessedDate,
-    total_synced: (syncRow?.total_synced || 0) + totalProcessed,
-    updated_at: new Date().toISOString(),
-  }, { onConflict: "api_source,modalidade" });
-
-  await supabase.from("ingestao_logs").insert({
-    fonte: "PNCP",
-    endpoint: `/contratacoes/publicacao?mod=${modalidade}`,
-    status: allErrors.length > 0 ? "parcial" : "sucesso",
-    registros_processados: totalProcessed,
-    data_inicio: fmtDateISO(startDate),
-    data_fim: fmtDateISO(lastProcessedDate),
-    erro: allErrors.length > 0 ? allErrors.join("; ").slice(0, 1000) : null,
-  });
-
-  return new Response(
-    JSON.stringify({ success: true, totalProcessed, hasMore, modalidade, lastProcessedDate }),
-    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-  );
-}
-
 async function handleWinners(supabase: any, body: any) {
-  const batchSize = body.limit || 50;
+  const batchSize = body.limit || 500;
 
   const { data: licitacoes, error: queryErr } = await supabase
     .rpc("licitacoes_sem_itens", { lim: batchSize });
@@ -522,7 +376,7 @@ async function handleWinners(supabase: any, body: any) {
   let winnersFound = 0;
   let processed = 0;
 
-  const PARALLEL = 10; // Increased from 5 for faster processing
+  const PARALLEL = 20;
   for (let i = 0; i < licitacoes.length; i += PARALLEL) {
     const batch = licitacoes.slice(i, i + PARALLEL);
     const results = await Promise.allSettled(
@@ -553,48 +407,38 @@ async function handleWinners(supabase: any, body: any) {
 }
 
 /**
- * MODE "bulk-backfill": Now processes ONE modalidade at a time, ONE month window.
- * Uses sync_status with api_source='pncp-backfill' to track progress per modalidade.
- * Designed to be called repeatedly (e.g., every 2 min via pg_cron).
- * Target: fill gap from 20231201 to 20260303.
+ * MODE "bulk-backfill": Process ONE month for the next incomplete modalidade.
+ * Only marks as complete if there were NO errors.
  */
 async function handleBulkBackfill(supabase: any, body: any) {
-  const backfillStart = body.dataInicial || "20231201";
+  const backfillStart = body.dataInicial || "20230101";
   const backfillEnd = body.dataFinal || fmtDate(new Date());
 
-  // Find the next modalidade that still needs backfilling
   const { data: backfillRows } = await supabase
     .from("sync_status")
     .select("*")
     .eq("api_source", "pncp-backfill");
 
-  const backfillMap: Record<number, string> = {};
+  const backfillMap: Record<number, { last: string; synced: number }> = {};
   for (const row of backfillRows || []) {
-    backfillMap[row.modalidade] = row.last_date_processed;
+    backfillMap[row.modalidade] = { last: row.last_date_processed, synced: row.total_synced || 0 };
   }
 
   let targetMod: number | null = null;
   let startDate = backfillStart;
 
   for (const mod of MODALIDADES) {
-    const lastProcessed = backfillMap[mod];
-    if (!lastProcessed) {
-      // Never started this modalidade
+    const entry = backfillMap[mod];
+    if (!entry) {
       targetMod = mod;
       startDate = backfillStart;
       break;
     }
-    if (lastProcessed < backfillEnd) {
-      // Still has months to process
-      const y = parseInt(lastProcessed.substring(0, 4));
-      const m = parseInt(lastProcessed.substring(4, 6)) - 1;
-      const d = parseInt(lastProcessed.substring(6, 8));
-      const nextDay = new Date(y, m, d + 1);
+    if (entry.last < backfillEnd) {
       targetMod = mod;
-      startDate = fmtDate(nextDay);
+      startDate = addDays(entry.last, 1);
       break;
     }
-    // This modalidade is complete, try next
   }
 
   if (targetMod === null) {
@@ -606,8 +450,6 @@ async function handleBulkBackfill(supabase: any, body: any) {
   }
 
   if (startDate > backfillEnd) {
-    console.log(`Mod ${targetMod}: already complete`);
-    // Mark as done and let next call pick up next modalidade
     await supabase.from("sync_status").upsert({
       api_source: "pncp-backfill", modalidade: targetMod,
       last_date_processed: backfillEnd,
@@ -619,7 +461,7 @@ async function handleBulkBackfill(supabase: any, body: any) {
     );
   }
 
-  // Process ONE month for this modalidade
+  // Process ONE month
   const sy = parseInt(startDate.substring(0, 4));
   const sm = parseInt(startDate.substring(4, 6));
   const lastDay = new Date(sy, sm, 0).getDate();
@@ -630,16 +472,19 @@ async function handleBulkBackfill(supabase: any, body: any) {
   const result = await fetchAllPages(supabase, targetMod, startDate, monthEnd, false);
   console.log(`Backfill: Mod ${targetMod} done: ${result.total} records, ${result.errors.length} errors`);
 
-  // Update backfill progress
-  const existing = backfillMap[targetMod];
-  const prevTotal = (backfillRows || []).find((r: any) => r.modalidade === targetMod)?.total_synced || 0;
+  const prevTotal = backfillMap[targetMod]?.synced || 0;
 
-  await supabase.from("sync_status").upsert({
-    api_source: "pncp-backfill", modalidade: targetMod,
-    last_date_processed: monthEnd,
-    total_synced: prevTotal + result.total,
-    updated_at: new Date().toISOString(),
-  }, { onConflict: "api_source,modalidade" });
+  // CRITICAL: Only advance progress if no errors occurred
+  if (result.errors.length === 0) {
+    await supabase.from("sync_status").upsert({
+      api_source: "pncp-backfill", modalidade: targetMod,
+      last_date_processed: monthEnd,
+      total_synced: prevTotal + result.total,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "api_source,modalidade" });
+  } else {
+    console.warn(`Backfill: Mod ${targetMod} had ${result.errors.length} errors, NOT advancing progress`);
+  }
 
   await supabase.from("ingestao_logs").insert({
     fonte: "PNCP", endpoint: `backfill/mod-${targetMod}`,
@@ -658,6 +503,223 @@ async function handleBulkBackfill(supabase: any, body: any) {
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 }
+
+/**
+ * MODE "gap-fill": Detect and fill date gaps in specific modalidades.
+ * Compares expected daily data presence against actual records.
+ */
+async function handleGapFill(supabase: any) {
+  // Check which modalidades have gaps in the last 30 days
+  const today = new Date();
+  const thirtyAgo = new Date(today);
+  thirtyAgo.setDate(today.getDate() - 30);
+  const startStr = fmtDate(thirtyAgo);
+  const endStr = fmtDate(today);
+
+  // Get daily counts per modalidade for last 30 days
+  const { data: dailyCounts } = await supabase
+    .from("licitacoes")
+    .select("modalidade, data_publicacao")
+    .gte("data_publicacao", fmtDateISO(startStr))
+    .lte("data_publicacao", fmtDateISO(endStr));
+
+  // Group by modalidade -> set of dates with data
+  const datesByMod: Record<string, Set<string>> = {};
+  for (const row of dailyCounts || []) {
+    if (!row.modalidade) continue;
+    if (!datesByMod[row.modalidade]) datesByMod[row.modalidade] = new Set();
+    datesByMod[row.modalidade].add(row.data_publicacao);
+  }
+
+  // For each high-volume modalidade, find the last date with data
+  const MODALIDADE_NAMES: Record<number, string> = {
+    4: "Concorrência - Eletrônica", 5: "Pregão - Eletrônico", 6: "Dispensa",
+    7: "Inexigibilidade", 8: "Pregão - Presencial", 9: "Concorrência - Presencial",
+    12: "Credenciamento",
+  };
+
+  let totalFilled = 0;
+  const fillErrors: string[] = [];
+
+  for (const [modId, modName] of Object.entries(MODALIDADE_NAMES)) {
+    const dates = datesByMod[modName];
+    if (!dates) continue;
+
+    // Find the max date this modalidade has data for
+    const sortedDates = Array.from(dates).sort();
+    const lastDate = sortedDates[sortedDates.length - 1];
+    const lastDateFmt = lastDate.replace(/-/g, "");
+
+    // If last date is more than 3 days behind today, re-fetch
+    const daysBehind = Math.floor((today.getTime() - new Date(lastDate).getTime()) / 86400000);
+    if (daysBehind > 2) {
+      const gapStart = addDays(lastDateFmt, 1);
+      console.log(`Gap-fill: ${modName} (mod ${modId}) last data: ${lastDate}, ${daysBehind} days behind. Fetching ${gapStart} → ${endStr}`);
+      const result = await fetchAllPages(supabase, parseInt(modId), gapStart, endStr, true);
+      totalFilled += result.total;
+      fillErrors.push(...result.errors);
+      console.log(`Gap-fill: ${modName} filled ${result.total} records`);
+    }
+  }
+
+  if (totalFilled > 0 || fillErrors.length > 0) {
+    await supabase.from("ingestao_logs").insert({
+      fonte: "PNCP", endpoint: "gap-fill",
+      status: fillErrors.length > 0 ? "parcial" : "sucesso",
+      registros_processados: totalFilled,
+      data_inicio: fmtDateISO(startStr), data_fim: fmtDateISO(endStr),
+      erro: fillErrors.length > 0 ? fillErrors.join("; ").slice(0, 1000) : null,
+    });
+  }
+
+  return new Response(
+    JSON.stringify({ success: true, totalFilled, errors: fillErrors.length }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
+/**
+ * MODE "orgao": Ingest all licitações from a specific organ by CNPJ
+ */
+async function handleOrgao(supabase: any, body: any) {
+  const { cnpj, nome, dataInicial = "20230101" } = body;
+
+  if (!cnpj && !nome) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Informe o CNPJ ou nome do órgão" }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  let orgaoCnpj = cnpj;
+  let orgaoNome = nome || "";
+
+  if (!orgaoCnpj && nome) {
+    try {
+      const orgaoResp = await fetchWithRetry(`${PNCP_DATA_URL}/orgaos?razaoSocial=${encodeURIComponent(nome)}&pagina=1&tamanhoPagina=10`);
+      if (orgaoResp.ok) {
+        const orgaos = await orgaoResp.json();
+        const orgaoList = Array.isArray(orgaos) ? orgaos : orgaos?.data || [];
+        if (orgaoList.length > 0) {
+          orgaoCnpj = orgaoList[0].cnpj;
+          orgaoNome = orgaoList[0].razaoSocial || nome;
+          console.log(`Found organ: ${orgaoNome} (CNPJ: ${orgaoCnpj})`);
+        }
+      }
+    } catch (e) {
+      console.warn("Error searching for organ:", e);
+    }
+  }
+
+  if (!orgaoCnpj) {
+    return new Response(
+      JSON.stringify({ success: false, error: `Órgão "${nome}" não encontrado na API do PNCP.` }),
+      { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  const today = fmtDate(new Date());
+  let totalIngested = 0;
+  let totalWinners = 0;
+  const allErrors: string[] = [];
+
+  console.log(`Fetching all licitações for CNPJ ${orgaoCnpj} from ${dataInicial} to ${today}`);
+
+  for (const mod of MODALIDADES) {
+    const result = await fetchAllPages(supabase, mod, dataInicial, today, true, orgaoCnpj);
+    totalIngested += result.total;
+    totalWinners += result.winners;
+    allErrors.push(...result.errors);
+  }
+
+  await supabase.from("ingestao_logs").insert({
+    fonte: "PNCP", endpoint: `orgao/${orgaoCnpj}`,
+    status: allErrors.length > 0 ? "parcial" : "sucesso",
+    registros_processados: totalIngested,
+    data_inicio: fmtDateISO(dataInicial), data_fim: fmtDateISO(today),
+    erro: allErrors.length > 0 ? allErrors.join("; ").slice(0, 1000) : null,
+  });
+
+  return new Response(
+    JSON.stringify({ success: true, orgao: orgaoNome, cnpj: orgaoCnpj, totalIngested, totalWinners, errors: allErrors.length }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
+/**
+ * MODE "ingest" (manual): Bulk ingestion
+ */
+async function handleIngest(supabase: any, body: any) {
+  const modalidade: number = body.modalidade || 6;
+  const forceStartDate: string | undefined = body.dataInicial;
+
+  const { data: syncRow } = await supabase
+    .from("sync_status")
+    .select("*")
+    .eq("api_source", "pncp")
+    .eq("modalidade", modalidade)
+    .maybeSingle();
+
+  let startDate: string;
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const endDate = fmtDate(yesterday);
+
+  if (forceStartDate) {
+    startDate = forceStartDate;
+  } else if (syncRow) {
+    startDate = addDays(syncRow.last_date_processed, 1);
+  } else {
+    startDate = "20230101";
+  }
+
+  const dataFinal = body.dataFinal || endDate;
+
+  if (startDate > dataFinal) {
+    return new Response(
+      JSON.stringify({ success: true, totalProcessed: 0, hasMore: false, modalidade, message: "Already up to date" }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  // Process only 1 month per call to avoid timeout
+  const sy = parseInt(startDate.substring(0, 4));
+  const sm = parseInt(startDate.substring(4, 6));
+  const lastDay = new Date(sy, sm, 0).getDate();
+  let monthEnd = `${sy}${String(sm).padStart(2, "0")}${String(lastDay).padStart(2, "0")}`;
+  if (monthEnd > dataFinal) monthEnd = dataFinal;
+
+  console.log(`Ingest: Mod ${modalidade} ${startDate} → ${monthEnd}`);
+  const result = await fetchAllPages(supabase, modalidade, startDate, monthEnd, false);
+
+  const hasMore = monthEnd < dataFinal;
+
+  // Only update progress if no errors
+  if (result.errors.length === 0) {
+    await supabase.from("sync_status").upsert({
+      api_source: "pncp", modalidade,
+      last_date_processed: monthEnd,
+      total_synced: (syncRow?.total_synced || 0) + result.total,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "api_source,modalidade" });
+  }
+
+  await supabase.from("ingestao_logs").insert({
+    fonte: "PNCP",
+    endpoint: `/contratacoes/publicacao?mod=${modalidade}`,
+    status: result.errors.length > 0 ? "parcial" : "sucesso",
+    registros_processados: result.total,
+    data_inicio: fmtDateISO(startDate), data_fim: fmtDateISO(monthEnd),
+    erro: result.errors.length > 0 ? result.errors.join("; ").slice(0, 1000) : null,
+  });
+
+  return new Response(
+    JSON.stringify({ success: true, totalProcessed: result.total, hasMore, modalidade, lastProcessedDate: monthEnd }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
+// --- Auth helpers ---
 
 async function authenticateAdmin(req: Request): Promise<{ userId: string } | null> {
   const authHeader = req.headers.get("Authorization");
@@ -683,7 +745,7 @@ async function authenticateAdmin(req: Request): Promise<{ userId: string } | nul
 }
 
 function isSchedulerMode(mode: string): boolean {
-  return mode === "cron" || mode === "winners" || mode === "bulk-backfill" || mode === "backfill";
+  return ["cron", "winners", "bulk-backfill", "backfill", "gap-fill"].includes(mode);
 }
 
 function hasSchedulerToken(req: Request): boolean {
@@ -691,13 +753,10 @@ function hasSchedulerToken(req: Request): boolean {
   if (!authHeader?.startsWith("Bearer ")) return false;
 
   const token = authHeader.replace("Bearer ", "").trim();
-  if (!token) return false;
-
-  const tokenParts = token.split(".");
-  if (tokenParts.length < 2) return false;
+  if (!token || token.split(".").length < 2) return false;
 
   try {
-    const base64 = tokenParts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
     const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
     const claims = JSON.parse(atob(padded));
     return claims?.role === "anon";
@@ -705,6 +764,8 @@ function hasSchedulerToken(req: Request): boolean {
     return false;
   }
 }
+
+// --- Main handler ---
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -734,6 +795,7 @@ serve(async (req) => {
     if (mode === "cron") return await handleCron(supabase);
     if (mode === "orgao") return await handleOrgao(supabase, body);
     if (mode === "bulk-backfill") return await handleBulkBackfill(supabase, body);
+    if (mode === "gap-fill") return await handleGapFill(supabase);
     return await handleIngest(supabase, body);
   } catch (error) {
     console.error("Error:", error);
