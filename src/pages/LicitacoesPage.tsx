@@ -237,7 +237,7 @@ export default function LicitacoesPage() {
 
   const useRpc = !!(appliedFilters.vencedor || appliedFilters.search);
 
-  const { data: queryResult, isLoading, isError, error: queryError, refetch } = useQuery({
+  const { data: queryResult, isLoading, isFetching, isError, error: queryError, refetch } = useQuery({
     queryKey: ["licitacoes-all", page, appliedFilters],
     queryFn: async () => {
       if (useRpc) {
