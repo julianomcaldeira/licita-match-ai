@@ -635,7 +635,31 @@ export default function LicitacoesPage() {
         </div>
       </div>
 
-      {/* Progress bar */}
+      {/* Search loading bar */}
+      <AnimatePresence>
+        {isFetching && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-2"
+          >
+            <div className="flex items-center gap-2 text-sm font-medium text-primary">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Pesquisando licitações...
+            </div>
+            <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
+              <motion.div
+                className="h-full rounded-full bg-primary"
+                animate={{ width: ["0%", "70%", "90%", "95%"] }}
+                transition={{ duration: 8, ease: "easeOut" }}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Ingest progress bar */}
       {progress && (
         <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="rounded-lg border border-border bg-card p-3 space-y-1.5">
           <div className="flex items-center justify-between text-xs">
