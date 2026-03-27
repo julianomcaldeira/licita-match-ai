@@ -14,6 +14,7 @@ import IngestaoMonitorPage from "@/pages/IngestaoMonitorPage";
 import AnalyticsPage from "@/pages/AnalyticsPage";
 import PlaceholderPage from "@/components/PlaceholderPage";
 import UsuariosPage from "@/pages/UsuariosPage";
+import RelatoriosPage from "@/pages/RelatoriosPage";
 import NotFound from "@/pages/NotFound";
 import { Users, FileText, Settings } from "lucide-react";
 
