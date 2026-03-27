@@ -285,6 +285,7 @@ export default function LicitacoesPage() {
     }
   };
 
+  const isAbertas = appliedFilters.tab === "abertas";
   const useRpc = !!(appliedFilters.vencedor || appliedFilters.search);
 
   const { data: queryResult, isLoading, isFetching, isError, error: queryError, refetch } = useQuery({
