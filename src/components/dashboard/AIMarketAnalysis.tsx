@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   Brain, Loader2, Sparkles, TrendingUp, Target, MapPin, Swords, BarChart3,
-  Calendar, MessageSquare, Clock, Trash2,
+  Calendar, MessageSquare, Clock, Trash2, RotateCcw, Send, User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,6 +24,12 @@ const ANALYSIS_TYPES = [
 const UFS = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
 
 const STORAGE_KEY = "ai-market-analysis-last";
+const CONVERSATION_KEY = "ai-market-conversation";
+
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
 
 interface SavedAnalysis {
   type: string;
@@ -44,6 +50,17 @@ function loadLastAnalysis(): SavedAnalysis | null {
 
 function saveLastAnalysis(a: SavedAnalysis) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(a)); } catch { /* ignore */ }
+}
+
+function loadConversation(): ChatMessage[] {
+  try {
+    const raw = localStorage.getItem(CONVERSATION_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveConversation(msgs: ChatMessage[]) {
+  try { localStorage.setItem(CONVERSATION_KEY, JSON.stringify(msgs)); } catch { /* ignore */ }
 }
 
 /* Custom markdown components for rich rendering */
@@ -120,6 +137,9 @@ export default function AIMarketAnalysis() {
   const [lastMeta, setLastMeta] = useState<{ type: string; timestamp: string; period: number; uf: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Conversation state for "custom" mode
+  const [conversation, setConversation] = useState<ChatMessage[]>([]);
+
   useEffect(() => {
     const saved = loadLastAnalysis();
     if (saved) {
@@ -129,13 +149,97 @@ export default function AIMarketAnalysis() {
       setPeriod(saved.period);
       if (saved.uf) setUf(saved.uf);
     }
+    const savedConv = loadConversation();
+    if (savedConv.length > 0) setConversation(savedConv);
   }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [currentContent]);
+  }, [currentContent, conversation]);
+
+  const streamResponse = useCallback(async (body: Record<string, any>): Promise<string> => {
+    const { data: session } = await supabase.auth.getSession();
+    const accessToken = session?.session?.access_token;
+    if (!accessToken) throw new Error("auth");
+
+    const resp = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/market-analysis`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(body),
+      }
+    );
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: "Erro desconhecido" }));
+      throw new Error(err.error || `Status ${resp.status}`);
+    }
+
+    if (!resp.body) throw new Error("Sem corpo na resposta");
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let textBuffer = "";
+    let fullContent = "";
+    let streamDone = false;
+
+    while (!streamDone) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      textBuffer += decoder.decode(value, { stream: true });
+
+      let newlineIndex: number;
+      while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
+        let line = textBuffer.slice(0, newlineIndex);
+        textBuffer = textBuffer.slice(newlineIndex + 1);
+
+        if (line.endsWith("\r")) line = line.slice(0, -1);
+        if (line.startsWith(":") || line.trim() === "") continue;
+        if (!line.startsWith("data: ")) continue;
+
+        const jsonStr = line.slice(6).trim();
+        if (jsonStr === "[DONE]") { streamDone = true; break; }
+
+        try {
+          const parsed = JSON.parse(jsonStr);
+          const content = parsed.choices?.[0]?.delta?.content;
+          if (content) {
+            fullContent += content;
+            setCurrentContent(fullContent);
+          }
+        } catch {
+          textBuffer = line + "\n" + textBuffer;
+          break;
+        }
+      }
+    }
+
+    if (textBuffer.trim()) {
+      for (let raw of textBuffer.split("\n")) {
+        if (!raw) continue;
+        if (raw.endsWith("\r")) raw = raw.slice(0, -1);
+        if (!raw.startsWith("data: ")) continue;
+        const jsonStr = raw.slice(6).trim();
+        if (jsonStr === "[DONE]") continue;
+        try {
+          const parsed = JSON.parse(jsonStr);
+          const content = parsed.choices?.[0]?.delta?.content;
+          if (content) {
+            fullContent += content;
+            setCurrentContent(fullContent);
+          }
+        } catch { /* ignore */ }
+      }
+    }
+
+    return fullContent;
+  }, []);
 
   const runAnalysis = useCallback(async () => {
     if (isStreaming) return;
@@ -143,98 +247,39 @@ export default function AIMarketAnalysis() {
 
     setIsStreaming(true);
     setCurrentContent("");
-    setLastMeta(null);
 
     const dateFrom = format(subMonths(new Date(), period), "yyyy-MM-dd");
     const dateTo = format(new Date(), "yyyy-MM-dd");
 
     try {
-      const { data: session } = await supabase.auth.getSession();
-      const accessToken = session?.session?.access_token;
-      if (!accessToken) {
-        setCurrentContent("❌ **Erro:** Você precisa estar logado para usar a análise IA.");
-        setIsStreaming(false);
-        return;
-      }
+      const isCustom = selectedType === "custom";
+      const isFollowUp = isCustom && conversation.length > 0;
 
-      const resp = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/market-analysis`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({
-            analysisType: selectedType,
-            filters: { dateFrom, dateTo, uf: uf || null, period },
-            userQuestion: selectedType === "custom" ? customQuestion : undefined,
-          }),
-        }
-      );
+      let fullContent: string;
 
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({ error: "Erro desconhecido" }));
-        setCurrentContent(`❌ **Erro:** ${err.error || `Status ${resp.status}`}`);
-        setIsStreaming(false);
-        return;
-      }
+      if (isCustom) {
+        // For custom mode, show streaming in the last assistant bubble
+        // but first add user message to conversation
+        const newUserMsg: ChatMessage = { role: "user", content: customQuestion };
+        const updatedConv = [...conversation, newUserMsg];
+        setConversation(updatedConv);
 
-      if (!resp.body) throw new Error("Sem corpo na resposta");
+        fullContent = await streamResponse({
+          analysisType: "custom",
+          filters: { dateFrom, dateTo, uf: uf || null, period },
+          userQuestion: customQuestion,
+          conversationHistory: isFollowUp ? conversation : undefined,
+        });
 
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let textBuffer = "";
-      let fullContent = "";
-      let streamDone = false;
-
-      while (!streamDone) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        textBuffer += decoder.decode(value, { stream: true });
-
-        let newlineIndex: number;
-        while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
-          let line = textBuffer.slice(0, newlineIndex);
-          textBuffer = textBuffer.slice(newlineIndex + 1);
-
-          if (line.endsWith("\r")) line = line.slice(0, -1);
-          if (line.startsWith(":") || line.trim() === "") continue;
-          if (!line.startsWith("data: ")) continue;
-
-          const jsonStr = line.slice(6).trim();
-          if (jsonStr === "[DONE]") { streamDone = true; break; }
-
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content;
-            if (content) {
-              fullContent += content;
-              setCurrentContent(fullContent);
-            }
-          } catch {
-            textBuffer = line + "\n" + textBuffer;
-            break;
-          }
-        }
-      }
-
-      if (textBuffer.trim()) {
-        for (let raw of textBuffer.split("\n")) {
-          if (!raw) continue;
-          if (raw.endsWith("\r")) raw = raw.slice(0, -1);
-          if (!raw.startsWith("data: ")) continue;
-          const jsonStr = raw.slice(6).trim();
-          if (jsonStr === "[DONE]") continue;
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content;
-            if (content) {
-              fullContent += content;
-              setCurrentContent(fullContent);
-            }
-          } catch { /* ignore */ }
-        }
+        const finalConv: ChatMessage[] = [...updatedConv, { role: "assistant", content: fullContent }];
+        setConversation(finalConv);
+        saveConversation(finalConv);
+      } else {
+        setLastMeta(null);
+        fullContent = await streamResponse({
+          analysisType: selectedType,
+          filters: { dateFrom, dateTo, uf: uf || null, period },
+        });
       }
 
       const typeLabel = ANALYSIS_TYPES.find(t => t.id === selectedType)?.label || selectedType;
@@ -244,7 +289,7 @@ export default function AIMarketAnalysis() {
       saveLastAnalysis({
         type: typeLabel,
         typeId: selectedType,
-        question: selectedType === "custom" ? customQuestion : undefined,
+        question: isCustom ? customQuestion : undefined,
         content: fullContent,
         timestamp: now,
         period,
@@ -252,21 +297,36 @@ export default function AIMarketAnalysis() {
       });
 
       setCustomQuestion("");
-    } catch (e) {
+    } catch (e: any) {
       console.error("Analysis error:", e);
-      setCurrentContent("❌ **Erro ao conectar com a IA.** Tente novamente.");
+      if (e.message === "auth") {
+        setCurrentContent("❌ **Erro:** Você precisa estar logado para usar a análise IA.");
+      } else {
+        setCurrentContent(`❌ **Erro:** ${e.message || "Erro ao conectar com a IA."}`);
+      }
     } finally {
       setIsStreaming(false);
     }
-  }, [isStreaming, selectedType, customQuestion, period, uf]);
+  }, [isStreaming, selectedType, customQuestion, period, uf, conversation, streamResponse]);
+
+  const startNewConversation = () => {
+    setConversation([]);
+    setCurrentContent("");
+    setLastMeta(null);
+    localStorage.removeItem(CONVERSATION_KEY);
+  };
 
   const clearAnalysis = () => {
     setCurrentContent("");
     setLastMeta(null);
+    setConversation([]);
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(CONVERSATION_KEY);
   };
 
   const activeType = ANALYSIS_TYPES.find(t => t.id === selectedType);
+  const isCustomMode = selectedType === "custom";
+  const hasConversation = conversation.length > 0;
 
   return (
     <div className="space-y-4">
@@ -320,54 +380,165 @@ export default function AIMarketAnalysis() {
           </Select>
         </div>
 
-        {selectedType === "custom" && (
-          <div className="flex-1 min-w-[250px] space-y-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Sua pergunta</label>
-            <Textarea
-              value={customQuestion}
-              onChange={(e) => setCustomQuestion(e.target.value)}
-              placeholder="Ex: Quais segmentos têm menos concorrência no Nordeste?"
-              className="min-h-[36px] max-h-[80px] text-sm resize-none"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); runAnalysis(); }
-              }}
-            />
+        {!isCustomMode && (
+          <div className="flex gap-2 ml-auto">
+            {currentContent && !isStreaming && (
+              <Button variant="ghost" size="sm" onClick={clearAnalysis} className="h-9 gap-1.5 text-muted-foreground hover:text-destructive">
+                <Trash2 className="h-3.5 w-3.5" /> Limpar
+              </Button>
+            )}
+            <Button onClick={runAnalysis} disabled={isStreaming}
+              className="h-9 gap-2 shrink-0 shadow-sm">
+              {isStreaming ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Analisando...</>
+              ) : (
+                <><Sparkles className="h-4 w-4" /> Gerar Análise</>
+              )}
+            </Button>
           </div>
         )}
 
-        <div className="flex gap-2 ml-auto">
-          {currentContent && !isStreaming && (
-            <Button variant="ghost" size="sm" onClick={clearAnalysis} className="h-9 gap-1.5 text-muted-foreground hover:text-destructive">
-              <Trash2 className="h-3.5 w-3.5" /> Limpar
-            </Button>
-          )}
-          <Button onClick={runAnalysis} disabled={isStreaming || (selectedType === "custom" && !customQuestion.trim())}
-            className="h-9 gap-2 shrink-0 shadow-sm">
-            {isStreaming ? (
-              <><Loader2 className="h-4 w-4 animate-spin" /> Analisando...</>
-            ) : (
-              <><Sparkles className="h-4 w-4" /> {selectedType === "custom" ? "Perguntar" : "Gerar Análise"}</>
+        {isCustomMode && (
+          <div className="flex gap-2 ml-auto">
+            {hasConversation && !isStreaming && (
+              <Button variant="ghost" size="sm" onClick={startNewConversation} className="h-9 gap-1.5 text-muted-foreground hover:text-primary">
+                <RotateCcw className="h-3.5 w-3.5" /> Nova Conversa
+              </Button>
             )}
-          </Button>
-        </div>
+            {(currentContent || hasConversation) && !isStreaming && (
+              <Button variant="ghost" size="sm" onClick={clearAnalysis} className="h-9 gap-1.5 text-muted-foreground hover:text-destructive">
+                <Trash2 className="h-3.5 w-3.5" /> Limpar Tudo
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Active type description */}
-      {activeType && selectedType !== "custom" && (
+      {/* Active type description (non-custom) */}
+      {activeType && !isCustomMode && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Brain className="h-4 w-4 text-primary" />
           <span>{activeType.description}</span>
         </div>
       )}
 
-      {/* Result area */}
-      {(currentContent || isStreaming) && (
+      {/* CUSTOM MODE: Chat-like conversation */}
+      {isCustomMode && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           className="rounded-xl border border-border bg-card shadow-sm overflow-hidden"
         >
-          {/* Header bar */}
+          {/* Chat header */}
+          <div className="flex items-center gap-3 px-6 py-3 bg-muted/30 border-b border-border">
+            <Brain className="h-4 w-4 text-primary" />
+            <span className="text-xs font-bold text-primary">i-pesquisei — Pergunta Livre</span>
+            {hasConversation && (
+              <>
+                <span className="h-3 w-px bg-border" />
+                <span className="text-[11px] text-muted-foreground">{Math.floor(conversation.length / 2)} troca{Math.floor(conversation.length / 2) !== 1 ? "s" : ""}</span>
+              </>
+            )}
+            <span className="ml-auto text-[10px] text-muted-foreground/60 font-medium">Powered by i-pesquisei IA</span>
+          </div>
+
+          {/* Chat messages */}
+          <div ref={scrollRef} className="max-h-[550px] overflow-y-auto">
+            {conversation.length === 0 && !isStreaming && !currentContent && (
+              <div className="flex flex-col items-center justify-center py-12 text-center px-6">
+                <MessageSquare className="h-10 w-10 text-muted-foreground/40 mb-3" />
+                <p className="text-sm text-muted-foreground">Faça uma pergunta sobre os dados de licitações.</p>
+                <p className="text-xs text-muted-foreground/60 mt-1">A conversa será mantida para perguntas de acompanhamento.</p>
+                <div className="mt-5 flex flex-wrap gap-2 justify-center">
+                  {["Quem domina o mercado?", "Onde há menos concorrência?", "Quais segmentos crescem mais?"].map((q) => (
+                    <button key={q} onClick={() => setCustomQuestion(q)}
+                      className="rounded-full border border-border bg-card px-4 py-2 text-xs font-medium text-muted-foreground hover:bg-primary/5 hover:border-primary/30 hover:text-foreground transition">
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {conversation.map((msg, i) => (
+              <div key={i} className={`px-6 py-4 ${msg.role === "user" ? "bg-muted/20" : "bg-card"} ${i > 0 ? "border-t border-border/40" : ""}`}>
+                <div className="flex items-start gap-3">
+                  <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${msg.role === "user" ? "bg-secondary" : "bg-primary/10"}`}>
+                    {msg.role === "user" ? <User className="h-3.5 w-3.5 text-foreground" /> : <Brain className="h-3.5 w-3.5 text-primary" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
+                      {msg.role === "user" ? "Você" : "i-pesquisei"}
+                    </span>
+                    {msg.role === "user" ? (
+                      <p className="text-sm text-foreground">{msg.content}</p>
+                    ) : (
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+                        {msg.content}
+                      </ReactMarkdown>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* Streaming assistant response (not yet in conversation array) */}
+            {isStreaming && currentContent && (
+              <div className="px-6 py-4 bg-card border-t border-border/40">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                    <Brain className="h-3.5 w-3.5 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">i-pesquisei</span>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+                      {currentContent}
+                    </ReactMarkdown>
+                    <span className="inline-block w-2 h-5 bg-primary rounded-sm animate-pulse ml-0.5" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {isStreaming && !currentContent && (
+              <div className="px-6 py-4 bg-card border-t border-border/40">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                    <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" />
+                  </div>
+                  <span className="text-xs text-primary font-semibold">Analisando os dados...</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Chat input */}
+          <div className="border-t border-border p-4 bg-muted/10">
+            <div className="flex items-end gap-2">
+              <Textarea
+                value={customQuestion}
+                onChange={(e) => setCustomQuestion(e.target.value)}
+                placeholder={hasConversation ? "Faça uma pergunta de acompanhamento..." : "Ex: Quais segmentos têm menos concorrência no Nordeste?"}
+                className="min-h-[40px] max-h-[100px] text-sm resize-none flex-1"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); runAnalysis(); }
+                }}
+              />
+              <Button onClick={runAnalysis} disabled={isStreaming || !customQuestion.trim()} size="sm" className="h-10 w-10 p-0 shrink-0">
+                {isStreaming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </Button>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* NON-CUSTOM: Standard result area */}
+      {!isCustomMode && (currentContent || isStreaming) && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl border border-border bg-card shadow-sm overflow-hidden"
+        >
           <div className={`flex items-center gap-3 px-6 py-3 ${isStreaming ? "bg-primary/5 border-b border-primary/20" : "bg-muted/30 border-b border-border"}`}>
             {isStreaming ? (
               <>
@@ -392,7 +563,6 @@ export default function AIMarketAnalysis() {
             ) : null}
           </div>
 
-          {/* Content */}
           <div ref={scrollRef} className="max-h-[650px] overflow-y-auto">
             <div className="px-8 py-6 md:px-10 md:py-8">
               <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
@@ -406,8 +576,8 @@ export default function AIMarketAnalysis() {
         </motion.div>
       )}
 
-      {/* Empty state */}
-      {!currentContent && !isStreaming && (
+      {/* Empty state (non-custom only) */}
+      {!isCustomMode && !currentContent && !isStreaming && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
           className="flex flex-col items-center justify-center py-16 text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 mb-4">
@@ -418,14 +588,6 @@ export default function AIMarketAnalysis() {
             Selecione um tipo de análise e clique em "Gerar Análise" para obter insights
             estratégicos baseados nos dados reais de licitações.
           </p>
-          <div className="mt-5 flex flex-wrap gap-2 justify-center">
-            {["Quem domina o mercado?", "Onde há menos concorrência?", "Quais segmentos crescem mais?"].map((q) => (
-              <button key={q} onClick={() => { setSelectedType("custom"); setCustomQuestion(q); }}
-                className="rounded-full border border-border bg-card px-4 py-2 text-xs font-medium text-muted-foreground hover:bg-primary/5 hover:border-primary/30 hover:text-foreground transition">
-                {q}
-              </button>
-            ))}
-          </div>
         </motion.div>
       )}
     </div>
