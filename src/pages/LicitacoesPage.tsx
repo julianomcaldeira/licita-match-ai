@@ -953,7 +953,7 @@ export default function LicitacoesPage() {
                         )}
                         {activeTab === "abertas" && (
                           <td className="px-4 py-3 text-center">
-                            <StatusBadge situacao={row.situacao} />
+                            <StatusBadge situacao={row.situacao} valorHomologado={row.valor_homologado} />
                           </td>
                         )}
                         <td className="px-4 py-3 text-muted-foreground text-xs">{formattedDate}</td>
