@@ -21,16 +21,22 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import ComboboxFilter from "@/components/ComboboxFilter";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
 const UFS = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
-const STATUS_OPTIONS = [
-  { value: "", label: "Todos" },
-  { value: "Divulgada no PNCP", label: "Abertas/Divulgadas" },
-  { value: "Concluída", label: "Encerradas/Com Resultado" },
+
+const STATUS_ABERTAS = [
+  { value: "", label: "Todas" },
+  { value: "Divulgada no PNCP", label: "Divulgadas" },
+  { value: "Suspensa", label: "Suspensas" },
+];
+
+const STATUS_ENCERRADAS = [
+  { value: "", label: "Todas" },
+  { value: "Concluída", label: "Com Resultado" },
   { value: "Revogada", label: "Revogadas" },
   { value: "Anulada", label: "Anuladas" },
-  { value: "Suspensa", label: "Suspensas" },
 ];
 
 const PAGE_SIZE = 20;
