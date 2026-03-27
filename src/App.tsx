@@ -13,6 +13,7 @@ import EmpresasPage from "@/pages/EmpresasPage";
 import IngestaoMonitorPage from "@/pages/IngestaoMonitorPage";
 import AnalyticsPage from "@/pages/AnalyticsPage";
 import PlaceholderPage from "@/components/PlaceholderPage";
+import UsuariosPage from "@/pages/UsuariosPage";
 import NotFound from "@/pages/NotFound";
 import { Users, FileText, Settings } from "lucide-react";
 
@@ -39,7 +40,7 @@ const App = () => (
               <Route path="/" element={<Dashboard />} />
               <Route path="/licitacoes" element={<LicitacoesPage />} />
               <Route path="/empresas" element={<EmpresasPage />} />
-              <Route path="/usuarios" element={<PlaceholderPage title="Usuários" description="Gerencie usuários e permissões por empresa" icon={Users} />} />
+              <Route path="/usuarios" element={<UsuariosPage />} />
               <Route path="/relatorios" element={<PlaceholderPage title="Relatórios" description="Exporte dados em CSV e PDF com filtros avançados" icon={FileText} />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/monitor-ingestao" element={<IngestaoMonitorPage />} />
