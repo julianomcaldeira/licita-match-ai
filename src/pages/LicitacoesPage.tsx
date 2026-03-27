@@ -562,7 +562,7 @@ export default function LicitacoesPage() {
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Status</label>
             <div className="flex flex-wrap gap-1.5">
-              {STATUS_OPTIONS.map((opt) => (
+              {statusOptions.map((opt) => (
                 <button
                   key={opt.value}
                   onClick={() => setFilterSituacao(opt.value)}
