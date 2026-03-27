@@ -603,6 +603,39 @@ export default function LicitacoesPage() {
         </TabsList>
       </Tabs>
 
+      {/* Totalizador de auditoria */}
+      {tabCounts && (
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-xl border border-border bg-card p-3 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+              <Database className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Total Geral</p>
+              <p className="text-xl font-bold text-foreground">{(tabCounts.abertas + tabCounts.encerradas).toLocaleString("pt-BR")}</p>
+            </div>
+          </div>
+          <div className="rounded-xl border border-border bg-card p-3 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-info/10">
+              <Clock className="h-5 w-5 text-info" />
+            </div>
+            <div>
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Abertas</p>
+              <p className="text-xl font-bold text-foreground">{tabCounts.abertas.toLocaleString("pt-BR")}</p>
+            </div>
+          </div>
+          <div className="rounded-xl border border-border bg-card p-3 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
+              <Award className="h-5 w-5 text-success" />
+            </div>
+            <div>
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Encerradas</p>
+              <p className="text-xl font-bold text-foreground">{tabCounts.encerradas.toLocaleString("pt-BR")}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Filters */}
       <div className="rounded-xl border border-border bg-card p-4 space-y-4">
         {/* Row 1: Keyword + Status radio buttons */}
