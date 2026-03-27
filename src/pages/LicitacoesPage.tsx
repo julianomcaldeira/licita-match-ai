@@ -40,6 +40,24 @@ const STATUS_ENCERRADAS = [
 ];
 
 const PAGE_SIZE = 20;
+const QUERY_TIMEOUT_MS = 12_000;
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs = QUERY_TIMEOUT_MS,
+  message = "A consulta demorou demais. Tente refinar os filtros."
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 const MODALIDADES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
 const MODALIDADE_NAMES: Record<number, string> = {
@@ -311,14 +329,61 @@ export default function LicitacoesPage() {
   const { data: queryResult, isLoading, isFetching, isError, error: queryError, refetch } = useQuery({
     queryKey: ["licitacoes-all", page, appliedFilters],
     queryFn: async () => {
+      const hasResultadoStatus = appliedFilters.situacao === "Concluída";
+
+      const buildBaseQuery = () => {
+        let query = supabase
+          .from("licitacoes")
+          .select("id, orgao, objeto, modalidade, valor_estimado, valor_homologado, data_publicacao, uf, municipio, situacao, numero_controle_pncp")
+          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+        if (isAbertas) {
+          query = query.order("data_publicacao", { ascending: false });
+        } else {
+          query = query.order("valor_homologado", { ascending: false, nullsFirst: false });
+        }
+
+        if (appliedFilters.dateFrom) {
+          query = query.gte("data_publicacao", appliedFilters.dateFrom);
+        }
+        if (appliedFilters.dateTo) {
+          query = query.lte("data_publicacao", appliedFilters.dateTo);
+        }
+        if (appliedFilters.uf) {
+          query = query.eq("uf", appliedFilters.uf);
+        }
+
+        if (isAbertas) {
+          if (appliedFilters.situacao) {
+            query = query.eq("situacao", appliedFilters.situacao);
+          }
+          query = query.or("valor_homologado.is.null,valor_homologado.eq.0");
+          query = query.not("situacao", "in", "(Revogada,Anulada)");
+        } else {
+          if (hasResultadoStatus) {
+            query = query.not("valor_homologado", "is", null).gt("valor_homologado", 0);
+          } else if (appliedFilters.situacao) {
+            query = query.eq("situacao", appliedFilters.situacao);
+          } else {
+            query = query.or("valor_homologado.gt.0,situacao.in.(Revogada,Anulada)");
+          }
+        }
+
+        if (appliedFilters.orgao) {
+          query = query.ilike("orgao", `%${appliedFilters.orgao}%`);
+        }
+
+        return query;
+      };
+
       if (useRpc) {
-        const hasResultadoStatus = appliedFilters.situacao === "Concluída";
         // For "abertas" tab, force situacao to open statuses if no specific status selected
         const rpcSituacao = isAbertas
           ? (appliedFilters.situacao || null)
           : (hasResultadoStatus ? null : appliedFilters.situacao || null);
+
         try {
-          const { data, error } = await (supabase as any).rpc("search_licitacoes", {
+          const rpcPromise = (supabase as any).rpc("search_licitacoes", {
             p_search: appliedFilters.search || null,
             p_orgao: appliedFilters.orgao || null,
             p_date_from: appliedFilters.dateFrom || null,
@@ -332,6 +397,7 @@ export default function LicitacoesPage() {
             p_limit: PAGE_SIZE + 1,
             p_offset: page * PAGE_SIZE,
           });
+          const { data, error } = await withTimeout(rpcPromise, QUERY_TIMEOUT_MS, "A busca demorou demais no modo avançado.");
           if (error) throw error;
 
           const fetchedRows = (data || []) as any[];
@@ -343,103 +409,74 @@ export default function LicitacoesPage() {
 
           return { rows, totalCount };
         } catch (rpcError) {
-          console.error("search_licitacoes falhou, usando fallback por objeto:", rpcError);
+          console.error("search_licitacoes falhou, usando fallback:", rpcError);
 
-          if (appliedFilters.vencedor) {
-            throw rpcError;
-          }
-
-          let fallbackQuery = supabase
-            .from("licitacoes")
-            .select("id, orgao, objeto, modalidade, valor_estimado, valor_homologado, data_publicacao, uf, municipio, situacao, numero_controle_pncp", { count: "estimated" })
-            .order("valor_homologado", { ascending: false, nullsFirst: false })
-            .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+          let fallbackQuery = buildBaseQuery();
 
           const words = (appliedFilters.search || "").toLowerCase().split(/\s+/).filter(Boolean);
           for (const word of words) {
             fallbackQuery = fallbackQuery.ilike("objeto", `%${word}%`);
           }
 
-          if (appliedFilters.dateFrom) {
-            fallbackQuery = fallbackQuery.gte("data_publicacao", appliedFilters.dateFrom);
-          }
-          if (appliedFilters.dateTo) {
-            fallbackQuery = fallbackQuery.lte("data_publicacao", appliedFilters.dateTo);
-          }
-          if (appliedFilters.uf) {
-            fallbackQuery = fallbackQuery.eq("uf", appliedFilters.uf);
-          }
-          if (hasResultadoStatus) {
-            fallbackQuery = fallbackQuery.not("valor_homologado", "is", null).gt("valor_homologado", 0);
-          } else if (appliedFilters.situacao) {
-            fallbackQuery = fallbackQuery.eq("situacao", appliedFilters.situacao);
-          }
-          if (appliedFilters.orgao) {
-            fallbackQuery = fallbackQuery.ilike("orgao", `%${appliedFilters.orgao}%`);
+          if (appliedFilters.vencedor) {
+            const winnersPromise = supabase
+              .from("licitacao_vencedores")
+              .select("licitacao_id")
+              .ilike("razao_social", `%${appliedFilters.vencedor}%`)
+              .limit(800);
+
+            const { data: winnerRows, error: winnerError } = await withTimeout(
+              winnersPromise,
+              8_000,
+              "A busca por vencedor demorou demais."
+            );
+
+            if (winnerError) throw rpcError;
+
+            const licitacaoIds = [...new Set((winnerRows || []).map((row: any) => row.licitacao_id).filter(Boolean))].slice(0, 150);
+            if (licitacaoIds.length === 0) {
+              return { rows: [], totalCount: 0 };
+            }
+
+            fallbackQuery = fallbackQuery.in("id", licitacaoIds);
           }
 
-          const { data: fallbackRows, error: fallbackError, count } = await fallbackQuery;
+          const { data: fallbackRows, error: fallbackError } = await withTimeout(
+            fallbackQuery,
+            QUERY_TIMEOUT_MS,
+            "A busca de fallback demorou demais."
+          );
           if (fallbackError) {
             throw rpcError;
           }
 
-          return { rows: fallbackRows || [], totalCount: count || 0 };
+          const fetchedRows = (fallbackRows || []) as any[];
+          const hasMore = fetchedRows.length > PAGE_SIZE;
+          const rows = hasMore ? fetchedRows.slice(0, PAGE_SIZE) : fetchedRows;
+          const totalCount = hasMore
+            ? (page + 2) * PAGE_SIZE
+            : page * PAGE_SIZE + rows.length;
+
+          return { rows, totalCount };
         }
       }
 
-      // Direct table query when no text search or vencedor filter
-      let query = supabase
-        .from("licitacoes")
-        .select("id, orgao, objeto, modalidade, valor_estimado, valor_homologado, data_publicacao, uf, municipio, situacao, numero_controle_pncp", { count: "estimated" });
-
-      // Tab-based ordering
-      if (isAbertas) {
-        query = query.order("data_publicacao", { ascending: false });
-      } else {
-        query = query.order("valor_homologado", { ascending: false, nullsFirst: false });
-      }
-      query = query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-
-      if (appliedFilters.dateFrom) {
-        query = query.gte("data_publicacao", appliedFilters.dateFrom);
-      }
-      if (appliedFilters.dateTo) {
-        query = query.lte("data_publicacao", appliedFilters.dateTo);
-      }
-      if (appliedFilters.uf) {
-        query = query.eq("uf", appliedFilters.uf);
-      }
-
-      // Tab-based default filtering
-      if (isAbertas) {
-        // Abertas: sem valor homologado E não revogada/anulada (complemento exato de Encerradas)
-        if (appliedFilters.situacao) {
-          query = query.eq("situacao", appliedFilters.situacao);
-        }
-        query = query.or("valor_homologado.is.null,valor_homologado.eq.0");
-        query = query.not("situacao", "in", "(Revogada,Anulada)");
-      } else {
-        // Encerradas: tem valor homologado OU foi revogada/anulada
-        if (appliedFilters.situacao === "Concluída") {
-          query = query.not("valor_homologado", "is", null).gt("valor_homologado", 0);
-        } else if (appliedFilters.situacao) {
-          query = query.eq("situacao", appliedFilters.situacao);
-        } else {
-          query = query.or("valor_homologado.gt.0,situacao.in.(Revogada,Anulada)");
-        }
-      }
-
-      if (appliedFilters.orgao) {
-        query = query.ilike("orgao", `%${appliedFilters.orgao}%`);
-      }
-
-      const { data, error, count } = await query;
+      const query = buildBaseQuery();
+      const { data, error } = await withTimeout(query, QUERY_TIMEOUT_MS);
       if (error) throw error;
-      return { rows: data || [], totalCount: count || 0 };
+
+      const fetchedRows = (data || []) as any[];
+      const hasMore = fetchedRows.length > PAGE_SIZE;
+      const rows = hasMore ? fetchedRows.slice(0, PAGE_SIZE) : fetchedRows;
+      const totalCount = hasMore
+        ? (page + 2) * PAGE_SIZE
+        : page * PAGE_SIZE + rows.length;
+
+      return { rows, totalCount };
     },
     placeholderData: (prev) => prev,
     staleTime: 60_000,
-    retry: 1,
+    retry: 0,
     retryDelay: 2000,
     refetchOnWindowFocus: false,
   });
