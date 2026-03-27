@@ -186,6 +186,22 @@ export default function LicitacoesPage() {
       uf: filterUf || undefined,
       situacao: filterSituacao || undefined,
       vencedor: filterVencedor.trim() || undefined,
+      tab: activeTab,
+    });
+  };
+
+  const handleTabChange = (tab: "abertas" | "encerradas") => {
+    setActiveTab(tab);
+    setFilterSituacao("");
+    setFilterVencedor("");
+    setPage(0);
+    setAppliedFilters({
+      orgao: filterOrgao.trim(),
+      search: filterSearch.trim(),
+      dateFrom: filterDateFrom ? format(filterDateFrom, "yyyy-MM-dd") : undefined,
+      dateTo: filterDateTo ? format(filterDateTo, "yyyy-MM-dd") : undefined,
+      uf: filterUf || undefined,
+      tab: tab,
     });
   };
 
