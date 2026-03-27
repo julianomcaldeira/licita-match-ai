@@ -99,11 +99,14 @@ interface IngestProgress {
 }
 
 export default function LicitacoesPage() {
+  const [activeTab, setActiveTab] = useState<"abertas" | "encerradas">("abertas");
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [page, setPage] = useState(0);
   const [progress, setProgress] = useState<IngestProgress | null>(null);
   const abortRef = useRef(false);
   const queryClient = useQueryClient();
+
+  const statusOptions = activeTab === "abertas" ? STATUS_ABERTAS : STATUS_ENCERRADAS;
 
   // Filter state
   const [filterOrgao, setFilterOrgao] = useState("");
