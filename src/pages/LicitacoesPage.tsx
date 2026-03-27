@@ -586,14 +586,16 @@ export default function LicitacoesPage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as "abertas" | "encerradas")} className="w-full">
-        <TabsList className="w-full max-w-md">
+        <TabsList className="w-full max-w-lg">
           <TabsTrigger value="abertas" className="flex-1 gap-2">
             <Clock className="h-4 w-4" />
             Abertas / Em Andamento
+            {tabCounts && <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">{tabCounts.abertas.toLocaleString("pt-BR")}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="encerradas" className="flex-1 gap-2">
             <Award className="h-4 w-4" />
             Encerradas / Com Resultado
+            {tabCounts && <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">{tabCounts.encerradas.toLocaleString("pt-BR")}</Badge>}
           </TabsTrigger>
         </TabsList>
       </Tabs>
