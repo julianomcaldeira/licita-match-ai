@@ -419,13 +419,12 @@ export default function LicitacoesPage() {
 
       // Tab-based default filtering
       if (isAbertas) {
-        // Abertas: status aberto E sem valor homologado
+        // Abertas: sem valor homologado E não revogada/anulada (complemento exato de Encerradas)
         if (appliedFilters.situacao) {
           query = query.eq("situacao", appliedFilters.situacao);
-        } else {
-          query = query.in("situacao", ["Divulgada no PNCP", "Suspensa"]);
         }
         query = query.or("valor_homologado.is.null,valor_homologado.eq.0");
+        query = query.not("situacao", "in", "(Revogada,Anulada)");
       } else {
         // Encerradas: tem valor homologado OU foi revogada/anulada
         if (appliedFilters.situacao === "Concluída") {
