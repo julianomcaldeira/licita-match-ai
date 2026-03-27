@@ -559,6 +559,20 @@ export default function LicitacoesPage() {
         </div>
       </div>
 
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as "abertas" | "encerradas")} className="w-full">
+        <TabsList className="w-full max-w-md">
+          <TabsTrigger value="abertas" className="flex-1 gap-2">
+            <Clock className="h-4 w-4" />
+            Abertas / Em Andamento
+          </TabsTrigger>
+          <TabsTrigger value="encerradas" className="flex-1 gap-2">
+            <Award className="h-4 w-4" />
+            Encerradas / Com Resultado
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       {/* Filters */}
       <div className="rounded-xl border border-border bg-card p-4 space-y-4">
         {/* Row 1: Keyword + Status radio buttons */}
