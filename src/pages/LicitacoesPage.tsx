@@ -108,6 +108,30 @@ export default function LicitacoesPage() {
 
   const statusOptions = activeTab === "abertas" ? STATUS_ABERTAS : STATUS_ENCERRADAS;
 
+  // Tab counts query - uses estimated counts for speed
+  const { data: tabCounts } = useQuery({
+    queryKey: ["licitacoes-tab-counts"],
+    queryFn: async () => {
+      const [abertasRes, encerradasRes] = await Promise.all([
+        supabase
+          .from("licitacoes")
+          .select("id", { count: "estimated", head: true })
+          .in("situacao", ["Divulgada no PNCP", "Suspensa"])
+          .or("valor_homologado.is.null,valor_homologado.eq.0"),
+        supabase
+          .from("licitacoes")
+          .select("id", { count: "estimated", head: true })
+          .or("valor_homologado.gt.0,situacao.in.(Revogada,Anulada)"),
+      ]);
+      return {
+        abertas: abertasRes.count || 0,
+        encerradas: encerradasRes.count || 0,
+      };
+    },
+    staleTime: 300_000,
+    refetchOnWindowFocus: false,
+  });
+
   // Filter state
   const [filterOrgao, setFilterOrgao] = useState("");
   const [filterSearch, setFilterSearch] = useState("");
@@ -308,6 +332,7 @@ export default function LicitacoesPage() {
             p_vencedor: appliedFilters.vencedor || null,
             p_modalidade: null,
             p_com_vencedor: !isAbertas && hasResultadoStatus,
+            p_sem_resultado: isAbertas,
             p_limit: PAGE_SIZE + 1,
             p_offset: page * PAGE_SIZE,
           });
@@ -391,20 +416,21 @@ export default function LicitacoesPage() {
 
       // Tab-based default filtering
       if (isAbertas) {
+        // Abertas: status aberto E sem valor homologado
         if (appliedFilters.situacao) {
           query = query.eq("situacao", appliedFilters.situacao);
         } else {
-          // Show only open biddings: "Divulgada no PNCP" or "Suspensa"
           query = query.in("situacao", ["Divulgada no PNCP", "Suspensa"]);
         }
+        query = query.or("valor_homologado.is.null,valor_homologado.eq.0");
       } else {
+        // Encerradas: tem valor homologado OU foi revogada/anulada
         if (appliedFilters.situacao === "Concluída") {
           query = query.not("valor_homologado", "is", null).gt("valor_homologado", 0);
         } else if (appliedFilters.situacao) {
           query = query.eq("situacao", appliedFilters.situacao);
         } else {
-          // Show only closed biddings by default
-          query = query.or("situacao.in.(Concluída,Homologada,Revogada,Anulada),valor_homologado.gt.0");
+          query = query.or("valor_homologado.gt.0,situacao.in.(Revogada,Anulada)");
         }
       }
 
@@ -561,14 +587,16 @@ export default function LicitacoesPage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as "abertas" | "encerradas")} className="w-full">
-        <TabsList className="w-full max-w-md">
+        <TabsList className="w-full max-w-lg">
           <TabsTrigger value="abertas" className="flex-1 gap-2">
             <Clock className="h-4 w-4" />
             Abertas / Em Andamento
+            {tabCounts && <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">{tabCounts.abertas.toLocaleString("pt-BR")}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="encerradas" className="flex-1 gap-2">
             <Award className="h-4 w-4" />
             Encerradas / Com Resultado
+            {tabCounts && <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">{tabCounts.encerradas.toLocaleString("pt-BR")}</Badge>}
           </TabsTrigger>
         </TabsList>
       </Tabs>
