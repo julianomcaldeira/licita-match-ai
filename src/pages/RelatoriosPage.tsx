@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,9 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
-import { FileDown, Play, X, Database, Filter, Columns3, Search, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { FileDown, FileSpreadsheet, Play, X, Database, Filter, Columns3, Search, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
+import * as XLSX from "xlsx";
 
 type TableConfig = {
   name: string;
@@ -124,105 +124,126 @@ type FilterRule = {
   value: string;
 };
 
-const OPERATORS: Record<string, { label: string; types: string[] }[]> = {
+const OPERATORS: Record<string, { label: string }[]> = {
   text: [
-    { label: "Contém", types: ["text"] },
-    { label: "Igual a", types: ["text"] },
-    { label: "Começa com", types: ["text"] },
-    { label: "Não contém", types: ["text"] },
+    { label: "Contém" },
+    { label: "Igual a" },
+    { label: "Começa com" },
+    { label: "Não contém" },
   ],
   number: [
-    { label: "Igual a", types: ["number"] },
-    { label: "Maior que", types: ["number"] },
-    { label: "Menor que", types: ["number"] },
-    { label: "Entre", types: ["number"] },
+    { label: "Igual a" },
+    { label: "Maior que" },
+    { label: "Menor que" },
   ],
   date: [
-    { label: "Igual a", types: ["date"] },
-    { label: "Depois de", types: ["date"] },
-    { label: "Antes de", types: ["date"] },
+    { label: "Igual a" },
+    { label: "Depois de" },
+    { label: "Antes de" },
   ],
 };
 
 const PAGE_SIZE = 50;
 
+type QuerySnapshot = {
+  table: string;
+  columns: string[];
+  filters: FilterRule[];
+  orderBy: string;
+  orderDir: "asc" | "desc";
+  page: number;
+};
+
+function buildSupabaseQuery(
+  tableConfig: TableConfig,
+  snap: QuerySnapshot
+) {
+  const selectCols =
+    snap.columns.length > 0 ? snap.columns.join(",") : "*";
+
+  let query = supabase
+    .from(tableConfig.name as any)
+    .select(selectCols, { count: "estimated" });
+
+  for (const f of snap.filters) {
+    if (!f.column || !f.value) continue;
+    switch (f.operator) {
+      case "Contém":
+        query = query.ilike(f.column, `%${f.value}%`);
+        break;
+      case "Igual a":
+        query = query.eq(f.column, f.value);
+        break;
+      case "Começa com":
+        query = query.ilike(f.column, `${f.value}%`);
+        break;
+      case "Não contém":
+        query = query.not(f.column, "ilike", `%${f.value}%`);
+        break;
+      case "Maior que":
+        query = query.gt(f.column, f.value);
+        break;
+      case "Menor que":
+        query = query.lt(f.column, f.value);
+        break;
+      case "Depois de":
+        query = query.gte(f.column, f.value);
+        break;
+      case "Antes de":
+        query = query.lte(f.column, f.value);
+        break;
+    }
+  }
+
+  if (snap.orderBy) {
+    query = query.order(snap.orderBy, { ascending: snap.orderDir === "asc" });
+  }
+
+  query = query.range(
+    snap.page * PAGE_SIZE,
+    (snap.page + 1) * PAGE_SIZE - 1
+  );
+
+  return query;
+}
+
 export default function RelatoriosPage() {
-  const [selectedTable, setSelectedTable] = useState<string>("");
+  const [selectedTable, setSelectedTable] = useState("");
   const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
   const [filters, setFilters] = useState<FilterRule[]>([]);
-  const [page, setPage] = useState(0);
-  const [executeQuery, setExecuteQuery] = useState(false);
-  const [orderBy, setOrderBy] = useState<string>("");
+  const [orderBy, setOrderBy] = useState("");
   const [orderDir, setOrderDir] = useState<"asc" | "desc">("desc");
+
+  // Snapshot-based: query only runs when snapshot changes (via button click)
+  const [querySnap, setQuerySnap] = useState<QuerySnapshot | null>(null);
 
   const tableConfig = useMemo(
     () => TABLES.find((t) => t.name === selectedTable),
     [selectedTable]
   );
 
+  const snapTableConfig = useMemo(
+    () => (querySnap ? TABLES.find((t) => t.name === querySnap.table) : null),
+    [querySnap]
+  );
+
   const visibleColumns = useMemo(() => {
-    if (!tableConfig) return [];
-    if (selectedColumns.length === 0) return tableConfig.columns;
-    return tableConfig.columns.filter((c) => selectedColumns.includes(c.key));
-  }, [tableConfig, selectedColumns]);
+    if (!snapTableConfig) return [];
+    if (!querySnap || querySnap.columns.length === 0) return snapTableConfig.columns;
+    return snapTableConfig.columns.filter((c) => querySnap.columns.includes(c.key));
+  }, [snapTableConfig, querySnap]);
 
-  const { data, isLoading, isFetching } = useQuery({
-    queryKey: ["relatorio", selectedTable, selectedColumns, filters, page, orderBy, orderDir],
+  const { data, isLoading } = useQuery({
+    queryKey: ["relatorio", querySnap],
     queryFn: async () => {
-      if (!tableConfig) return { rows: [], count: 0 };
-
-      const selectCols =
-        selectedColumns.length > 0 ? selectedColumns.join(",") : "*";
-
-      let query = supabase
-        .from(tableConfig.name as any)
-        .select(selectCols, { count: "exact" });
-
-      // Apply filters
-      for (const f of filters) {
-        if (!f.column || !f.value) continue;
-        const col = tableConfig.columns.find((c) => c.key === f.column);
-        if (!col) continue;
-
-        switch (f.operator) {
-          case "Contém":
-            query = query.ilike(f.column, `%${f.value}%`);
-            break;
-          case "Igual a":
-            query = query.eq(f.column, f.value);
-            break;
-          case "Começa com":
-            query = query.ilike(f.column, `${f.value}%`);
-            break;
-          case "Não contém":
-            query = query.not(f.column, "ilike", `%${f.value}%`);
-            break;
-          case "Maior que":
-            query = query.gt(f.column, f.value);
-            break;
-          case "Menor que":
-            query = query.lt(f.column, f.value);
-            break;
-          case "Depois de":
-            query = query.gte(f.column, f.value);
-            break;
-          case "Antes de":
-            query = query.lte(f.column, f.value);
-            break;
-        }
-      }
-
-      if (orderBy) {
-        query = query.order(orderBy, { ascending: orderDir === "asc" });
-      }
-
-      query = query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-
+      if (!querySnap || !snapTableConfig) return { rows: [], count: 0 };
+      const query = buildSupabaseQuery(snapTableConfig, querySnap);
       const { data: rows, count, error } = await query;
       if (error) throw error;
       return { rows: (rows || []) as Record<string, any>[], count: count || 0 };
     },
-    enabled: executeQuery && !!selectedTable,
+    enabled: !!querySnap,
+    staleTime: 60_000,
   });
 
   const totalPages = Math.ceil((data?.count || 0) / PAGE_SIZE);
@@ -231,9 +252,8 @@ export default function RelatoriosPage() {
     setSelectedTable(name);
     setSelectedColumns([]);
     setFilters([]);
-    setPage(0);
-    setExecuteQuery(false);
     setOrderBy("");
+    setQuerySnap(null);
   }
 
   function toggleColumn(key: string) {
@@ -244,11 +264,11 @@ export default function RelatoriosPage() {
 
   function selectAllColumns() {
     if (!tableConfig) return;
-    if (selectedColumns.length === tableConfig.columns.length) {
-      setSelectedColumns([]);
-    } else {
-      setSelectedColumns(tableConfig.columns.map((c) => c.key));
-    }
+    setSelectedColumns(
+      selectedColumns.length === tableConfig.columns.length
+        ? []
+        : tableConfig.columns.map((c) => c.key)
+    );
   }
 
   function addFilter() {
@@ -263,7 +283,6 @@ export default function RelatoriosPage() {
       prev.map((f) => {
         if (f.id !== id) return f;
         const updated = { ...f, ...field };
-        // Reset operator when column changes
         if (field.column && tableConfig) {
           const col = tableConfig.columns.find((c) => c.key === field.column);
           if (col) {
@@ -280,9 +299,29 @@ export default function RelatoriosPage() {
     setFilters((prev) => prev.filter((f) => f.id !== id));
   }
 
-  function runQuery() {
-    setPage(0);
-    setExecuteQuery(true);
+  function runQuery(pageOverride?: number) {
+    if (!selectedTable) return;
+    setQuerySnap({
+      table: selectedTable,
+      columns: [...selectedColumns],
+      filters: [...filters],
+      orderBy,
+      orderDir,
+      page: pageOverride ?? 0,
+    });
+  }
+
+  function goToPage(newPage: number) {
+    if (!querySnap) return;
+    setQuerySnap({ ...querySnap, page: newPage });
+  }
+
+  function handleHeaderSort(colKey: string) {
+    if (!querySnap) return;
+    const newDir = querySnap.orderBy === colKey && querySnap.orderDir === "desc" ? "asc" : "desc";
+    setOrderBy(colKey);
+    setOrderDir(newDir);
+    setQuerySnap({ ...querySnap, orderBy: colKey, orderDir: newDir, page: 0 });
   }
 
   function getColumnType(key: string) {
@@ -291,46 +330,56 @@ export default function RelatoriosPage() {
 
   function formatCell(value: any, type: string) {
     if (value === null || value === undefined) return "—";
-    if (type === "number" && typeof value === "number") {
+    if (type === "number" && typeof value === "number")
       return value.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
-    }
     if (type === "date" && typeof value === "string") {
-      try {
-        return new Date(value).toLocaleDateString("pt-BR");
-      } catch {
-        return value;
-      }
+      try { return new Date(value).toLocaleDateString("pt-BR"); } catch { return value; }
     }
     if (Array.isArray(value)) return value.join(", ");
     if (typeof value === "object") return JSON.stringify(value);
     return String(value);
   }
 
-  async function exportCSV() {
-    if (!data?.rows?.length || !tableConfig) return;
+  function getExportRows() {
+    if (!data?.rows?.length) return [];
+    return data.rows.map((row) => {
+      const obj: Record<string, any> = {};
+      for (const col of visibleColumns) {
+        obj[col.label] = row[col.key] ?? "";
+      }
+      return obj;
+    });
+  }
 
+  function exportCSV() {
+    const rows = getExportRows();
+    if (!rows.length || !snapTableConfig) return;
     const cols = visibleColumns;
     const header = cols.map((c) => c.label).join(";");
-    const rows = data.rows.map((row) =>
-      cols
-        .map((c) => {
-          const v = row[c.key];
-          if (v === null || v === undefined) return "";
-          if (typeof v === "string" && v.includes(";")) return `"${v}"`;
-          return String(v);
-        })
-        .join(";")
+    const lines = data!.rows.map((row) =>
+      cols.map((c) => {
+        const v = row[c.key];
+        if (v === null || v === undefined) return "";
+        const s = String(v);
+        return s.includes(";") ? `"${s}"` : s;
+      }).join(";")
     );
-
-    const csv = [header, ...rows].join("\n");
+    const csv = [header, ...lines].join("\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `relatorio_${tableConfig.name}_${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("CSV exportado com sucesso!");
+    downloadBlob(blob, `relatorio_${snapTableConfig.name}_${today()}.csv`);
+    toast.success("CSV exportado!");
+  }
+
+  function exportXLSX() {
+    const rows = getExportRows();
+    if (!rows.length || !snapTableConfig) return;
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, snapTableConfig.label.slice(0, 31));
+    const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    downloadBlob(blob, `relatorio_${snapTableConfig.name}_${today()}.xlsx`);
+    toast.success("XLSX exportado!");
   }
 
   return (
@@ -343,9 +392,8 @@ export default function RelatoriosPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Sidebar - Config */}
+        {/* Sidebar */}
         <div className="lg:col-span-1 space-y-4">
-          {/* Table Selection */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
@@ -359,16 +407,13 @@ export default function RelatoriosPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {TABLES.map((t) => (
-                    <SelectItem key={t.name} value={t.name}>
-                      {t.label}
-                    </SelectItem>
+                    <SelectItem key={t.name} value={t.name}>{t.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </CardContent>
           </Card>
 
-          {/* Column Selection */}
           {tableConfig && (
             <Card>
               <CardHeader className="pb-3">
@@ -376,15 +421,8 @@ export default function RelatoriosPage() {
                   <CardTitle className="text-sm flex items-center gap-2">
                     <Columns3 className="h-4 w-4" /> Colunas
                   </CardTitle>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs h-7"
-                    onClick={selectAllColumns}
-                  >
-                    {selectedColumns.length === tableConfig.columns.length
-                      ? "Limpar"
-                      : "Todas"}
+                  <Button variant="ghost" size="sm" className="text-xs h-7" onClick={selectAllColumns}>
+                    {selectedColumns.length === tableConfig.columns.length ? "Limpar" : "Todas"}
                   </Button>
                 </div>
               </CardHeader>
@@ -392,21 +430,13 @@ export default function RelatoriosPage() {
                 <ScrollArea className="h-[200px]">
                   <div className="space-y-2">
                     {tableConfig.columns.map((col) => (
-                      <label
-                        key={col.key}
-                        className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5"
-                      >
+                      <label key={col.key} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5">
                         <Checkbox
-                          checked={
-                            selectedColumns.length === 0 ||
-                            selectedColumns.includes(col.key)
-                          }
+                          checked={selectedColumns.length === 0 || selectedColumns.includes(col.key)}
                           onCheckedChange={() => toggleColumn(col.key)}
                         />
                         <span className="truncate">{col.label}</span>
-                        <Badge variant="outline" className="ml-auto text-[10px] px-1.5 py-0">
-                          {col.type}
-                        </Badge>
+                        <Badge variant="outline" className="ml-auto text-[10px] px-1.5 py-0">{col.type}</Badge>
                       </label>
                     ))}
                   </div>
@@ -415,7 +445,6 @@ export default function RelatoriosPage() {
             </Card>
           )}
 
-          {/* Filters */}
           {tableConfig && (
             <Card>
               <CardHeader className="pb-3">
@@ -423,60 +452,36 @@ export default function RelatoriosPage() {
                   <CardTitle className="text-sm flex items-center gap-2">
                     <Filter className="h-4 w-4" /> Filtros
                   </CardTitle>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs h-7"
-                    onClick={addFilter}
-                  >
+                  <Button variant="ghost" size="sm" className="text-xs h-7" onClick={addFilter}>
                     + Adicionar
                   </Button>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 {filters.length === 0 && (
-                  <p className="text-xs text-muted-foreground text-center py-2">
-                    Nenhum filtro aplicado
-                  </p>
+                  <p className="text-xs text-muted-foreground text-center py-2">Nenhum filtro aplicado</p>
                 )}
                 {filters.map((f) => {
                   const colType = getColumnType(f.column);
                   const ops = OPERATORS[colType] || OPERATORS.text;
                   return (
                     <div key={f.id} className="space-y-1.5 p-2 bg-muted/30 rounded-lg relative">
-                      <button
-                        onClick={() => removeFilter(f.id)}
-                        className="absolute top-1 right-1 text-muted-foreground hover:text-destructive"
-                      >
+                      <button onClick={() => removeFilter(f.id)} className="absolute top-1 right-1 text-muted-foreground hover:text-destructive">
                         <X className="h-3.5 w-3.5" />
                       </button>
-                      <Select
-                        value={f.column}
-                        onValueChange={(v) => updateFilter(f.id, { column: v })}
-                      >
-                        <SelectTrigger className="h-8 text-xs">
-                          <SelectValue placeholder="Coluna" />
-                        </SelectTrigger>
+                      <Select value={f.column} onValueChange={(v) => updateFilter(f.id, { column: v })}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Coluna" /></SelectTrigger>
                         <SelectContent>
                           {tableConfig.columns.map((c) => (
-                            <SelectItem key={c.key} value={c.key}>
-                              {c.label}
-                            </SelectItem>
+                            <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                      <Select
-                        value={f.operator}
-                        onValueChange={(v) => updateFilter(f.id, { operator: v })}
-                      >
-                        <SelectTrigger className="h-8 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
+                      <Select value={f.operator} onValueChange={(v) => updateFilter(f.id, { operator: v })}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           {ops.map((op) => (
-                            <SelectItem key={op.label} value={op.label}>
-                              {op.label}
-                            </SelectItem>
+                            <SelectItem key={op.label} value={op.label}>{op.label}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -494,7 +499,6 @@ export default function RelatoriosPage() {
             </Card>
           )}
 
-          {/* Order */}
           {tableConfig && (
             <Card>
               <CardHeader className="pb-3">
@@ -502,21 +506,15 @@ export default function RelatoriosPage() {
               </CardHeader>
               <CardContent className="space-y-2">
                 <Select value={orderBy} onValueChange={setOrderBy}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue placeholder="Ordenar por..." />
-                  </SelectTrigger>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Ordenar por..." /></SelectTrigger>
                   <SelectContent>
                     {tableConfig.columns.map((c) => (
-                      <SelectItem key={c.key} value={c.key}>
-                        {c.label}
-                      </SelectItem>
+                      <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 <Select value={orderDir} onValueChange={(v) => setOrderDir(v as "asc" | "desc")}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="desc">Decrescente</SelectItem>
                     <SelectItem value="asc">Crescente</SelectItem>
@@ -526,10 +524,10 @@ export default function RelatoriosPage() {
             </Card>
           )}
 
-          {/* Execute */}
           {tableConfig && (
-            <Button className="w-full" onClick={runQuery}>
-              <Play className="h-4 w-4 mr-2" /> Executar Consulta
+            <Button className="w-full" onClick={() => runQuery()} disabled={isLoading}>
+              {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
+              Executar Consulta
             </Button>
           )}
         </div>
@@ -538,39 +536,42 @@ export default function RelatoriosPage() {
         <div className="lg:col-span-3">
           <Card className="h-full">
             <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-3">
                   <CardTitle className="text-sm">Resultados</CardTitle>
-                  {data && executeQuery && (
+                  {data && querySnap && (
                     <Badge variant="secondary" className="text-xs">
-                      {data.count.toLocaleString("pt-BR")} registros
+                      ~{data.count.toLocaleString("pt-BR")} registros
                     </Badge>
                   )}
                 </div>
                 {data?.rows?.length ? (
-                  <Button variant="outline" size="sm" onClick={exportCSV}>
-                    <FileDown className="h-4 w-4 mr-1" /> Exportar CSV
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={exportCSV}>
+                      <FileDown className="h-4 w-4 mr-1" /> CSV
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={exportXLSX}>
+                      <FileSpreadsheet className="h-4 w-4 mr-1" /> XLSX
+                    </Button>
+                  </div>
                 ) : null}
               </div>
             </CardHeader>
             <CardContent>
-              {!executeQuery && (
+              {!querySnap && (
                 <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
                   <Search className="h-12 w-12 mb-3 opacity-30" />
-                  <p className="text-sm">
-                    Selecione uma tabela e clique em "Executar Consulta"
-                  </p>
+                  <p className="text-sm">Selecione uma tabela e clique em "Executar Consulta"</p>
                 </div>
               )}
 
-              {(isLoading || isFetching) && executeQuery && (
+              {isLoading && querySnap && (
                 <div className="flex items-center justify-center py-20">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
               )}
 
-              {executeQuery && !isLoading && !isFetching && data && (
+              {querySnap && !isLoading && data && (
                 <>
                   <ScrollArea className="w-full">
                     <div className="min-w-max">
@@ -581,17 +582,10 @@ export default function RelatoriosPage() {
                               <TableHead
                                 key={col.key}
                                 className="text-xs whitespace-nowrap cursor-pointer hover:text-foreground"
-                                onClick={() => {
-                                  if (orderBy === col.key) {
-                                    setOrderDir((d) => (d === "asc" ? "desc" : "asc"));
-                                  } else {
-                                    setOrderBy(col.key);
-                                    setOrderDir("desc");
-                                  }
-                                }}
+                                onClick={() => handleHeaderSort(col.key)}
                               >
                                 {col.label}
-                                {orderBy === col.key && (orderDir === "asc" ? " ↑" : " ↓")}
+                                {querySnap.orderBy === col.key && (querySnap.orderDir === "asc" ? " ↑" : " ↓")}
                               </TableHead>
                             ))}
                           </TableRow>
@@ -599,10 +593,7 @@ export default function RelatoriosPage() {
                         <TableBody>
                           {data.rows.length === 0 && (
                             <TableRow>
-                              <TableCell
-                                colSpan={visibleColumns.length}
-                                className="text-center text-muted-foreground py-10"
-                              >
+                              <TableCell colSpan={visibleColumns.length} className="text-center text-muted-foreground py-10">
                                 Nenhum registro encontrado
                               </TableCell>
                             </TableRow>
@@ -610,11 +601,7 @@ export default function RelatoriosPage() {
                           {data.rows.map((row, i) => (
                             <TableRow key={i}>
                               {visibleColumns.map((col) => (
-                                <TableCell
-                                  key={col.key}
-                                  className="text-xs whitespace-nowrap max-w-[300px] truncate"
-                                  title={String(row[col.key] ?? "")}
-                                >
+                                <TableCell key={col.key} className="text-xs whitespace-nowrap max-w-[300px] truncate" title={String(row[col.key] ?? "")}>
                                   {formatCell(row[col.key], col.type)}
                                 </TableCell>
                               ))}
@@ -625,27 +612,16 @@ export default function RelatoriosPage() {
                     </div>
                   </ScrollArea>
 
-                  {/* Pagination */}
                   {totalPages > 1 && (
                     <div className="flex items-center justify-between mt-4 pt-3 border-t border-border">
                       <span className="text-xs text-muted-foreground">
-                        Página {page + 1} de {totalPages}
+                        Página {(querySnap.page || 0) + 1} de {totalPages}
                       </span>
                       <div className="flex gap-1">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={page === 0}
-                          onClick={() => setPage((p) => p - 1)}
-                        >
+                        <Button variant="outline" size="sm" disabled={querySnap.page === 0} onClick={() => goToPage(querySnap.page - 1)}>
                           <ChevronLeft className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={page >= totalPages - 1}
-                          onClick={() => setPage((p) => p + 1)}
-                        >
+                        <Button variant="outline" size="sm" disabled={querySnap.page >= totalPages - 1} onClick={() => goToPage(querySnap.page + 1)}>
                           <ChevronRight className="h-4 w-4" />
                         </Button>
                       </div>
@@ -659,4 +635,17 @@ export default function RelatoriosPage() {
       </div>
     </div>
   );
+}
+
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
