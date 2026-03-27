@@ -54,11 +54,12 @@ function formatCurrency(value: number | null) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 }
 
-function StatusBadge({ situacao, hasWinner }: { situacao: string | null; hasWinner?: boolean }) {
-  if (!situacao && !hasWinner) return <span className="text-muted-foreground text-xs">—</span>;
-  const displayStatus = hasWinner ? "Com Resultado" : situacao;
+function StatusBadge({ situacao, hasWinner, valorHomologado }: { situacao: string | null; hasWinner?: boolean; valorHomologado?: number | null }) {
+  const hasResult = hasWinner || (valorHomologado != null && valorHomologado > 0);
+  if (!situacao && !hasResult) return <span className="text-muted-foreground text-xs">—</span>;
+  const displayStatus = hasResult ? "Com Resultado" : situacao;
   const normalized = (displayStatus || "").toLowerCase();
-  const color = hasWinner || normalized.includes("homologad") || normalized.includes("conclu") || normalized.includes("resultado")
+  const color = hasResult || normalized.includes("homologad") || normalized.includes("conclu") || normalized.includes("resultado")
     ? "bg-success/10 text-success border-success/20"
     : normalized.includes("andamento") || normalized.includes("abert") || normalized.includes("divulgada")
     ? "bg-info/10 text-info border-info/20"
