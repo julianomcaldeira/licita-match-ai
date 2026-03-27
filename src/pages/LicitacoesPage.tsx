@@ -21,16 +21,22 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import ComboboxFilter from "@/components/ComboboxFilter";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
 const UFS = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
-const STATUS_OPTIONS = [
-  { value: "", label: "Todos" },
-  { value: "Divulgada no PNCP", label: "Abertas/Divulgadas" },
-  { value: "Concluída", label: "Encerradas/Com Resultado" },
+
+const STATUS_ABERTAS = [
+  { value: "", label: "Todas" },
+  { value: "Divulgada no PNCP", label: "Divulgadas" },
+  { value: "Suspensa", label: "Suspensas" },
+];
+
+const STATUS_ENCERRADAS = [
+  { value: "", label: "Todas" },
+  { value: "Concluída", label: "Com Resultado" },
   { value: "Revogada", label: "Revogadas" },
   { value: "Anulada", label: "Anuladas" },
-  { value: "Suspensa", label: "Suspensas" },
 ];
 
 const PAGE_SIZE = 20;
@@ -93,11 +99,14 @@ interface IngestProgress {
 }
 
 export default function LicitacoesPage() {
+  const [activeTab, setActiveTab] = useState<"abertas" | "encerradas">("abertas");
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [page, setPage] = useState(0);
   const [progress, setProgress] = useState<IngestProgress | null>(null);
   const abortRef = useRef(false);
   const queryClient = useQueryClient();
+
+  const statusOptions = activeTab === "abertas" ? STATUS_ABERTAS : STATUS_ENCERRADAS;
 
   // Filter state
   const [filterOrgao, setFilterOrgao] = useState("");
@@ -164,8 +173,8 @@ export default function LicitacoesPage() {
 
 
   const [appliedFilters, setAppliedFilters] = useState<{
-    orgao: string; search: string; dateFrom?: string; dateTo?: string; uf?: string; situacao?: string; vencedor?: string;
-  }>({ orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd") });
+    orgao: string; search: string; dateFrom?: string; dateTo?: string; uf?: string; situacao?: string; vencedor?: string; tab: "abertas" | "encerradas";
+  }>({ orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd"), tab: "abertas" });
 
   const handleSearch = () => {
     setPage(0);
@@ -177,6 +186,22 @@ export default function LicitacoesPage() {
       uf: filterUf || undefined,
       situacao: filterSituacao || undefined,
       vencedor: filterVencedor.trim() || undefined,
+      tab: activeTab,
+    });
+  };
+
+  const handleTabChange = (tab: "abertas" | "encerradas") => {
+    setActiveTab(tab);
+    setFilterSituacao("");
+    setFilterVencedor("");
+    setPage(0);
+    setAppliedFilters({
+      orgao: filterOrgao.trim(),
+      search: filterSearch.trim(),
+      dateFrom: filterDateFrom ? format(filterDateFrom, "yyyy-MM-dd") : undefined,
+      dateTo: filterDateTo ? format(filterDateTo, "yyyy-MM-dd") : undefined,
+      uf: filterUf || undefined,
+      tab: tab,
     });
   };
 
@@ -189,7 +214,7 @@ export default function LicitacoesPage() {
     setFilterSituacao("");
     setFilterVencedor("");
     setPage(0);
-    setAppliedFilters({ orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd") });
+    setAppliedFilters({ orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd"), tab: activeTab });
   };
 
   const hasActiveFilters = appliedFilters.orgao || appliedFilters.search || appliedFilters.dateFrom || appliedFilters.dateTo || appliedFilters.uf || appliedFilters.situacao || appliedFilters.vencedor;
@@ -260,6 +285,7 @@ export default function LicitacoesPage() {
     }
   };
 
+  const isAbertas = appliedFilters.tab === "abertas";
   const useRpc = !!(appliedFilters.vencedor || appliedFilters.search);
 
   const { data: queryResult, isLoading, isFetching, isError, error: queryError, refetch } = useQuery({
@@ -267,6 +293,10 @@ export default function LicitacoesPage() {
     queryFn: async () => {
       if (useRpc) {
         const hasResultadoStatus = appliedFilters.situacao === "Concluída";
+        // For "abertas" tab, force situacao to open statuses if no specific status selected
+        const rpcSituacao = isAbertas
+          ? (appliedFilters.situacao || "Divulgada no PNCP")
+          : (hasResultadoStatus ? null : appliedFilters.situacao || null);
         try {
           const { data, error } = await (supabase as any).rpc("search_licitacoes", {
             p_search: appliedFilters.search || null,
@@ -274,10 +304,10 @@ export default function LicitacoesPage() {
             p_date_from: appliedFilters.dateFrom || null,
             p_date_to: appliedFilters.dateTo || null,
             p_uf: appliedFilters.uf || null,
-            p_situacao: hasResultadoStatus ? null : appliedFilters.situacao || null,
+            p_situacao: rpcSituacao,
             p_vencedor: appliedFilters.vencedor || null,
             p_modalidade: null,
-            p_com_vencedor: hasResultadoStatus,
+            p_com_vencedor: !isAbertas && hasResultadoStatus,
             p_limit: PAGE_SIZE + 1,
             p_offset: page * PAGE_SIZE,
           });
@@ -339,9 +369,15 @@ export default function LicitacoesPage() {
       // Direct table query when no text search or vencedor filter
       let query = supabase
         .from("licitacoes")
-        .select("id, orgao, objeto, modalidade, valor_estimado, valor_homologado, data_publicacao, uf, municipio, situacao, numero_controle_pncp", { count: "estimated" })
-        .order("valor_homologado", { ascending: false, nullsFirst: false })
-        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+        .select("id, orgao, objeto, modalidade, valor_estimado, valor_homologado, data_publicacao, uf, municipio, situacao, numero_controle_pncp", { count: "estimated" });
+
+      // Tab-based ordering
+      if (isAbertas) {
+        query = query.order("data_publicacao", { ascending: false });
+      } else {
+        query = query.order("valor_homologado", { ascending: false, nullsFirst: false });
+      }
+      query = query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
       if (appliedFilters.dateFrom) {
         query = query.gte("data_publicacao", appliedFilters.dateFrom);
@@ -352,11 +388,26 @@ export default function LicitacoesPage() {
       if (appliedFilters.uf) {
         query = query.eq("uf", appliedFilters.uf);
       }
-      if (appliedFilters.situacao === "Concluída") {
-        query = query.not("valor_homologado", "is", null).gt("valor_homologado", 0);
-      } else if (appliedFilters.situacao) {
-        query = query.eq("situacao", appliedFilters.situacao);
+
+      // Tab-based default filtering
+      if (isAbertas) {
+        if (appliedFilters.situacao) {
+          query = query.eq("situacao", appliedFilters.situacao);
+        } else {
+          // Show only open biddings: "Divulgada no PNCP" or "Suspensa"
+          query = query.in("situacao", ["Divulgada no PNCP", "Suspensa"]);
+        }
+      } else {
+        if (appliedFilters.situacao === "Concluída") {
+          query = query.not("valor_homologado", "is", null).gt("valor_homologado", 0);
+        } else if (appliedFilters.situacao) {
+          query = query.eq("situacao", appliedFilters.situacao);
+        } else {
+          // Show only closed biddings by default
+          query = query.or("situacao.in.(Concluída,Homologada,Revogada,Anulada),valor_homologado.gt.0");
+        }
       }
+
       if (appliedFilters.orgao) {
         query = query.ilike("orgao", `%${appliedFilters.orgao}%`);
       }
@@ -472,7 +523,7 @@ export default function LicitacoesPage() {
           <h1 className="font-display text-2xl font-bold text-foreground">Licitações</h1>
           <p className="text-sm text-muted-foreground">
             {totalCount > 0
-              ? `${totalCount.toLocaleString("pt-BR")} licitações com resultado · Ordenadas por maior valor`
+              ? `${totalCount.toLocaleString("pt-BR")} licitações · ${activeTab === "abertas" ? "Abertas · Mais recentes primeiro" : "Encerradas · Ordenadas por maior valor"}`
               : "Carregando dados..."}
           </p>
         </div>
@@ -508,6 +559,20 @@ export default function LicitacoesPage() {
         </div>
       </div>
 
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as "abertas" | "encerradas")} className="w-full">
+        <TabsList className="w-full max-w-md">
+          <TabsTrigger value="abertas" className="flex-1 gap-2">
+            <Clock className="h-4 w-4" />
+            Abertas / Em Andamento
+          </TabsTrigger>
+          <TabsTrigger value="encerradas" className="flex-1 gap-2">
+            <Award className="h-4 w-4" />
+            Encerradas / Com Resultado
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       {/* Filters */}
       <div className="rounded-xl border border-border bg-card p-4 space-y-4">
         {/* Row 1: Keyword + Status radio buttons */}
@@ -537,7 +602,7 @@ export default function LicitacoesPage() {
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Status</label>
             <div className="flex flex-wrap gap-1.5">
-              {STATUS_OPTIONS.map((opt) => (
+              {statusOptions.map((opt) => (
                 <button
                   key={opt.value}
                   onClick={() => setFilterSituacao(opt.value)}
@@ -777,11 +842,18 @@ export default function LicitacoesPage() {
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Objeto</th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Modalidade</th>
                     <th className="px-4 py-3 text-right font-medium text-muted-foreground">Valor Est.</th>
-                    <th className="px-4 py-3 text-right font-medium text-muted-foreground">Val. Homologado</th>
-                     <th className="px-4 py-3 text-right font-medium text-muted-foreground">Economia</th>
-                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Vencedor</th>
-                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Data</th>
-                     <th className="px-4 py-3 text-center font-medium text-muted-foreground">UF</th>
+                    {activeTab === "encerradas" && (
+                      <>
+                        <th className="px-4 py-3 text-right font-medium text-muted-foreground">Val. Homologado</th>
+                        <th className="px-4 py-3 text-right font-medium text-muted-foreground">Economia</th>
+                        <th className="px-4 py-3 text-left font-medium text-muted-foreground">Vencedor</th>
+                      </>
+                    )}
+                    {activeTab === "abertas" && (
+                      <th className="px-4 py-3 text-center font-medium text-muted-foreground">Situação</th>
+                    )}
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Data</th>
+                    <th className="px-4 py-3 text-center font-medium text-muted-foreground">UF</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -823,27 +895,36 @@ export default function LicitacoesPage() {
                         </td>
                         <td className="px-4 py-3 text-muted-foreground text-xs">{row.modalidade || "—"}</td>
                         <td className="px-4 py-3 text-right font-medium text-foreground tabular-nums">{formatCurrency(row.valor_estimado)}</td>
-                        <td className="px-4 py-3 text-right font-medium text-success tabular-nums">{row.valor_homologado ? formatCurrency(row.valor_homologado) : "—"}</td>
-                        <td className="px-4 py-3 text-right font-medium tabular-nums">
-                          {row.valor_estimado && row.valor_homologado ? (
-                            <span className={row.valor_estimado - row.valor_homologado > 0 ? "text-success" : "text-destructive"}>
-                              {formatCurrency(row.valor_estimado - row.valor_homologado)}
-                            </span>
-                          ) : "—"}
-                        </td>
-                        <td className="px-4 py-3 max-w-[200px]" onClick={(e) => e.stopPropagation()}>
-                          {row.vencedor_nome ? (
-                            <button
-                              onClick={() => searchByWinner(row.vencedor_nome)}
-                              className="block truncate text-primary text-xs font-medium hover:underline text-left max-w-full"
-                              title={`Ver todas licitações de ${row.vencedor_nome}`}
-                            >
-                              {row.vencedor_nome}
-                            </button>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </td>
+                        {activeTab === "encerradas" && (
+                          <>
+                            <td className="px-4 py-3 text-right font-medium text-success tabular-nums">{row.valor_homologado ? formatCurrency(row.valor_homologado) : "—"}</td>
+                            <td className="px-4 py-3 text-right font-medium tabular-nums">
+                              {row.valor_estimado && row.valor_homologado ? (
+                                <span className={row.valor_estimado - row.valor_homologado > 0 ? "text-success" : "text-destructive"}>
+                                  {formatCurrency(row.valor_estimado - row.valor_homologado)}
+                                </span>
+                              ) : "—"}
+                            </td>
+                            <td className="px-4 py-3 max-w-[200px]" onClick={(e) => e.stopPropagation()}>
+                              {row.vencedor_nome ? (
+                                <button
+                                  onClick={() => searchByWinner(row.vencedor_nome)}
+                                  className="block truncate text-primary text-xs font-medium hover:underline text-left max-w-full"
+                                  title={`Ver todas licitações de ${row.vencedor_nome}`}
+                                >
+                                  {row.vencedor_nome}
+                                </button>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              )}
+                            </td>
+                          </>
+                        )}
+                        {activeTab === "abertas" && (
+                          <td className="px-4 py-3 text-center">
+                            <StatusBadge situacao={row.situacao} />
+                          </td>
+                        )}
                         <td className="px-4 py-3 text-muted-foreground text-xs">{formattedDate}</td>
                         <td className="px-4 py-3 text-center text-muted-foreground text-xs font-medium">{row.uf || "—"}</td>
                       </tr>
