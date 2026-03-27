@@ -112,20 +112,22 @@ export default function LicitacoesPage() {
   const { data: tabCounts } = useQuery({
     queryKey: ["licitacoes-tab-counts"],
     queryFn: async () => {
-      const [abertasRes, encerradasRes] = await Promise.all([
+      // Encerradas = valor_homologado > 0 OR situacao in (Revogada, Anulada)
+      // Abertas = tudo que NÃO é encerrada (complemento exato)
+      const [totalRes, encerradasRes] = await Promise.all([
         supabase
           .from("licitacoes")
-          .select("id", { count: "estimated", head: true })
-          .in("situacao", ["Divulgada no PNCP", "Suspensa"])
-          .or("valor_homologado.is.null,valor_homologado.eq.0"),
+          .select("id", { count: "estimated", head: true }),
         supabase
           .from("licitacoes")
           .select("id", { count: "estimated", head: true })
           .or("valor_homologado.gt.0,situacao.in.(Revogada,Anulada)"),
       ]);
+      const total = totalRes.count || 0;
+      const encerradas = encerradasRes.count || 0;
       return {
-        abertas: abertasRes.count || 0,
-        encerradas: encerradasRes.count || 0,
+        abertas: total - encerradas,
+        encerradas,
       };
     },
     staleTime: 300_000,
