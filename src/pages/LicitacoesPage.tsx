@@ -173,8 +173,8 @@ export default function LicitacoesPage() {
 
 
   const [appliedFilters, setAppliedFilters] = useState<{
-    orgao: string; search: string; dateFrom?: string; dateTo?: string; uf?: string; situacao?: string; vencedor?: string;
-  }>({ orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd") });
+    orgao: string; search: string; dateFrom?: string; dateTo?: string; uf?: string; situacao?: string; vencedor?: string; tab: "abertas" | "encerradas";
+  }>({ orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd"), tab: "abertas" });
 
   const handleSearch = () => {
     setPage(0);
