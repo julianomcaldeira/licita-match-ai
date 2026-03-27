@@ -54,11 +54,12 @@ function formatCurrency(value: number | null) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 }
 
-function StatusBadge({ situacao, hasWinner }: { situacao: string | null; hasWinner?: boolean }) {
-  if (!situacao && !hasWinner) return <span className="text-muted-foreground text-xs">—</span>;
-  const displayStatus = hasWinner ? "Com Resultado" : situacao;
+function StatusBadge({ situacao, hasWinner, valorHomologado }: { situacao: string | null; hasWinner?: boolean; valorHomologado?: number | null }) {
+  const hasResult = hasWinner || (valorHomologado != null && valorHomologado > 0);
+  if (!situacao && !hasResult) return <span className="text-muted-foreground text-xs">—</span>;
+  const displayStatus = hasResult ? "Com Resultado" : situacao;
   const normalized = (displayStatus || "").toLowerCase();
-  const color = hasWinner || normalized.includes("homologad") || normalized.includes("conclu") || normalized.includes("resultado")
+  const color = hasResult || normalized.includes("homologad") || normalized.includes("conclu") || normalized.includes("resultado")
     ? "bg-success/10 text-success border-success/20"
     : normalized.includes("andamento") || normalized.includes("abert") || normalized.includes("divulgada")
     ? "bg-info/10 text-info border-info/20"
@@ -321,7 +322,7 @@ export default function LicitacoesPage() {
         const hasResultadoStatus = appliedFilters.situacao === "Concluída";
         // For "abertas" tab, force situacao to open statuses if no specific status selected
         const rpcSituacao = isAbertas
-          ? (appliedFilters.situacao || "Divulgada no PNCP")
+          ? (appliedFilters.situacao || null)
           : (hasResultadoStatus ? null : appliedFilters.situacao || null);
         try {
           const { data, error } = await (supabase as any).rpc("search_licitacoes", {
@@ -418,13 +419,12 @@ export default function LicitacoesPage() {
 
       // Tab-based default filtering
       if (isAbertas) {
-        // Abertas: status aberto E sem valor homologado
+        // Abertas: sem valor homologado E não revogada/anulada (complemento exato de Encerradas)
         if (appliedFilters.situacao) {
           query = query.eq("situacao", appliedFilters.situacao);
-        } else {
-          query = query.in("situacao", ["Divulgada no PNCP", "Suspensa"]);
         }
         query = query.or("valor_homologado.is.null,valor_homologado.eq.0");
+        query = query.not("situacao", "in", "(Revogada,Anulada)");
       } else {
         // Encerradas: tem valor homologado OU foi revogada/anulada
         if (appliedFilters.situacao === "Concluída") {
@@ -952,7 +952,7 @@ export default function LicitacoesPage() {
                         )}
                         {activeTab === "abertas" && (
                           <td className="px-4 py-3 text-center">
-                            <StatusBadge situacao={row.situacao} />
+                            <StatusBadge situacao={row.situacao} valorHomologado={row.valor_homologado} />
                           </td>
                         )}
                         <td className="px-4 py-3 text-muted-foreground text-xs">{formattedDate}</td>
@@ -1004,7 +1004,7 @@ export default function LicitacoesPage() {
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <StatusBadge situacao={selectedLicitacao.situacao} hasWinner={detailWinners.length > 0} />
+                    <StatusBadge situacao={selectedLicitacao.situacao} hasWinner={detailWinners.length > 0} valorHomologado={selectedLicitacao.valor_homologado} />
                     {selectedLicitacao.modalidade && <Badge variant="outline" className="text-xs">{selectedLicitacao.modalidade}</Badge>}
                     {selectedLicitacao.numero_controle_pncp && (
                       (() => {
