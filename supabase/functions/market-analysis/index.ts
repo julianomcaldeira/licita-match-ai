@@ -7,7 +7,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Simple in-memory rate limiter
 const rateLimits = new Map<string, { count: number; resetAt: number }>();
 function checkRateLimit(userId: string, max = 10, windowMs = 3600000): boolean {
   const now = Date.now();
@@ -41,7 +40,6 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    // Auth check
     const auth = await authenticateUser(req);
     if (!auth) {
       return new Response(JSON.stringify({ error: "Não autorizado" }), {
@@ -49,7 +47,6 @@ serve(async (req) => {
       });
     }
 
-    // Rate limit
     if (!checkRateLimit(auth.userId, 10, 3600000)) {
       return new Response(JSON.stringify({ error: "Limite de requisições excedido. Tente novamente mais tarde." }), {
         status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -63,7 +60,7 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { analysisType, filters, userQuestion } = await req.json();
+    const { analysisType, filters, userQuestion, conversationHistory } = await req.json();
 
     const dateFrom = filters?.dateFrom || "2023-01-01";
     const dateTo = filters?.dateTo || new Date().toISOString().split("T")[0];
@@ -142,9 +139,43 @@ REGRAS DE CONTEÚDO:
 - Use emojis estratégicos: 📊 dados, 🏆 rankings, ⚠️ alertas, 💡 insights, 📈 crescimento, 📉 queda
 - Formate valores monetários sempre como "R$ X,XX" com separador de milhar
 
+Quando o usuário fizer perguntas de acompanhamento, continue a análise a partir do contexto já discutido. Não repita dados já apresentados, aprofunde.
+
 Responda SEMPRE em português brasileiro.`;
 
-    const userPrompt = `${analysisPrompts[analysisType] || analysisPrompts.custom}\n\n${marketContext}`;
+    // Build messages array
+    const messages: { role: string; content: string }[] = [
+      { role: "system", content: systemPrompt },
+    ];
+
+    // If there's conversation history (follow-up questions), include it
+    if (analysisType === "custom" && Array.isArray(conversationHistory) && conversationHistory.length > 0) {
+      // First message always includes market context
+      messages.push({
+        role: "user",
+        content: `${conversationHistory[0].content}\n\n${marketContext}`,
+      });
+
+      // Add remaining history messages as-is
+      for (let i = 1; i < conversationHistory.length; i++) {
+        messages.push({
+          role: conversationHistory[i].role,
+          content: conversationHistory[i].content,
+        });
+      }
+
+      // Add the new question
+      messages.push({
+        role: "user",
+        content: userQuestion,
+      });
+    } else {
+      // Single question or structured analysis
+      messages.push({
+        role: "user",
+        content: `${analysisPrompts[analysisType] || analysisPrompts.custom}\n\n${marketContext}`,
+      });
+    }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -154,10 +185,7 @@ Responda SEMPRE em português brasileiro.`;
       },
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
+        messages,
         stream: true,
       }),
     });
