@@ -108,6 +108,30 @@ export default function LicitacoesPage() {
 
   const statusOptions = activeTab === "abertas" ? STATUS_ABERTAS : STATUS_ENCERRADAS;
 
+  // Tab counts query
+  const { data: tabCounts } = useQuery({
+    queryKey: ["licitacoes-tab-counts"],
+    queryFn: async () => {
+      const [abertasRes, encerradasRes] = await Promise.all([
+        supabase
+          .from("licitacoes")
+          .select("id", { count: "exact", head: true })
+          .in("situacao", ["Divulgada no PNCP", "Suspensa"])
+          .or("valor_homologado.is.null,valor_homologado.eq.0"),
+        supabase
+          .from("licitacoes")
+          .select("id", { count: "exact", head: true })
+          .or("valor_homologado.gt.0,situacao.in.(Revogada,Anulada)"),
+      ]);
+      return {
+        abertas: abertasRes.count || 0,
+        encerradas: encerradasRes.count || 0,
+      };
+    },
+    staleTime: 300_000,
+    refetchOnWindowFocus: false,
+  });
+
   // Filter state
   const [filterOrgao, setFilterOrgao] = useState("");
   const [filterSearch, setFilterSearch] = useState("");
