@@ -415,20 +415,21 @@ export default function LicitacoesPage() {
 
       // Tab-based default filtering
       if (isAbertas) {
+        // Abertas: status aberto E sem valor homologado
         if (appliedFilters.situacao) {
           query = query.eq("situacao", appliedFilters.situacao);
         } else {
-          // Show only open biddings: "Divulgada no PNCP" or "Suspensa"
           query = query.in("situacao", ["Divulgada no PNCP", "Suspensa"]);
         }
+        query = query.or("valor_homologado.is.null,valor_homologado.eq.0");
       } else {
+        // Encerradas: tem valor homologado OU foi revogada/anulada
         if (appliedFilters.situacao === "Concluída") {
           query = query.not("valor_homologado", "is", null).gt("valor_homologado", 0);
         } else if (appliedFilters.situacao) {
           query = query.eq("situacao", appliedFilters.situacao);
         } else {
-          // Show only closed biddings by default
-          query = query.or("situacao.in.(Concluída,Homologada,Revogada,Anulada),valor_homologado.gt.0");
+          query = query.or("valor_homologado.gt.0,situacao.in.(Revogada,Anulada)");
         }
       }
 
