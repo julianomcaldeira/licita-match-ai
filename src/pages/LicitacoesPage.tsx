@@ -1005,7 +1005,7 @@ export default function LicitacoesPage() {
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <StatusBadge situacao={selectedLicitacao.situacao} hasWinner={detailWinners.length > 0} />
+                    <StatusBadge situacao={selectedLicitacao.situacao} hasWinner={detailWinners.length > 0} valorHomologado={selectedLicitacao.valor_homologado} />
                     {selectedLicitacao.modalidade && <Badge variant="outline" className="text-xs">{selectedLicitacao.modalidade}</Badge>}
                     {selectedLicitacao.numero_controle_pncp && (
                       (() => {
