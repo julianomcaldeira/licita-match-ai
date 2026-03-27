@@ -293,6 +293,10 @@ export default function LicitacoesPage() {
     queryFn: async () => {
       if (useRpc) {
         const hasResultadoStatus = appliedFilters.situacao === "Concluída";
+        // For "abertas" tab, force situacao to open statuses if no specific status selected
+        const rpcSituacao = isAbertas
+          ? (appliedFilters.situacao || "Divulgada no PNCP")
+          : (hasResultadoStatus ? null : appliedFilters.situacao || null);
         try {
           const { data, error } = await (supabase as any).rpc("search_licitacoes", {
             p_search: appliedFilters.search || null,
@@ -300,10 +304,10 @@ export default function LicitacoesPage() {
             p_date_from: appliedFilters.dateFrom || null,
             p_date_to: appliedFilters.dateTo || null,
             p_uf: appliedFilters.uf || null,
-            p_situacao: hasResultadoStatus ? null : appliedFilters.situacao || null,
+            p_situacao: rpcSituacao,
             p_vencedor: appliedFilters.vencedor || null,
             p_modalidade: null,
-            p_com_vencedor: hasResultadoStatus,
+            p_com_vencedor: !isAbertas && hasResultadoStatus,
             p_limit: PAGE_SIZE + 1,
             p_offset: page * PAGE_SIZE,
           });
