@@ -550,9 +550,7 @@ export default function LicitacoesPage() {
         <div>
           <h1 className="font-display text-2xl font-bold text-foreground">Licitações</h1>
           <p className="text-sm text-muted-foreground">
-            {totalCount > 0
-              ? `${totalCount.toLocaleString("pt-BR")} licitações · ${activeTab === "abertas" ? "Abertas · Mais recentes primeiro" : "Encerradas · Ordenadas por maior valor"}`
-              : "Carregando dados..."}
+            {activeTab === "abertas" ? "Abertas · Mais recentes primeiro" : "Encerradas · Ordenadas por maior valor"}
           </p>
         </div>
         <div className="flex items-center gap-2">
