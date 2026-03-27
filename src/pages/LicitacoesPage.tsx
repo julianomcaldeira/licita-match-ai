@@ -43,7 +43,7 @@ const PAGE_SIZE = 20;
 const QUERY_TIMEOUT_MS = 12_000;
 
 async function withTimeout<T>(
-  promise: Promise<T>,
+  promiseLike: PromiseLike<T>,
   timeoutMs = QUERY_TIMEOUT_MS,
   message = "A consulta demorou demais. Tente refinar os filtros."
 ): Promise<T> {
@@ -53,7 +53,7 @@ async function withTimeout<T>(
   });
 
   try {
-    return await Promise.race([promise, timeoutPromise]);
+    return await Promise.race([Promise.resolve(promiseLike), timeoutPromise]);
   } finally {
     if (timer) clearTimeout(timer);
   }
@@ -397,7 +397,12 @@ export default function LicitacoesPage() {
             p_limit: PAGE_SIZE + 1,
             p_offset: page * PAGE_SIZE,
           });
-          const { data, error } = await withTimeout(rpcPromise, QUERY_TIMEOUT_MS, "A busca demorou demais no modo avançado.");
+          const rpcResult = await withTimeout<{ data: any[] | null; error: any }>(
+            rpcPromise as PromiseLike<{ data: any[] | null; error: any }>,
+            QUERY_TIMEOUT_MS,
+            "A busca demorou demais no modo avançado."
+          );
+          const { data, error } = rpcResult;
           if (error) throw error;
 
           const fetchedRows = (data || []) as any[];
@@ -425,15 +430,22 @@ export default function LicitacoesPage() {
               .ilike("razao_social", `%${appliedFilters.vencedor}%`)
               .limit(800);
 
-            const { data: winnerRows, error: winnerError } = await withTimeout(
-              winnersPromise,
+            const winnersResult = await withTimeout<{ data: { licitacao_id: string | null }[] | null; error: any }>(
+              winnersPromise as PromiseLike<{ data: { licitacao_id: string | null }[] | null; error: any }>,
               8_000,
               "A busca por vencedor demorou demais."
             );
+            const { data: winnerRows, error: winnerError } = winnersResult;
 
             if (winnerError) throw rpcError;
 
-            const licitacaoIds = [...new Set((winnerRows || []).map((row: any) => row.licitacao_id).filter(Boolean))].slice(0, 150);
+            const licitacaoIds = [
+              ...new Set(
+                (winnerRows || [])
+                  .map((row) => row.licitacao_id)
+                  .filter((id): id is string => typeof id === "string" && id.length > 0)
+              ),
+            ].slice(0, 150);
             if (licitacaoIds.length === 0) {
               return { rows: [], totalCount: 0 };
             }
@@ -441,11 +453,12 @@ export default function LicitacoesPage() {
             fallbackQuery = fallbackQuery.in("id", licitacaoIds);
           }
 
-          const { data: fallbackRows, error: fallbackError } = await withTimeout(
-            fallbackQuery,
+          const fallbackResult = await withTimeout<{ data: any[] | null; error: any }>(
+            fallbackQuery as PromiseLike<{ data: any[] | null; error: any }>,
             QUERY_TIMEOUT_MS,
             "A busca de fallback demorou demais."
           );
+          const { data: fallbackRows, error: fallbackError } = fallbackResult;
           if (fallbackError) {
             throw rpcError;
           }
@@ -462,7 +475,11 @@ export default function LicitacoesPage() {
       }
 
       const query = buildBaseQuery();
-      const { data, error } = await withTimeout(query, QUERY_TIMEOUT_MS);
+      const queryResult = await withTimeout<{ data: any[] | null; error: any }>(
+        query as PromiseLike<{ data: any[] | null; error: any }>,
+        QUERY_TIMEOUT_MS
+      );
+      const { data, error } = queryResult;
       if (error) throw error;
 
       const fetchedRows = (data || []) as any[];
