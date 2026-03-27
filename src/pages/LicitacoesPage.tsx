@@ -369,9 +369,15 @@ export default function LicitacoesPage() {
       // Direct table query when no text search or vencedor filter
       let query = supabase
         .from("licitacoes")
-        .select("id, orgao, objeto, modalidade, valor_estimado, valor_homologado, data_publicacao, uf, municipio, situacao, numero_controle_pncp", { count: "estimated" })
-        .order("valor_homologado", { ascending: false, nullsFirst: false })
-        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+        .select("id, orgao, objeto, modalidade, valor_estimado, valor_homologado, data_publicacao, uf, municipio, situacao, numero_controle_pncp", { count: "estimated" });
+
+      // Tab-based ordering
+      if (isAbertas) {
+        query = query.order("data_publicacao", { ascending: false });
+      } else {
+        query = query.order("valor_homologado", { ascending: false, nullsFirst: false });
+      }
+      query = query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
       if (appliedFilters.dateFrom) {
         query = query.gte("data_publicacao", appliedFilters.dateFrom);
@@ -382,11 +388,26 @@ export default function LicitacoesPage() {
       if (appliedFilters.uf) {
         query = query.eq("uf", appliedFilters.uf);
       }
-      if (appliedFilters.situacao === "Concluída") {
-        query = query.not("valor_homologado", "is", null).gt("valor_homologado", 0);
-      } else if (appliedFilters.situacao) {
-        query = query.eq("situacao", appliedFilters.situacao);
+
+      // Tab-based default filtering
+      if (isAbertas) {
+        if (appliedFilters.situacao) {
+          query = query.eq("situacao", appliedFilters.situacao);
+        } else {
+          // Show only open biddings: "Divulgada no PNCP" or "Suspensa"
+          query = query.in("situacao", ["Divulgada no PNCP", "Suspensa"]);
+        }
+      } else {
+        if (appliedFilters.situacao === "Concluída") {
+          query = query.not("valor_homologado", "is", null).gt("valor_homologado", 0);
+        } else if (appliedFilters.situacao) {
+          query = query.eq("situacao", appliedFilters.situacao);
+        } else {
+          // Show only closed biddings by default
+          query = query.or("situacao.in.(Concluída,Homologada,Revogada,Anulada),valor_homologado.gt.0");
+        }
       }
+
       if (appliedFilters.orgao) {
         query = query.ilike("orgao", `%${appliedFilters.orgao}%`);
       }
