@@ -322,7 +322,7 @@ export default function LicitacoesPage() {
         const hasResultadoStatus = appliedFilters.situacao === "Concluída";
         // For "abertas" tab, force situacao to open statuses if no specific status selected
         const rpcSituacao = isAbertas
-          ? (appliedFilters.situacao || "Divulgada no PNCP")
+          ? (appliedFilters.situacao || null)
           : (hasResultadoStatus ? null : appliedFilters.situacao || null);
         try {
           const { data, error } = await (supabase as any).rpc("search_licitacoes", {
