@@ -842,11 +842,18 @@ export default function LicitacoesPage() {
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Objeto</th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Modalidade</th>
                     <th className="px-4 py-3 text-right font-medium text-muted-foreground">Valor Est.</th>
-                    <th className="px-4 py-3 text-right font-medium text-muted-foreground">Val. Homologado</th>
-                     <th className="px-4 py-3 text-right font-medium text-muted-foreground">Economia</th>
-                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Vencedor</th>
-                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Data</th>
-                     <th className="px-4 py-3 text-center font-medium text-muted-foreground">UF</th>
+                    {activeTab === "encerradas" && (
+                      <>
+                        <th className="px-4 py-3 text-right font-medium text-muted-foreground">Val. Homologado</th>
+                        <th className="px-4 py-3 text-right font-medium text-muted-foreground">Economia</th>
+                        <th className="px-4 py-3 text-left font-medium text-muted-foreground">Vencedor</th>
+                      </>
+                    )}
+                    {activeTab === "abertas" && (
+                      <th className="px-4 py-3 text-center font-medium text-muted-foreground">Situação</th>
+                    )}
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Data</th>
+                    <th className="px-4 py-3 text-center font-medium text-muted-foreground">UF</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -888,27 +895,36 @@ export default function LicitacoesPage() {
                         </td>
                         <td className="px-4 py-3 text-muted-foreground text-xs">{row.modalidade || "—"}</td>
                         <td className="px-4 py-3 text-right font-medium text-foreground tabular-nums">{formatCurrency(row.valor_estimado)}</td>
-                        <td className="px-4 py-3 text-right font-medium text-success tabular-nums">{row.valor_homologado ? formatCurrency(row.valor_homologado) : "—"}</td>
-                        <td className="px-4 py-3 text-right font-medium tabular-nums">
-                          {row.valor_estimado && row.valor_homologado ? (
-                            <span className={row.valor_estimado - row.valor_homologado > 0 ? "text-success" : "text-destructive"}>
-                              {formatCurrency(row.valor_estimado - row.valor_homologado)}
-                            </span>
-                          ) : "—"}
-                        </td>
-                        <td className="px-4 py-3 max-w-[200px]" onClick={(e) => e.stopPropagation()}>
-                          {row.vencedor_nome ? (
-                            <button
-                              onClick={() => searchByWinner(row.vencedor_nome)}
-                              className="block truncate text-primary text-xs font-medium hover:underline text-left max-w-full"
-                              title={`Ver todas licitações de ${row.vencedor_nome}`}
-                            >
-                              {row.vencedor_nome}
-                            </button>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </td>
+                        {activeTab === "encerradas" && (
+                          <>
+                            <td className="px-4 py-3 text-right font-medium text-success tabular-nums">{row.valor_homologado ? formatCurrency(row.valor_homologado) : "—"}</td>
+                            <td className="px-4 py-3 text-right font-medium tabular-nums">
+                              {row.valor_estimado && row.valor_homologado ? (
+                                <span className={row.valor_estimado - row.valor_homologado > 0 ? "text-success" : "text-destructive"}>
+                                  {formatCurrency(row.valor_estimado - row.valor_homologado)}
+                                </span>
+                              ) : "—"}
+                            </td>
+                            <td className="px-4 py-3 max-w-[200px]" onClick={(e) => e.stopPropagation()}>
+                              {row.vencedor_nome ? (
+                                <button
+                                  onClick={() => searchByWinner(row.vencedor_nome)}
+                                  className="block truncate text-primary text-xs font-medium hover:underline text-left max-w-full"
+                                  title={`Ver todas licitações de ${row.vencedor_nome}`}
+                                >
+                                  {row.vencedor_nome}
+                                </button>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              )}
+                            </td>
+                          </>
+                        )}
+                        {activeTab === "abertas" && (
+                          <td className="px-4 py-3 text-center">
+                            <StatusBadge situacao={row.situacao} />
+                          </td>
+                        )}
                         <td className="px-4 py-3 text-muted-foreground text-xs">{formattedDate}</td>
                         <td className="px-4 py-3 text-center text-muted-foreground text-xs font-medium">{row.uf || "—"}</td>
                       </tr>
