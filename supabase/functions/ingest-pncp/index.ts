@@ -14,6 +14,8 @@ const MODALIDADES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_FETCH_RETRIES = 5;
 const MAX_RANGE_SPLIT_DEPTH = 4;
+const MAX_BACKFILL_WINDOW_DAYS = 3;
+const MAX_MANUAL_INGEST_WINDOW_DAYS = 7;
 
 interface PNCPContratacao {
   numeroControlePNCP?: string;
@@ -75,8 +77,17 @@ function splitDateRange(dataInicial: string, dataFinal: string) {
   ] as const;
 }
 
+function capDateRange(dataInicial: string, dataFinal: string, maxDaysInclusive: number) {
+  if (maxDaysInclusive <= 1) {
+    return dataInicial < dataFinal ? dataInicial : dataFinal;
+  }
+
+  const cappedEnd = addDays(dataInicial, maxDaysInclusive - 1);
+  return cappedEnd < dataFinal ? cappedEnd : dataFinal;
+}
+
 function isRetryableFetchError(message: string): boolean {
-  return /HTTP\s(?:429|5\d\d)|timed out|timeout|fetch failed|connection|network/i.test(message);
+  return /HTTP\s(?:429|5\d\d)|timed out|timeout|fetch failed|connection|network|abort|aborted|signal has been aborted/i.test(message);
 }
 
 function mergeFetchResults(results: Array<{ total: number; winners: number; errors: string[]; pagesOk: number }>) {
@@ -572,12 +583,7 @@ async function handleBulkBackfill(supabase: any, body: any) {
     );
   }
 
-  // Process ONE month
-  const sy = parseInt(startDate.substring(0, 4));
-  const sm = parseInt(startDate.substring(4, 6));
-  const lastDay = new Date(sy, sm, 0).getDate();
-  let monthEnd = `${sy}${String(sm).padStart(2, "0")}${String(lastDay).padStart(2, "0")}`;
-  if (monthEnd > backfillEnd) monthEnd = backfillEnd;
+  const monthEnd = capDateRange(startDate, backfillEnd, MAX_BACKFILL_WINDOW_DAYS);
 
   console.log(`Backfill: Mod ${targetMod} ${startDate} → ${monthEnd}`);
   const result = await fetchRangeResilient(supabase, targetMod, startDate, monthEnd, false);
@@ -793,12 +799,7 @@ async function handleIngest(supabase: any, body: any) {
     );
   }
 
-  // Process only 1 month per call to avoid timeout
-  const sy = parseInt(startDate.substring(0, 4));
-  const sm = parseInt(startDate.substring(4, 6));
-  const lastDay = new Date(sy, sm, 0).getDate();
-  let monthEnd = `${sy}${String(sm).padStart(2, "0")}${String(lastDay).padStart(2, "0")}`;
-  if (monthEnd > dataFinal) monthEnd = dataFinal;
+  const monthEnd = capDateRange(startDate, dataFinal, MAX_MANUAL_INGEST_WINDOW_DAYS);
 
   console.log(`Ingest: Mod ${modalidade} ${startDate} → ${monthEnd}`);
   const result = await fetchRangeResilient(supabase, modalidade, startDate, monthEnd, false);
