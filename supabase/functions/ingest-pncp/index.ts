@@ -11,6 +11,9 @@ const PNCP_CONSULTA_URL = "https://pncp.gov.br/api/consulta/v1";
 const PNCP_DATA_URL = "https://pncp.gov.br/api/pncp/v1";
 const PAGE_SIZE = 50;
 const MODALIDADES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+const FETCH_TIMEOUT_MS = 15_000;
+const MAX_FETCH_RETRIES = 5;
+const MAX_RANGE_SPLIT_DEPTH = 4;
 
 interface PNCPContratacao {
   numeroControlePNCP?: string;
@@ -46,23 +49,80 @@ function addDays(yyyymmdd: string, days: number): string {
   return fmtDate(dt);
 }
 
-async function fetchWithRetry(url: string, retries = 3, delayMs = 2000): Promise<Response> {
+function diffDays(dataInicial: string, dataFinal: string): number {
+  const start = new Date(`${fmtDateISO(dataInicial)}T00:00:00Z`);
+  const end = new Date(`${fmtDateISO(dataFinal)}T00:00:00Z`);
+  return Math.max(0, Math.round((end.getTime() - start.getTime()) / 86400000));
+}
+
+function splitDateRange(dataInicial: string, dataFinal: string) {
+  const totalDays = diffDays(dataInicial, dataFinal);
+  if (totalDays <= 0) {
+    return null;
+  }
+
+  const midpointDays = Math.floor(totalDays / 2);
+  const leftEnd = addDays(dataInicial, midpointDays);
+  const rightStart = addDays(leftEnd, 1);
+
+  if (rightStart > dataFinal) {
+    return null;
+  }
+
+  return [
+    { dataInicial, dataFinal: leftEnd },
+    { dataInicial: rightStart, dataFinal },
+  ] as const;
+}
+
+function isRetryableFetchError(message: string): boolean {
+  return /HTTP\s(?:429|5\d\d)|timed out|timeout|fetch failed|connection|network/i.test(message);
+}
+
+function mergeFetchResults(results: Array<{ total: number; winners: number; errors: string[]; pagesOk: number }>) {
+  return results.reduce(
+    (acc, current) => ({
+      total: acc.total + current.total,
+      winners: acc.winners + current.winners,
+      errors: [...acc.errors, ...current.errors],
+      pagesOk: acc.pagesOk + current.pagesOk,
+    }),
+    { total: 0, winners: 0, errors: [] as string[], pagesOk: 0 }
+  );
+}
+
+async function fetchWithRetry(url: string, retries = MAX_FETCH_RETRIES, delayMs = 2000): Promise<Response> {
+  let lastError: Error | null = null;
+
   for (let i = 0; i < retries; i++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
     try {
-      const resp = await fetch(url, { headers: { Accept: "application/json" } });
-      if (resp.status === 429) {
+      const resp = await fetch(url, { headers: { Accept: "application/json" }, signal: controller.signal });
+      const shouldRetryStatus = resp.status === 429 || resp.status >= 500;
+
+      if (shouldRetryStatus && i < retries - 1) {
         const wait = delayMs * Math.pow(2, i);
-        console.log(`Rate limited, waiting ${wait}ms...`);
+        const errBody = await resp.clone().text().catch(() => "");
+        console.warn(`PNCP retry ${i + 1}/${retries} for ${url}: HTTP ${resp.status} ${errBody.slice(0, 160)}`);
         await new Promise((r) => setTimeout(r, wait));
         continue;
       }
+
       return resp;
     } catch (e) {
-      if (i === retries - 1) throw e;
-      await new Promise((r) => setTimeout(r, delayMs));
+      lastError = e instanceof Error ? e : new Error("Unknown fetch error");
+      if (i === retries - 1) throw lastError;
+      const wait = delayMs * Math.pow(2, i);
+      console.warn(`PNCP request failed, retrying in ${wait}ms: ${lastError.message}`);
+      await new Promise((r) => setTimeout(r, wait));
+    } finally {
+      clearTimeout(timeout);
     }
   }
-  throw new Error("Max retries reached");
+
+  throw lastError ?? new Error("Max retries reached");
 }
 
 function safeParseJSON(text: string): any {
@@ -179,6 +239,57 @@ async function fetchAllPages(
   }
 
   return { total, winners: winnersFound, errors, pagesOk };
+}
+
+async function fetchRangeResilient(
+  supabase: any,
+  modalidade: number,
+  dataInicial: string,
+  dataFinal: string,
+  fetchWinners = false,
+  cnpj?: string,
+  depth = 0
+): Promise<{ total: number; winners: number; errors: string[]; pagesOk: number }> {
+  const result = await fetchAllPages(supabase, modalidade, dataInicial, dataFinal, fetchWinners, cnpj);
+
+  if (
+    result.errors.length === 0 ||
+    depth >= MAX_RANGE_SPLIT_DEPTH ||
+    !result.errors.every(isRetryableFetchError)
+  ) {
+    return result;
+  }
+
+  const ranges = splitDateRange(dataInicial, dataFinal);
+  if (!ranges) {
+    return result;
+  }
+
+  const [leftRange, rightRange] = ranges;
+  console.warn(
+    `PNCP range split for modalidade ${modalidade}: ${dataInicial}-${dataFinal} -> ${leftRange.dataInicial}-${leftRange.dataFinal} and ${rightRange.dataInicial}-${rightRange.dataFinal}`
+  );
+
+  const leftResult = await fetchRangeResilient(
+    supabase,
+    modalidade,
+    leftRange.dataInicial,
+    leftRange.dataFinal,
+    fetchWinners,
+    cnpj,
+    depth + 1
+  );
+  const rightResult = await fetchRangeResilient(
+    supabase,
+    modalidade,
+    rightRange.dataInicial,
+    rightRange.dataFinal,
+    fetchWinners,
+    cnpj,
+    depth + 1
+  );
+
+  return mergeFetchResults([leftResult, rightResult]);
 }
 
 /**
@@ -319,7 +430,7 @@ async function handleCron(supabase: any) {
 
   for (const mod of MODALIDADES) {
     console.log(`Cron: Mod ${mod} ${startStr} → ${endStr}`);
-    const result = await fetchAllPages(supabase, mod, startStr, endStr, true);
+    const result = await fetchRangeResilient(supabase, mod, startStr, endStr, true);
     totalIngested += result.total;
     totalWinners += result.winners;
     errors.push(...result.errors);
@@ -469,7 +580,7 @@ async function handleBulkBackfill(supabase: any, body: any) {
   if (monthEnd > backfillEnd) monthEnd = backfillEnd;
 
   console.log(`Backfill: Mod ${targetMod} ${startDate} → ${monthEnd}`);
-  const result = await fetchAllPages(supabase, targetMod, startDate, monthEnd, false);
+  const result = await fetchRangeResilient(supabase, targetMod, startDate, monthEnd, false);
   console.log(`Backfill: Mod ${targetMod} done: ${result.total} records, ${result.errors.length} errors`);
 
   const prevTotal = backfillMap[targetMod]?.synced || 0;
@@ -555,7 +666,7 @@ async function handleGapFill(supabase: any) {
     if (daysBehind > 2) {
       const gapStart = addDays(lastDateFmt, 1);
       console.log(`Gap-fill: ${modName} (mod ${modId}) last data: ${lastDate}, ${daysBehind} days behind. Fetching ${gapStart} → ${endStr}`);
-      const result = await fetchAllPages(supabase, parseInt(modId), gapStart, endStr, true);
+      const result = await fetchRangeResilient(supabase, parseInt(modId), gapStart, endStr, true);
       totalFilled += result.total;
       fillErrors.push(...result.errors);
       console.log(`Gap-fill: ${modName} filled ${result.total} records`);
@@ -626,7 +737,7 @@ async function handleOrgao(supabase: any, body: any) {
   console.log(`Fetching all licitações for CNPJ ${orgaoCnpj} from ${dataInicial} to ${today}`);
 
   for (const mod of MODALIDADES) {
-    const result = await fetchAllPages(supabase, mod, dataInicial, today, true, orgaoCnpj);
+    const result = await fetchRangeResilient(supabase, mod, dataInicial, today, true, orgaoCnpj);
     totalIngested += result.total;
     totalWinners += result.winners;
     allErrors.push(...result.errors);
@@ -690,7 +801,7 @@ async function handleIngest(supabase: any, body: any) {
   if (monthEnd > dataFinal) monthEnd = dataFinal;
 
   console.log(`Ingest: Mod ${modalidade} ${startDate} → ${monthEnd}`);
-  const result = await fetchAllPages(supabase, modalidade, startDate, monthEnd, false);
+  const result = await fetchRangeResilient(supabase, modalidade, startDate, monthEnd, false);
 
   const hasMore = monthEnd < dataFinal;
 
