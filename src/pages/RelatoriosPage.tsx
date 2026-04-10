@@ -13,6 +13,8 @@ import { FileDown, FileSpreadsheet, Play, X, Database, Filter, Columns3, Search,
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 
+const EXPORT_BATCH = 1000;
+
 type TableConfig = {
   name: string;
   label: string;
