@@ -608,11 +608,11 @@ export default function RelatoriosPage() {
                 </div>
                 {data?.rows?.length ? (
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={exportCSV}>
-                      <FileDown className="h-4 w-4 mr-1" /> CSV
+                    <Button variant="outline" size="sm" onClick={exportCSV} disabled={exporting}>
+                      {exporting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileDown className="h-4 w-4 mr-1" />} CSV
                     </Button>
-                    <Button variant="outline" size="sm" onClick={exportXLSX}>
-                      <FileSpreadsheet className="h-4 w-4 mr-1" /> XLSX
+                    <Button variant="outline" size="sm" onClick={exportXLSX} disabled={exporting}>
+                      {exporting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileSpreadsheet className="h-4 w-4 mr-1" />} XLSX
                     </Button>
                   </div>
                 ) : null}
