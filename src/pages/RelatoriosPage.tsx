@@ -13,6 +13,8 @@ import { FileDown, FileSpreadsheet, Play, X, Database, Filter, Columns3, Search,
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 
+const EXPORT_BATCH = 1000;
+
 type TableConfig = {
   name: string;
   label: string;
@@ -340,9 +342,51 @@ export default function RelatoriosPage() {
     return String(value);
   }
 
-  function getExportRows() {
-    if (!data?.rows?.length) return [];
-    return data.rows.map((row) => {
+  const [exporting, setExporting] = useState(false);
+
+  async function fetchAllRows(): Promise<Record<string, any>[]> {
+    if (!querySnap || !snapTableConfig) return [];
+    const selectCols = querySnap.columns.length > 0 ? querySnap.columns.join(",") : "*";
+    let allRows: Record<string, any>[] = [];
+    let from = 0;
+
+    while (true) {
+      let query = supabase
+        .from(snapTableConfig.name as any)
+        .select(selectCols);
+
+      for (const f of querySnap.filters) {
+        if (!f.column || !f.value) continue;
+        switch (f.operator) {
+          case "Contém": query = query.ilike(f.column, `%${f.value}%`); break;
+          case "Igual a": query = query.eq(f.column, f.value); break;
+          case "Começa com": query = query.ilike(f.column, `${f.value}%`); break;
+          case "Não contém": query = query.not(f.column, "ilike", `%${f.value}%`); break;
+          case "Maior que": query = query.gt(f.column, f.value); break;
+          case "Menor que": query = query.lt(f.column, f.value); break;
+          case "Depois de": query = query.gte(f.column, f.value); break;
+          case "Antes de": query = query.lte(f.column, f.value); break;
+        }
+      }
+
+      if (querySnap.orderBy) {
+        query = query.order(querySnap.orderBy, { ascending: querySnap.orderDir === "asc" });
+      }
+
+      query = query.range(from, from + EXPORT_BATCH - 1);
+      const { data: rows, error } = await query;
+      if (error) throw error;
+      if (!rows || rows.length === 0) break;
+      allRows = allRows.concat(rows as Record<string, any>[]);
+      if (rows.length < EXPORT_BATCH) break;
+      from += EXPORT_BATCH;
+    }
+
+    return allRows;
+  }
+
+  function rowsToExportFormat(rows: Record<string, any>[]) {
+    return rows.map((row) => {
       const obj: Record<string, any> = {};
       for (const col of visibleColumns) {
         obj[col.label] = row[col.key] ?? "";
@@ -351,35 +395,52 @@ export default function RelatoriosPage() {
     });
   }
 
-  function exportCSV() {
-    const rows = getExportRows();
-    if (!rows.length || !snapTableConfig) return;
-    const cols = visibleColumns;
-    const header = cols.map((c) => c.label).join(";");
-    const lines = data!.rows.map((row) =>
-      cols.map((c) => {
-        const v = row[c.key];
-        if (v === null || v === undefined) return "";
-        const s = String(v);
-        return s.includes(";") ? `"${s}"` : s;
-      }).join(";")
-    );
-    const csv = [header, ...lines].join("\n");
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-    downloadBlob(blob, `relatorio_${snapTableConfig.name}_${today()}.csv`);
-    toast.success("CSV exportado!");
+  async function exportCSV() {
+    if (!snapTableConfig) return;
+    setExporting(true);
+    try {
+      const allRows = await fetchAllRows();
+      if (!allRows.length) { toast.error("Nenhum dado para exportar"); return; }
+      const cols = visibleColumns;
+      const header = cols.map((c) => c.label).join(";");
+      const lines = allRows.map((row) =>
+        cols.map((c) => {
+          const v = row[c.key];
+          if (v === null || v === undefined) return "";
+          const s = String(v);
+          return s.includes(";") ? `"${s}"` : s;
+        }).join(";")
+      );
+      const csv = [header, ...lines].join("\n");
+      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+      downloadBlob(blob, `relatorio_${snapTableConfig.name}_${today()}.csv`);
+      toast.success(`CSV exportado com ${allRows.length} registros!`);
+    } catch (e: any) {
+      toast.error("Erro ao exportar: " + (e.message || e));
+    } finally {
+      setExporting(false);
+    }
   }
 
-  function exportXLSX() {
-    const rows = getExportRows();
-    if (!rows.length || !snapTableConfig) return;
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, snapTableConfig.label.slice(0, 31));
-    const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    downloadBlob(blob, `relatorio_${snapTableConfig.name}_${today()}.xlsx`);
-    toast.success("XLSX exportado!");
+  async function exportXLSX() {
+    if (!snapTableConfig) return;
+    setExporting(true);
+    try {
+      const allRows = await fetchAllRows();
+      if (!allRows.length) { toast.error("Nenhum dado para exportar"); return; }
+      const formatted = rowsToExportFormat(allRows);
+      const ws = XLSX.utils.json_to_sheet(formatted);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, snapTableConfig.label.slice(0, 31));
+      const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+      const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      downloadBlob(blob, `relatorio_${snapTableConfig.name}_${today()}.xlsx`);
+      toast.success(`XLSX exportado com ${allRows.length} registros!`);
+    } catch (e: any) {
+      toast.error("Erro ao exportar: " + (e.message || e));
+    } finally {
+      setExporting(false);
+    }
   }
 
   return (
@@ -547,11 +608,11 @@ export default function RelatoriosPage() {
                 </div>
                 {data?.rows?.length ? (
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={exportCSV}>
-                      <FileDown className="h-4 w-4 mr-1" /> CSV
+                    <Button variant="outline" size="sm" onClick={exportCSV} disabled={exporting}>
+                      {exporting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileDown className="h-4 w-4 mr-1" />} CSV
                     </Button>
-                    <Button variant="outline" size="sm" onClick={exportXLSX}>
-                      <FileSpreadsheet className="h-4 w-4 mr-1" /> XLSX
+                    <Button variant="outline" size="sm" onClick={exportXLSX} disabled={exporting}>
+                      {exporting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileSpreadsheet className="h-4 w-4 mr-1" />} XLSX
                     </Button>
                   </div>
                 ) : null}
