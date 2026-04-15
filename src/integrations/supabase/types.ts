@@ -634,6 +634,20 @@ export type Database = {
           total_orgaos: number
         }[]
       }
+      check_vencedores_sancionados: {
+        Args: { p_limit?: number }
+        Returns: {
+          cnpj: string
+          data_fim: string
+          data_inicio: string
+          orgao_sancionador: string
+          razao_social: string
+          tipo_cadastro: string
+          tipo_sancao: string
+          total_valor: number
+          total_vitorias: number
+        }[]
+      }
       get_distinct_situacoes: {
         Args: never
         Returns: {
