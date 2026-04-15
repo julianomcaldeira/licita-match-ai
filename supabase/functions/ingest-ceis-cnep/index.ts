@@ -8,6 +8,7 @@ const corsHeaders = {
 };
 
 const API_BASE = "https://api.portaldatransparencia.gov.br/api-de-dados";
+const MAX_PAGES_PER_RUN = 80; // Stay under Edge Function timeout
 
 async function fetchWithRetry(url: string, apiKey: string, retries = 3): Promise<Response> {
   for (let i = 0; i < retries; i++) {
@@ -32,75 +33,83 @@ async function fetchWithRetry(url: string, apiKey: string, retries = 3): Promise
   throw new Error("Max retries");
 }
 
-/** Convert DD/MM/YYYY to YYYY-MM-DD, return null on bad input */
 function parseDateBR(d: string | null | undefined): string | null {
   if (!d) return null;
   const m = d.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
   if (m) return `${m[3]}-${m[2]}-${m[1]}`;
-  // Already ISO?
   if (/^\d{4}-\d{2}-\d{2}/.test(d)) return d.slice(0, 10);
   return null;
 }
 
-async function ingestCadastro(
-  supabase: any,
-  apiKey: string,
-  tipo: "ceis" | "cnep",
-): Promise<{ total: number; errors: string[] }> {
-  let pagina = 1;
+function fmtDateBR(d: Date): string {
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+}
+
+function mapItem(item: any, tipo: string) {
+  return {
+    id_origem: String(item.id || `${tipo}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`),
+    cnpj_cpf: ((item.cpfCnpjSancionado || item.sancionado?.codigoFormatado || item.sancionado?.cpfCnpj || "").replace(/[.\-\/]/g, "")) || null,
+    nome: item.sancionado?.nome || item.nomeFantasia || item.razaoSocial || "Não informado",
+    tipo_cadastro: tipo.toUpperCase(),
+    tipo_sancao: item.tipoSancao?.descricaoResumida || item.tipoSancao?.descricao || null,
+    orgao_sancionador: item.orgaoSancionador?.nome || null,
+    uf_orgao: item.orgaoSancionador?.siglaUf || null,
+    data_inicio: parseDateBR(item.dataInicioSancao),
+    data_fim: parseDateBR(item.dataFimSancao),
+    fundamentacao_legal: item.fundamentacaoLegal || item.fundamentacao?.descricao || null,
+    fonte: "PORTAL_TRANSPARENCIA",
+    raw_json: item,
+  };
+}
+
+/**
+ * Single-window ingestion: fetches one date range for one cadastro type.
+ * Returns early if we hit MAX_PAGES_PER_RUN to avoid timeouts.
+ */
+async function ingestWindow(
+  supabase: any, apiKey: string, tipo: string,
+  dataInicial: string, dataFinal: string,
+): Promise<{ total: number; errors: string[]; exhausted: boolean }> {
   let total = 0;
   const errors: string[] = [];
-  const endpoint = tipo === "ceis" ? "ceis" : "cnep";
+  let pagina = 1;
 
-  while (true) {
+  while (pagina <= MAX_PAGES_PER_RUN) {
     try {
-      const url = `${API_BASE}/${endpoint}?pagina=${pagina}`;
-      console.log(`Fetching ${tipo.toUpperCase()} page ${pagina}`);
+      const url = `${API_BASE}/${tipo}?dataInicial=${encodeURIComponent(dataInicial)}&dataFinal=${encodeURIComponent(dataFinal)}&pagina=${pagina}`;
+      console.log(`${tipo.toUpperCase()} ${dataInicial}-${dataFinal} p${pagina}`);
       const resp = await fetchWithRetry(url, apiKey);
 
       if (!resp.ok) {
         const txt = await resp.text();
-        errors.push(`${tipo} p${pagina}: HTTP ${resp.status} - ${txt.slice(0, 100)}`);
+        if (resp.status === 404 || resp.status === 400) break;
+        errors.push(`p${pagina}: HTTP ${resp.status}`);
         break;
       }
 
       const items = await resp.json();
-      if (!Array.isArray(items) || items.length === 0) break;
+      if (!Array.isArray(items) || items.length === 0) return { total, errors, exhausted: true };
 
-      const rows = items.map((item: any) => ({
-        id_origem: String(item.id || item.codigoSancao || `${tipo}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`),
-        cnpj_cpf: ((item.cpfCnpj || item.sancionado?.codigoFormatado || item.sancionado?.cpfCnpj || "").replace(/[.\-\/]/g, "")) || null,
-        nome: item.sancionado?.nome || item.nomeFantasia || item.razaoSocial || "Não informado",
-        tipo_cadastro: tipo.toUpperCase(),
-        tipo_sancao: item.tipoSancao?.descricaoResumida || item.tipoSancao?.descricao || null,
-        orgao_sancionador: item.orgaoSancionador?.nome || null,
-        uf_orgao: item.orgaoSancionador?.siglaUf || null,
-        data_inicio: parseDateBR(item.dataInicioSancao),
-        data_fim: parseDateBR(item.dataFimSancao),
-        fundamentacao_legal: item.fundamentacaoLegal || item.fundamentacao?.descricao || null,
-        fonte: "PORTAL_TRANSPARENCIA",
-        raw_json: item,
-      }));
-
+      const rows = items.map((item: any) => mapItem(item, tipo));
       for (let i = 0; i < rows.length; i += 100) {
         const batch = rows.slice(i, i + 100);
         const { error } = await supabase
           .from("empresas_sancionadas")
           .upsert(batch, { onConflict: "id_origem,tipo_cadastro" });
-        if (error) errors.push(`${tipo} p${pagina}: ${error.message}`);
+        if (error) errors.push(`p${pagina}: ${error.message}`);
         else total += batch.length;
       }
 
-      if (items.length < 500) break; // Last page
+      if (items.length < 15) return { total, errors, exhausted: true };
       pagina++;
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 200));
     } catch (e) {
-      errors.push(`${tipo} p${pagina}: ${e instanceof Error ? e.message : "unknown"}`);
+      errors.push(`p${pagina}: ${e instanceof Error ? e.message : "unknown"}`);
       break;
     }
   }
 
-  return { total, errors };
+  return { total, errors, exhausted: pagina <= MAX_PAGES_PER_RUN };
 }
 
 serve(async (req) => {
@@ -122,31 +131,33 @@ serve(async (req) => {
   );
 
   const body = await req.json().catch(() => ({}));
-  const tipo = body.tipo || "both"; // "ceis", "cnep", or "both"
+  const tipo: string = body.tipo || "ceis"; // "ceis" or "cnep"
+  // Date range in DD/MM/YYYY format
+  const dataInicial: string = body.dataInicial || fmtDateBR((() => { const d = new Date(); d.setMonth(d.getMonth() - 3); return d; })());
+  const dataFinal: string = body.dataFinal || fmtDateBR(new Date());
 
   try {
-    const results: Record<string, any> = {};
-
-    if (tipo === "ceis" || tipo === "both") {
-      results.ceis = await ingestCadastro(supabase, apiKey, "ceis");
-    }
-    if (tipo === "cnep" || tipo === "both") {
-      results.cnep = await ingestCadastro(supabase, apiKey, "cnep");
-    }
-
-    const totalProcessed = (results.ceis?.total || 0) + (results.cnep?.total || 0);
-    const allErrors = [...(results.ceis?.errors || []), ...(results.cnep?.errors || [])];
+    const result = await ingestWindow(supabase, apiKey, tipo, dataInicial, dataFinal);
 
     await supabase.from("ingestao_logs").insert({
       fonte: "PORTAL_TRANSPARENCIA",
-      endpoint: `ceis-cnep/${tipo}`,
-      status: allErrors.length > 0 ? "parcial" : "sucesso",
-      registros_processados: totalProcessed,
-      erro: allErrors.length > 0 ? allErrors.join("; ").slice(0, 1000) : null,
+      endpoint: `${tipo}/${dataInicial}-${dataFinal}`,
+      status: result.errors.length > 0 ? "parcial" : "sucesso",
+      registros_processados: result.total,
+      data_inicio: dataInicial,
+      data_fim: dataFinal,
+      erro: result.errors.length > 0 ? result.errors.join("; ").slice(0, 1000) : null,
     });
 
     return new Response(
-      JSON.stringify({ success: true, totalProcessed, results }),
+      JSON.stringify({
+        success: true,
+        tipo,
+        window: `${dataInicial} → ${dataFinal}`,
+        totalProcessed: result.total,
+        exhausted: result.exhausted,
+        errors: result.errors.length,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {
