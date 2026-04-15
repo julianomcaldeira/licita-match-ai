@@ -117,6 +117,37 @@ const TABLES: TableConfig[] = [
       { key: "justificativa_tecnica", label: "Justificativa", type: "text" },
     ],
   },
+  {
+    name: "empresas_sancionadas",
+    label: "Empresas Sancionadas (CEIS/CNEP)",
+    columns: [
+      { key: "id", label: "ID", type: "text" },
+      { key: "cnpj_cpf", label: "CNPJ/CPF", type: "text" },
+      { key: "nome", label: "Nome", type: "text" },
+      { key: "tipo_cadastro", label: "Cadastro (CEIS/CNEP)", type: "text" },
+      { key: "tipo_sancao", label: "Tipo Sanção", type: "text" },
+      { key: "orgao_sancionador", label: "Órgão Sancionador", type: "text" },
+      { key: "uf_orgao", label: "UF", type: "text" },
+      { key: "data_inicio", label: "Data Início", type: "date" },
+      { key: "data_fim", label: "Data Fim", type: "date" },
+      { key: "fundamentacao_legal", label: "Fundamentação Legal", type: "text" },
+    ],
+  },
+  {
+    name: "diarios_oficiais",
+    label: "Diários Oficiais",
+    columns: [
+      { key: "id", label: "ID", type: "text" },
+      { key: "territory_id", label: "Cód. Município", type: "text" },
+      { key: "territory_name", label: "Município", type: "text" },
+      { key: "state_code", label: "UF", type: "text" },
+      { key: "publication_date", label: "Data Publicação", type: "date" },
+      { key: "excerpt", label: "Trecho", type: "text" },
+      { key: "query_matched", label: "Termo Buscado", type: "text" },
+      { key: "url", label: "URL", type: "text" },
+      { key: "is_extra_edition", label: "Edição Extra", type: "text" },
+    ],
+  },
 ];
 
 type FilterRule = {
