@@ -215,16 +215,24 @@ export default function LicitacoesPage() {
   }>({ orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd"), tab: "abertas" });
 
   const handleSearch = () => {
+    const hasWinnerFilter = !!filterVencedor.trim();
+    const nextTab = hasWinnerFilter ? "encerradas" : activeTab;
+    const nextSituacao = hasWinnerFilter ? "" : filterSituacao;
+
     setPage(0);
+    if (hasWinnerFilter) {
+      setActiveTab("encerradas");
+      setFilterSituacao("");
+    }
     setAppliedFilters({
       orgao: filterOrgao.trim(),
       search: filterSearch.trim(),
       dateFrom: filterDateFrom ? format(filterDateFrom, "yyyy-MM-dd") : undefined,
       dateTo: filterDateTo ? format(filterDateTo, "yyyy-MM-dd") : undefined,
       uf: filterUf || undefined,
-      situacao: filterSituacao || undefined,
+      situacao: nextSituacao || undefined,
       vencedor: filterVencedor.trim() || undefined,
-      tab: activeTab,
+      tab: nextTab,
     });
   };
 
@@ -258,10 +266,12 @@ export default function LicitacoesPage() {
   const hasActiveFilters = appliedFilters.orgao || appliedFilters.search || appliedFilters.dateFrom || appliedFilters.dateTo || appliedFilters.uf || appliedFilters.situacao || appliedFilters.vencedor;
 
   const searchByWinner = (name: string) => {
+    setActiveTab("encerradas");
+    setFilterSituacao("");
     setFilterVencedor(name);
     setDetailOpen(false);
     setPage(0);
-    setAppliedFilters((prev) => ({ ...prev, vencedor: name }));
+    setAppliedFilters((prev) => ({ ...prev, vencedor: name, situacao: undefined, tab: "encerradas" }));
   };
 
   // Detail modal state
@@ -323,7 +333,7 @@ export default function LicitacoesPage() {
     }
   };
 
-  const isAbertas = appliedFilters.tab === "abertas";
+  const isAbertas = appliedFilters.vencedor ? false : appliedFilters.tab === "abertas";
   const useRpc = !!(appliedFilters.vencedor || appliedFilters.search);
 
   const { data: queryResult, isLoading, isFetching, isError, error: queryError, refetch } = useQuery({
@@ -918,12 +928,16 @@ export default function LicitacoesPage() {
               variant="outline"
               className="mt-4"
               onClick={() => {
-                setFilterDateFrom(defaultDateFrom);
+                setActiveTab("encerradas");
+                setFilterSituacao("");
+                setFilterDateFrom(undefined);
                 setFilterDateTo(undefined);
                 setPage(0);
                 setAppliedFilters((prev) => ({
                   ...prev,
-                  dateFrom: format(defaultDateFrom, "yyyy-MM-dd"),
+                  situacao: undefined,
+                  tab: "encerradas",
+                  dateFrom: undefined,
                   dateTo: undefined,
                 }));
               }}
