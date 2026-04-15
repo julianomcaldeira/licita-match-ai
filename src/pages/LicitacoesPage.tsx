@@ -214,6 +214,17 @@ export default function LicitacoesPage() {
     orgao: string; search: string; dateFrom?: string; dateTo?: string; uf?: string; situacao?: string; vencedor?: string; tab: "abertas" | "encerradas";
   }>({ orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd"), tab: "abertas" });
 
+  const activateWinnerMode = () => {
+    setActiveTab("encerradas");
+    setFilterSituacao("");
+  };
+
+  const handleWinnerFilterChange = (value: string) => {
+    const nextValue = value.trim();
+    setFilterVencedor(value);
+    if (nextValue) activateWinnerMode();
+  };
+
   const handleSearch = () => {
     const hasWinnerFilter = !!filterVencedor.trim();
     const nextTab = hasWinnerFilter ? "encerradas" : activeTab;
@@ -221,8 +232,7 @@ export default function LicitacoesPage() {
 
     setPage(0);
     if (hasWinnerFilter) {
-      setActiveTab("encerradas");
-      setFilterSituacao("");
+      activateWinnerMode();
     }
     setAppliedFilters({
       orgao: filterOrgao.trim(),
@@ -266,8 +276,7 @@ export default function LicitacoesPage() {
   const hasActiveFilters = appliedFilters.orgao || appliedFilters.search || appliedFilters.dateFrom || appliedFilters.dateTo || appliedFilters.uf || appliedFilters.situacao || appliedFilters.vencedor;
 
   const searchByWinner = (name: string) => {
-    setActiveTab("encerradas");
-    setFilterSituacao("");
+    activateWinnerMode();
     setFilterVencedor(name);
     setDetailOpen(false);
     setPage(0);
@@ -813,7 +822,7 @@ export default function LicitacoesPage() {
                     <label className="text-xs font-medium text-muted-foreground">Vencedor</label>
                     <ComboboxFilter
                       value={filterVencedor}
-                      onChange={setFilterVencedor}
+                      onChange={handleWinnerFilterChange}
                       options={vencedorOptions}
                       placeholder="Selecionar vencedor..."
                       searchPlaceholder="Buscar vencedor..."
@@ -826,7 +835,16 @@ export default function LicitacoesPage() {
                           <Trophy className="h-3 w-3" />
                           {vencedorStats.total} vitória{vencedorStats.total !== 1 ? "s" : ""}
                         </span>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-success/10 border border-success/20 px-2 py-0.5 text-[10px] font-semibold text-success">
+                          <Award className="h-3 w-3" />
+                          Busca em Encerradas / Com Resultado
+                        </span>
                       </div>
+                    )}
+                    {filterVencedor && (
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        Ao pesquisar por vencedor, o sistema consulta automaticamente licitações encerradas com resultado.
+                      </p>
                     )}
                   </div>
                 </div>
