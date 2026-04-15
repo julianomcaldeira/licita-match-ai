@@ -784,37 +784,69 @@ export type Database = {
         }[]
       }
       refresh_all_mvs: { Args: never; Returns: undefined }
-      search_licitacoes: {
-        Args: {
-          p_com_vencedor?: boolean
-          p_date_from?: string
-          p_date_to?: string
-          p_limit?: number
-          p_modalidade?: string
-          p_offset?: number
-          p_orgao?: string
-          p_search?: string
-          p_sem_resultado?: boolean
-          p_situacao?: string
-          p_uf?: string
-          p_vencedor?: string
-        }
-        Returns: {
-          data_publicacao: string
-          id: string
-          modalidade: string
-          municipio: string
-          numero_controle_pncp: string
-          objeto: string
-          orgao: string
-          situacao: string
-          total_count: number
-          uf: string
-          valor_estimado: number
-          valor_homologado: number
-          vencedor_nome: string
-        }[]
-      }
+      search_licitacoes:
+        | {
+            Args: {
+              p_com_vencedor?: boolean
+              p_date_from?: string
+              p_date_to?: string
+              p_limit?: number
+              p_modalidade?: string
+              p_offset?: number
+              p_orgao?: string
+              p_search?: string
+              p_sem_resultado?: boolean
+              p_situacao?: string
+              p_uf?: string
+              p_vencedor?: string
+            }
+            Returns: {
+              data_publicacao: string
+              id: string
+              modalidade: string
+              municipio: string
+              numero_controle_pncp: string
+              objeto: string
+              orgao: string
+              situacao: string
+              total_count: number
+              uf: string
+              valor_estimado: number
+              valor_homologado: number
+              vencedor_nome: string
+            }[]
+          }
+        | {
+            Args: {
+              p_com_vencedor?: boolean
+              p_date_from?: string
+              p_date_to?: string
+              p_limit?: number
+              p_modalidade?: string
+              p_offset?: number
+              p_orgao?: string
+              p_search?: string
+              p_sem_resultado?: boolean
+              p_situacao?: string
+              p_uf?: string
+              p_vencedor?: string
+            }
+            Returns: {
+              data_publicacao: string
+              id: string
+              modalidade: string
+              municipio: string
+              numero_controle_pncp: string
+              objeto: string
+              orgao: string
+              situacao: string
+              total_count: number
+              uf: string
+              valor_estimado: number
+              valor_homologado: number
+              vencedor_nome: string
+            }[]
+          }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
     }
