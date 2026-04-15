@@ -100,6 +100,54 @@ export type Database = {
           },
         ]
       }
+      diarios_oficiais: {
+        Row: {
+          created_at: string
+          excerpt: string | null
+          fonte: string
+          id: string
+          is_extra_edition: boolean | null
+          publication_date: string
+          query_matched: string | null
+          raw_json: Json | null
+          state_code: string | null
+          territory_id: string
+          territory_name: string | null
+          txt_url: string | null
+          url: string | null
+        }
+        Insert: {
+          created_at?: string
+          excerpt?: string | null
+          fonte?: string
+          id?: string
+          is_extra_edition?: boolean | null
+          publication_date: string
+          query_matched?: string | null
+          raw_json?: Json | null
+          state_code?: string | null
+          territory_id: string
+          territory_name?: string | null
+          txt_url?: string | null
+          url?: string | null
+        }
+        Update: {
+          created_at?: string
+          excerpt?: string | null
+          fonte?: string
+          id?: string
+          is_extra_edition?: boolean | null
+          publication_date?: string
+          query_matched?: string | null
+          raw_json?: Json | null
+          state_code?: string | null
+          territory_id?: string
+          territory_name?: string | null
+          txt_url?: string | null
+          url?: string | null
+        }
+        Relationships: []
+      }
       empresas_clientes: {
         Row: {
           cnpj: string | null
@@ -132,6 +180,60 @@ export type Database = {
           palavras_chave?: string[] | null
           prompt_personalizado?: string | null
           segmentos?: string[] | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      empresas_sancionadas: {
+        Row: {
+          cnpj_cpf: string | null
+          created_at: string
+          data_fim: string | null
+          data_inicio: string | null
+          fonte: string
+          fundamentacao_legal: string | null
+          id: string
+          id_origem: string
+          nome: string
+          orgao_sancionador: string | null
+          raw_json: Json | null
+          tipo_cadastro: string
+          tipo_sancao: string | null
+          uf_orgao: string | null
+          updated_at: string
+        }
+        Insert: {
+          cnpj_cpf?: string | null
+          created_at?: string
+          data_fim?: string | null
+          data_inicio?: string | null
+          fonte?: string
+          fundamentacao_legal?: string | null
+          id?: string
+          id_origem: string
+          nome: string
+          orgao_sancionador?: string | null
+          raw_json?: Json | null
+          tipo_cadastro: string
+          tipo_sancao?: string | null
+          uf_orgao?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cnpj_cpf?: string | null
+          created_at?: string
+          data_fim?: string | null
+          data_inicio?: string | null
+          fonte?: string
+          fundamentacao_legal?: string | null
+          id?: string
+          id_origem?: string
+          nome?: string
+          orgao_sancionador?: string | null
+          raw_json?: Json | null
+          tipo_cadastro?: string
+          tipo_sancao?: string | null
+          uf_orgao?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -637,6 +739,7 @@ export type Database = {
           valor_estimado: number
         }[]
       }
+      refresh_all_mvs: { Args: never; Returns: undefined }
       search_licitacoes: {
         Args: {
           p_com_vencedor?: boolean
