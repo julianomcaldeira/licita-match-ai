@@ -8,6 +8,7 @@ const corsHeaders = {
 };
 
 const API_BASE = "https://api.portaldatransparencia.gov.br/api-de-dados";
+const MAX_PAGES_PER_RUN = 80; // Stay under Edge Function timeout
 
 async function fetchWithRetry(url: string, apiKey: string, retries = 3): Promise<Response> {
   for (let i = 0; i < retries; i++) {
@@ -32,7 +33,6 @@ async function fetchWithRetry(url: string, apiKey: string, retries = 3): Promise
   throw new Error("Max retries");
 }
 
-/** Convert DD/MM/YYYY to YYYY-MM-DD, return null on bad input */
 function parseDateBR(d: string | null | undefined): string | null {
   if (!d) return null;
   const m = d.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
@@ -41,14 +41,13 @@ function parseDateBR(d: string | null | undefined): string | null {
   return null;
 }
 
-/** Format Date to DD/MM/YYYY for the Portal da Transparência API */
 function fmtDateBR(d: Date): string {
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 }
 
 function mapItem(item: any, tipo: string) {
   return {
-    id_origem: String(item.id || item.codigoSancao || `${tipo}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`),
+    id_origem: String(item.id || `${tipo}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`),
     cnpj_cpf: ((item.cpfCnpjSancionado || item.sancionado?.codigoFormatado || item.sancionado?.cpfCnpj || "").replace(/[.\-\/]/g, "")) || null,
     nome: item.sancionado?.nome || item.nomeFantasia || item.razaoSocial || "Não informado",
     tipo_cadastro: tipo.toUpperCase(),
@@ -64,79 +63,53 @@ function mapItem(item: any, tipo: string) {
 }
 
 /**
- * Ingest CEIS or CNEP using windowed date ranges to get ALL records.
- * The API requires period filters and returns max ~15 records per page.
- * We iterate month by month from startYear to today to cover everything.
+ * Single-window ingestion: fetches one date range for one cadastro type.
+ * Returns early if we hit MAX_PAGES_PER_RUN to avoid timeouts.
  */
-async function ingestCadastroByPeriod(
-  supabase: any,
-  apiKey: string,
-  tipo: "ceis" | "cnep",
-  startYear: number,
-): Promise<{ total: number; errors: string[] }> {
+async function ingestWindow(
+  supabase: any, apiKey: string, tipo: string,
+  dataInicial: string, dataFinal: string,
+): Promise<{ total: number; errors: string[]; exhausted: boolean }> {
   let total = 0;
   const errors: string[] = [];
+  let pagina = 1;
 
-  const now = new Date();
-  let current = new Date(startYear, 0, 1); // Jan 1 of startYear
+  while (pagina <= MAX_PAGES_PER_RUN) {
+    try {
+      const url = `${API_BASE}/${tipo}?dataInicial=${encodeURIComponent(dataInicial)}&dataFinal=${encodeURIComponent(dataFinal)}&pagina=${pagina}`;
+      console.log(`${tipo.toUpperCase()} ${dataInicial}-${dataFinal} p${pagina}`);
+      const resp = await fetchWithRetry(url, apiKey);
 
-  while (current <= now) {
-    const windowStart = new Date(current);
-    // 6-month windows to stay within API limits
-    const windowEnd = new Date(current);
-    windowEnd.setMonth(windowEnd.getMonth() + 6);
-    windowEnd.setDate(windowEnd.getDate() - 1);
-    if (windowEnd > now) {
-      windowEnd.setTime(now.getTime());
-    }
-
-    const dataInicial = fmtDateBR(windowStart);
-    const dataFinal = fmtDateBR(windowEnd);
-
-    let pagina = 1;
-    while (true) {
-      try {
-        const url = `${API_BASE}/${tipo}?dataInicial=${encodeURIComponent(dataInicial)}&dataFinal=${encodeURIComponent(dataFinal)}&pagina=${pagina}`;
-        console.log(`Fetching ${tipo.toUpperCase()} ${dataInicial}-${dataFinal} page ${pagina}`);
-        const resp = await fetchWithRetry(url, apiKey);
-
-        if (!resp.ok) {
-          const txt = await resp.text();
-          if (resp.status === 404 || resp.status === 400) break;
-          errors.push(`${tipo} ${dataInicial} p${pagina}: HTTP ${resp.status} - ${txt.slice(0, 100)}`);
-          break;
-        }
-
-        const items = await resp.json();
-        if (!Array.isArray(items) || items.length === 0) break;
-
-        const rows = items.map((item: any) => mapItem(item, tipo));
-
-        for (let i = 0; i < rows.length; i += 100) {
-          const batch = rows.slice(i, i + 100);
-          const { error } = await supabase
-            .from("empresas_sancionadas")
-            .upsert(batch, { onConflict: "id_origem,tipo_cadastro" });
-          if (error) errors.push(`${tipo} ${dataInicial} p${pagina}: ${error.message}`);
-          else total += batch.length;
-        }
-
-        // If less than 15 items, we've exhausted this window
-        if (items.length < 15) break;
-        pagina++;
-        await new Promise(r => setTimeout(r, 300));
-      } catch (e) {
-        errors.push(`${tipo} ${dataInicial} p${pagina}: ${e instanceof Error ? e.message : "unknown"}`);
+      if (!resp.ok) {
+        const txt = await resp.text();
+        if (resp.status === 404 || resp.status === 400) break;
+        errors.push(`p${pagina}: HTTP ${resp.status}`);
         break;
       }
-    }
 
-    // Move to next window
-    current.setMonth(current.getMonth() + 6);
-    await new Promise(r => setTimeout(r, 200));
+      const items = await resp.json();
+      if (!Array.isArray(items) || items.length === 0) return { total, errors, exhausted: true };
+
+      const rows = items.map((item: any) => mapItem(item, tipo));
+      for (let i = 0; i < rows.length; i += 100) {
+        const batch = rows.slice(i, i + 100);
+        const { error } = await supabase
+          .from("empresas_sancionadas")
+          .upsert(batch, { onConflict: "id_origem,tipo_cadastro" });
+        if (error) errors.push(`p${pagina}: ${error.message}`);
+        else total += batch.length;
+      }
+
+      if (items.length < 15) return { total, errors, exhausted: true };
+      pagina++;
+      await new Promise(r => setTimeout(r, 200));
+    } catch (e) {
+      errors.push(`p${pagina}: ${e instanceof Error ? e.message : "unknown"}`);
+      break;
+    }
   }
 
-  return { total, errors };
+  return { total, errors, exhausted: pagina <= MAX_PAGES_PER_RUN };
 }
 
 serve(async (req) => {
@@ -158,33 +131,33 @@ serve(async (req) => {
   );
 
   const body = await req.json().catch(() => ({}));
-  const tipo = body.tipo || "both"; // "ceis", "cnep", or "both"
-  // Start year for historical ingestion (CEIS has data since 1988, CNEP since 2016)
-  const startYear = body.startYear || 2020;
+  const tipo: string = body.tipo || "ceis"; // "ceis" or "cnep"
+  // Date range in DD/MM/YYYY format
+  const dataInicial: string = body.dataInicial || fmtDateBR((() => { const d = new Date(); d.setMonth(d.getMonth() - 3); return d; })());
+  const dataFinal: string = body.dataFinal || fmtDateBR(new Date());
 
   try {
-    const results: Record<string, any> = {};
-
-    if (tipo === "ceis" || tipo === "both") {
-      results.ceis = await ingestCadastroByPeriod(supabase, apiKey, "ceis", tipo === "both" ? startYear : (body.startYear || 2020));
-    }
-    if (tipo === "cnep" || tipo === "both") {
-      results.cnep = await ingestCadastroByPeriod(supabase, apiKey, "cnep", tipo === "both" ? Math.max(startYear, 2016) : (body.startYear || 2020));
-    }
-
-    const totalProcessed = (results.ceis?.total || 0) + (results.cnep?.total || 0);
-    const allErrors = [...(results.ceis?.errors || []), ...(results.cnep?.errors || [])];
+    const result = await ingestWindow(supabase, apiKey, tipo, dataInicial, dataFinal);
 
     await supabase.from("ingestao_logs").insert({
       fonte: "PORTAL_TRANSPARENCIA",
-      endpoint: `ceis-cnep/${tipo}/from-${startYear}`,
-      status: allErrors.length > 0 ? "parcial" : "sucesso",
-      registros_processados: totalProcessed,
-      erro: allErrors.length > 0 ? allErrors.join("; ").slice(0, 1000) : null,
+      endpoint: `${tipo}/${dataInicial}-${dataFinal}`,
+      status: result.errors.length > 0 ? "parcial" : "sucesso",
+      registros_processados: result.total,
+      data_inicio: dataInicial,
+      data_fim: dataFinal,
+      erro: result.errors.length > 0 ? result.errors.join("; ").slice(0, 1000) : null,
     });
 
     return new Response(
-      JSON.stringify({ success: true, totalProcessed, results }),
+      JSON.stringify({
+        success: true,
+        tipo,
+        window: `${dataInicial} → ${dataFinal}`,
+        totalProcessed: result.total,
+        exhausted: result.exhausted,
+        errors: result.errors.length,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {
