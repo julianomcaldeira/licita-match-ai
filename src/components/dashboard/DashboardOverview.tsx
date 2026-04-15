@@ -8,6 +8,7 @@ import {
   Database, Target, AlertTriangle, CheckCircle2, Clock, Star, Trophy, MapPin,
 } from "lucide-react";
 import heroBanner from "@/assets/hero-banner.jpg";
+import SancionadosAlertCard from "./SancionadosAlertCard";
 
 const container = {
   hidden: { opacity: 0 },
