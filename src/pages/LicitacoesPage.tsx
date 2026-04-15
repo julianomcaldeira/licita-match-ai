@@ -823,21 +823,21 @@ export default function LicitacoesPage() {
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Vencedor</label>
-                    <ComboboxFilter
-                      value={filterVencedor}
+                    <label className="text-xs font-medium text-muted-foreground">Vencedor(es)</label>
+                    <ComboboxMultiFilter
+                      values={filterVencedores}
                       onChange={handleWinnerFilterChange}
                       options={vencedorOptions}
-                      placeholder="Selecionar vencedor..."
+                      placeholder="Selecionar vencedores..."
                       searchPlaceholder="Buscar vencedor..."
                       isLoading={vencedoresLoading}
                       onServerSearch={setVencedorSearch}
                     />
-                    {filterVencedor && vencedorStats && (
+                    {filterVencedores.length > 0 && vencedorStats && (
                       <div className="flex items-center gap-2 flex-wrap mt-1">
                         <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-semibold text-primary">
                           <Trophy className="h-3 w-3" />
-                          {vencedorStats.total} vitória{vencedorStats.total !== 1 ? "s" : ""}
+                          {vencedorStats.totalSum} vitória{vencedorStats.totalSum !== 1 ? "s" : ""} ({filterVencedores.length} empresa{filterVencedores.length > 1 ? "s" : ""})
                         </span>
                         <span className="inline-flex items-center gap-1 rounded-full bg-success/10 border border-success/20 px-2 py-0.5 text-[10px] font-semibold text-success">
                           <Award className="h-3 w-3" />
@@ -845,7 +845,7 @@ export default function LicitacoesPage() {
                         </span>
                       </div>
                     )}
-                    {filterVencedor && (
+                    {filterVencedores.length > 0 && (
                       <p className="mt-1 text-[11px] text-muted-foreground">
                         Ao pesquisar por vencedor, o sistema consulta automaticamente licitações encerradas com resultado.
                       </p>
