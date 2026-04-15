@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      api_keys: {
+        Row: {
+          api_key: string
+          client_name: string
+          created_at: string
+          id: string
+          is_active: boolean
+          last_used_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          api_key?: string
+          client_name: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_used_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          api_key?: string
+          client_name?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_used_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       contratos: {
         Row: {
           categoria: string | null
