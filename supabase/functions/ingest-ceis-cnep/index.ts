@@ -69,7 +69,7 @@ async function ingestCadastro(
 
       const rows = items.map((item: any) => ({
         id_origem: String(item.id || item.codigoSancao || `${tipo}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`),
-        cnpj_cpf: (item.cpfCnpj || item.sancionado?.cpfCnpj || "").replace(/[.\-\/]/g, "") || null,
+        cnpj_cpf: ((item.cpfCnpj || item.sancionado?.codigoFormatado || item.sancionado?.cpfCnpj || "").replace(/[.\-\/]/g, "")) || null,
         nome: item.sancionado?.nome || item.nomeFantasia || item.razaoSocial || "Não informado",
         tipo_cadastro: tipo.toUpperCase(),
         tipo_sancao: item.tipoSancao?.descricaoResumida || item.tipoSancao?.descricao || null,
