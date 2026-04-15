@@ -32,6 +32,16 @@ async function fetchWithRetry(url: string, apiKey: string, retries = 3): Promise
   throw new Error("Max retries");
 }
 
+/** Convert DD/MM/YYYY to YYYY-MM-DD, return null on bad input */
+function parseDateBR(d: string | null | undefined): string | null {
+  if (!d) return null;
+  const m = d.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  // Already ISO?
+  if (/^\d{4}-\d{2}-\d{2}/.test(d)) return d.slice(0, 10);
+  return null;
+}
+
 async function ingestCadastro(
   supabase: any,
   apiKey: string,
@@ -65,8 +75,8 @@ async function ingestCadastro(
         tipo_sancao: item.tipoSancao?.descricaoResumida || item.tipoSancao?.descricao || null,
         orgao_sancionador: item.orgaoSancionador?.nome || null,
         uf_orgao: item.orgaoSancionador?.siglaUf || null,
-        data_inicio: item.dataInicioSancao || null,
-        data_fim: item.dataFimSancao || null,
+        data_inicio: parseDateBR(item.dataInicioSancao),
+        data_fim: parseDateBR(item.dataFimSancao),
         fundamentacao_legal: item.fundamentacaoLegal || item.fundamentacao?.descricao || null,
         fonte: "PORTAL_TRANSPARENCIA",
         raw_json: item,

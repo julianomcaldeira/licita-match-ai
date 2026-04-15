@@ -7,7 +7,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const API_BASE = "https://queridodiario.ok.org.br/api";
+const API_BASE = "https://api.queridodiario.ok.org.br";
 
 // Default keywords relevant to licitações
 const DEFAULT_KEYWORDS = [
