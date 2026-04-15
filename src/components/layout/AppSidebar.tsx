@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Activity,
   ShieldAlert,
+  Key,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import logoImg from "@/assets/logo-ipesquisei.png";
@@ -25,6 +26,7 @@ const navigation = [
   { name: "Relatórios", href: "/relatorios", icon: FileText },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
   { name: "Monitor Ingestão", href: "/monitor-ingestao", icon: Activity },
+  { name: "API Pública", href: "/api", icon: Key },
   { name: "Configurações", href: "/configuracoes", icon: Settings },
 ];
 
