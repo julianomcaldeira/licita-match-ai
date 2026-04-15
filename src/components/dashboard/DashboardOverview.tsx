@@ -182,6 +182,9 @@ export default function DashboardOverview() {
         </div>
       </div>
 
+      {/* Sancionados Alert */}
+      <SancionadosAlertCard />
+
       {/* KPI Cards */}
       <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="Licitações c/ Resultado" value={stats?.licitacoesComResultado?.toLocaleString("pt-BR") ?? "—"} icon={Database} subtitle={`${stats?.licitacoes?.toLocaleString("pt-BR") ?? "—"} total na base`} />
