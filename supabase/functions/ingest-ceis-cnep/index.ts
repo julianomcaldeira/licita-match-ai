@@ -8,7 +8,6 @@ const corsHeaders = {
 const API_BASE = "https://api.portaldatransparencia.gov.br/api-de-dados";
 const MAX_PAGES = 100;
 const WINDOW_MONTHS = 6;
-// Both start from 2020
 const START_DATES: Record<string, string> = { ceis: "2020-01-01", cnep: "2020-01-01" };
 
 async function fetchWithRetry(url: string, apiKey: string, retries = 3): Promise<Response> {
@@ -74,9 +73,39 @@ function mapItem(item: any, tipo: string) {
   };
 }
 
+async function authenticateAdmin(req: Request): Promise<{ userId: string } | null> {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) return null;
+
+  const supabaseAuth = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || "",
+    { global: { headers: { Authorization: authHeader } } }
+  );
+
+  const token = authHeader.replace("Bearer ", "");
+  const { data, error } = await supabaseAuth.auth.getClaims(token);
+  if (error || !data?.claims) return null;
+
+  const userId = data.claims.sub as string;
+  const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const { data: roles } = await supabase
+    .from("user_roles").select("role").eq("user_id", userId).eq("role", "admin_central").limit(1);
+
+  if (!roles?.length) return null;
+  return { userId };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Auth + admin check
+  const auth = await authenticateAdmin(req);
+  if (!auth) {
+    return new Response(JSON.stringify({ error: "Não autorizado. Acesso restrito a administradores." }),
+      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
   const apiKey = Deno.env.get("PORTAL_TRANSPARENCIA_API_KEY");
@@ -91,7 +120,6 @@ Deno.serve(async (req) => {
   const syncKey = `sancionadas_${tipo}`;
 
   try {
-    // Determine where we left off
     const { data: syncRow } = await supabase
       .from("sync_status")
       .select("*")
@@ -100,7 +128,7 @@ Deno.serve(async (req) => {
 
     let windowStart: string;
     if (syncRow) {
-      windowStart = addMonths(syncRow.last_date_processed, 0); // continue from last
+      windowStart = addMonths(syncRow.last_date_processed, 0);
     } else {
       windowStart = START_DATES[tipo] || "2003-01-01";
     }
@@ -159,8 +187,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Move cursor forward for next run
-    const nextStart = exhausted ? windowEnd : windowStart; // if not exhausted, retry same window
+    const nextStart = exhausted ? windowEnd : windowStart;
     if (syncRow) {
       await supabase.from("sync_status")
         .update({ last_date_processed: nextStart, total_synced: (syncRow.total_synced || 0) + total, updated_at: new Date().toISOString() })
@@ -174,7 +201,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Log
     await supabase.from("ingestao_logs").insert({
       fonte: "PORTAL_TRANSPARENCIA",
       endpoint: `${tipo.toUpperCase()}/${windowStart}→${windowEnd}`,
