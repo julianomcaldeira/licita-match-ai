@@ -17,3 +17,9 @@ verify_jwt = false
 
 [functions.market-analysis]
 verify_jwt = false
+
+[functions.ingest-ceis-cnep]
+verify_jwt = false
+
+[functions.ingest-querido-diario]
+verify_jwt = false
