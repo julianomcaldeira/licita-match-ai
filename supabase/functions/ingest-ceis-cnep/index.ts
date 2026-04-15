@@ -8,8 +8,8 @@ const corsHeaders = {
 const API_BASE = "https://api.portaldatransparencia.gov.br/api-de-dados";
 const MAX_PAGES = 100;
 const WINDOW_MONTHS = 6;
-// CEIS starts from 2003, CNEP from 2016
-const START_DATES: Record<string, string> = { ceis: "2003-01-01", cnep: "2016-01-01" };
+// Both start from 2020
+const START_DATES: Record<string, string> = { ceis: "2020-01-01", cnep: "2020-01-01" };
 
 async function fetchWithRetry(url: string, apiKey: string, retries = 3): Promise<Response> {
   for (let i = 0; i < retries; i++) {
