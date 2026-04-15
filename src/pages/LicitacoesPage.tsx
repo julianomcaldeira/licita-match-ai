@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import ComboboxFilter from "@/components/ComboboxFilter";
+import ComboboxMultiFilter from "@/components/ComboboxMultiFilter";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
@@ -161,7 +162,7 @@ export default function LicitacoesPage() {
   const [filterDateTo, setFilterDateTo] = useState<Date | undefined>();
   const [filterUf, setFilterUf] = useState("");
   const [filterSituacao, setFilterSituacao] = useState("");
-  const [filterVencedor, setFilterVencedor] = useState("");
+  const [filterVencedores, setFilterVencedores] = useState<string[]>([]);
 
   // Server-side search for orgão options
   const [orgaoSearch, setOrgaoSearch] = useState("");
@@ -193,19 +194,22 @@ export default function LicitacoesPage() {
 
   // Vencedor stats query - lightweight using materialized view
   const { data: vencedorStats } = useQuery({
-    queryKey: ["vencedor-stats", filterVencedor],
+    queryKey: ["vencedor-stats", filterVencedores],
     queryFn: async () => {
-      if (!filterVencedor) return null;
-      const { data, error } = await supabase
-        .from("mv_empresas_vencedoras")
-        .select("total_vitorias")
-        .ilike("razao_social", `%${filterVencedor}%`)
-        .limit(1)
-        .maybeSingle();
-      if (error || !data) return { total: 0 };
-      return { total: data.total_vitorias || 0 };
+      if (!filterVencedores.length) return null;
+      const promises = filterVencedores.map(async (v) => {
+        const { data } = await supabase
+          .from("mv_empresas_vencedoras")
+          .select("total_vitorias, razao_social")
+          .ilike("razao_social", `%${v}%`)
+          .limit(1)
+          .maybeSingle();
+        return { name: v, total: data?.total_vitorias || 0 };
+      });
+      const results = await Promise.all(promises);
+      return { items: results, totalSum: results.reduce((s, r) => s + r.total, 0) };
     },
-    enabled: !!filterVencedor,
+    enabled: filterVencedores.length > 0,
     staleTime: 300_000,
   });
 
@@ -214,19 +218,19 @@ export default function LicitacoesPage() {
     orgao: string; search: string; dateFrom?: string; dateTo?: string; uf?: string; situacao?: string; vencedor?: string; tab: "abertas" | "encerradas";
   }>({ orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd"), tab: "abertas" });
 
+  const hasWinnerFilter = filterVencedores.length > 0;
+
   const activateWinnerMode = () => {
     setActiveTab("encerradas");
     setFilterSituacao("");
   };
 
-  const handleWinnerFilterChange = (value: string) => {
-    const nextValue = value.trim();
-    setFilterVencedor(value);
-    if (nextValue) activateWinnerMode();
+  const handleWinnerFilterChange = (values: string[]) => {
+    setFilterVencedores(values);
+    if (values.length > 0) activateWinnerMode();
   };
 
   const handleSearch = () => {
-    const hasWinnerFilter = !!filterVencedor.trim();
     const nextTab = hasWinnerFilter ? "encerradas" : activeTab;
     const nextSituacao = hasWinnerFilter ? "" : filterSituacao;
 
@@ -241,7 +245,7 @@ export default function LicitacoesPage() {
       dateTo: filterDateTo ? format(filterDateTo, "yyyy-MM-dd") : undefined,
       uf: filterUf || undefined,
       situacao: nextSituacao || undefined,
-      vencedor: filterVencedor.trim() || undefined,
+      vencedor: filterVencedores.length > 0 ? filterVencedores.join("||") : undefined,
       tab: nextTab,
     });
   };
@@ -249,7 +253,7 @@ export default function LicitacoesPage() {
   const handleTabChange = (tab: "abertas" | "encerradas") => {
     setActiveTab(tab);
     setFilterSituacao("");
-    setFilterVencedor("");
+    setFilterVencedores([]);
     setPage(0);
     setAppliedFilters({
       orgao: filterOrgao.trim(),
@@ -268,7 +272,7 @@ export default function LicitacoesPage() {
     setFilterDateTo(undefined);
     setFilterUf("");
     setFilterSituacao("");
-    setFilterVencedor("");
+    setFilterVencedores([]);
     setPage(0);
     setAppliedFilters({ orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd"), tab: activeTab });
   };
@@ -277,7 +281,7 @@ export default function LicitacoesPage() {
 
   const searchByWinner = (name: string) => {
     activateWinnerMode();
-    setFilterVencedor(name);
+    setFilterVencedores([name]);
     setDetailOpen(false);
     setPage(0);
     setAppliedFilters((prev) => ({ ...prev, vencedor: name, situacao: undefined, tab: "encerradas" }));
