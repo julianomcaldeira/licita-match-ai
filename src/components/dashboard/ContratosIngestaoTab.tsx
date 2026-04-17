@@ -1,7 +1,11 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { FileText, Calendar, Building2, TrendingUp, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+type PeriodDays = 7 | 30 | 90;
 
 function formatBR(n: number | null | undefined) {
   return (n ?? 0).toLocaleString("pt-BR");
@@ -14,6 +18,8 @@ function formatDay(d: string) {
 }
 
 export function ContratosIngestaoTab() {
+  const [periodDays, setPeriodDays] = useState<PeriodDays>(30);
+
   const { data: stats, isLoading: loadingStats } = useQuery({
     queryKey: ["contratos-stats"],
     queryFn: async () => {
@@ -25,9 +31,9 @@ export function ContratosIngestaoTab() {
   });
 
   const { data: porDia, isLoading: loadingDia } = useQuery({
-    queryKey: ["contratos-por-dia"],
+    queryKey: ["contratos-por-dia", periodDays],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("contratos_por_dia", { p_days: 30 });
+      const { data, error } = await supabase.rpc("contratos_por_dia", { p_days: periodDays });
       if (error) throw error;
       return data || [];
     },
@@ -35,9 +41,9 @@ export function ContratosIngestaoTab() {
   });
 
   const { data: topOrgaos, isLoading: loadingOrgaos } = useQuery({
-    queryKey: ["contratos-top-orgaos"],
+    queryKey: ["contratos-top-orgaos", periodDays],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("contratos_top_orgaos", { p_days: 30, p_limit: 10 });
+      const { data, error } = await supabase.rpc("contratos_top_orgaos", { p_days: periodDays, p_limit: 10 });
       if (error) throw error;
       return data || [];
     },
@@ -52,6 +58,8 @@ export function ContratosIngestaoTab() {
     { label: "Últimos 7 dias", value: stats?.total_7d, icon: TrendingUp, color: "text-module-purple" },
     { label: "Hoje", value: stats?.total_hoje, icon: TrendingUp, color: "text-success" },
   ];
+
+  const periodOptions: PeriodDays[] = [7, 30, 90];
 
   return (
     <div className="space-y-4">
@@ -75,6 +83,27 @@ export function ContratosIngestaoTab() {
         ))}
       </div>
 
+      {/* Seletor de período */}
+      <div className="flex items-center justify-end gap-2">
+        <span className="text-xs text-muted-foreground">Janela de análise:</span>
+        <div className="inline-flex rounded-lg border border-border bg-card p-0.5 shadow-sm">
+          {periodOptions.map((d) => (
+            <button
+              key={d}
+              onClick={() => setPeriodDays(d)}
+              className={cn(
+                "rounded-md px-3 py-1 text-xs font-medium transition-colors",
+                periodDays === d
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+              )}
+            >
+              {d} dias
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Contratos por dia */}
         <motion.div
@@ -84,7 +113,7 @@ export function ContratosIngestaoTab() {
         >
           <div className="flex items-center gap-2 border-b border-border px-4 py-3">
             <Calendar className="h-4 w-4 text-primary" />
-            <h3 className="font-display text-sm font-semibold text-foreground">Contratos por Dia (30d)</h3>
+            <h3 className="font-display text-sm font-semibold text-foreground">Contratos por Dia ({periodDays}d)</h3>
           </div>
           {loadingDia ? (
             <div className="flex items-center justify-center py-12">
@@ -92,7 +121,7 @@ export function ContratosIngestaoTab() {
             </div>
           ) : !porDia?.length ? (
             <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-              Nenhum contrato ingerido nos últimos 30 dias.
+              Nenhum contrato ingerido nos últimos {periodDays} dias.
             </div>
           ) : (
             <div className="max-h-96 overflow-y-auto">
@@ -130,7 +159,7 @@ export function ContratosIngestaoTab() {
         >
           <div className="flex items-center gap-2 border-b border-border px-4 py-3">
             <Building2 className="h-4 w-4 text-primary" />
-            <h3 className="font-display text-sm font-semibold text-foreground">Top Órgãos (30d)</h3>
+            <h3 className="font-display text-sm font-semibold text-foreground">Top Órgãos ({periodDays}d)</h3>
           </div>
           {loadingOrgaos ? (
             <div className="flex items-center justify-center py-12">
@@ -138,7 +167,7 @@ export function ContratosIngestaoTab() {
             </div>
           ) : !topOrgaos?.length ? (
             <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-              Nenhum contrato ingerido nos últimos 30 dias.
+              Nenhum contrato ingerido nos últimos {periodDays} dias.
             </div>
           ) : (
             <div className="max-h-96 overflow-y-auto">
