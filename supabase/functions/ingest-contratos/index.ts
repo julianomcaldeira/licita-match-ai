@@ -109,6 +109,95 @@ async function fetchLicitacoesByOrgao(
 }
 
 /**
+ * Bulk fetch contracts from Portal da Transparência by date range.
+ * Endpoint: /contratos?dataInicial=DD/MM/YYYY&dataFinal=DD/MM/YYYY&pagina=N
+ * Each page returns up to 500 records.
+ */
+async function fetchContratosBulk(
+  supabase: any,
+  apiKey: string,
+  dataInicial: string,
+  dataFinal: string,
+  maxPages: number = 50,
+): Promise<{ total: number; pages: number; errors: string[] }> {
+  let pagina = 1;
+  let total = 0;
+  const errors: string[] = [];
+  let hasMore = true;
+
+  while (hasMore && pagina <= maxPages) {
+    try {
+      const url = `${API_BASE}/contratos?dataInicial=${encodeURIComponent(dataInicial)}&dataFinal=${encodeURIComponent(dataFinal)}&pagina=${pagina}`;
+      console.log(`Fetching contratos: ${url}`);
+      const response = await fetchWithRetry(url, apiKey);
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.warn(`HTTP ${response.status}: ${errText.slice(0, 200)}`);
+        if (response.status === 404 || response.status === 400) {
+          hasMore = false;
+          break;
+        }
+        errors.push(`Page ${pagina}: HTTP ${response.status}`);
+        hasMore = false;
+        break;
+      }
+
+      const contratos = await response.json();
+      if (!Array.isArray(contratos) || contratos.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      const rows = contratos.map((c: any) => {
+        const cnpjOrgao = (c.unidadeGestora?.orgaoVinculado?.cnpj || c.unidadeGestora?.codigo || "desconhecido")
+          .toString().replace(/[.\-\/]/g, "");
+        const numContrato = c.numero || c.id?.toString() || `pt-c-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        return {
+          cnpj_orgao: cnpjOrgao,
+          numero_contrato: numContrato,
+          orgao_nome: c.unidadeGestora?.orgaoVinculado?.nome || c.unidadeGestora?.orgaoMaximo?.nome || null,
+          orgao_codigo: c.unidadeGestora?.codigo?.toString() || null,
+          fornecedor_nome: c.fornecedor?.nome || null,
+          fornecedor_cnpj: c.fornecedor?.cnpjFormatado?.replace(/[.\-\/]/g, "") || c.fornecedor?.cpfFormatado?.replace(/[.\-\/]/g, "") || null,
+          objeto: c.objeto || "Sem descrição",
+          valor_inicial: c.valorInicialCompra ?? c.valorInicial ?? null,
+          valor_final: c.valorFinalCompra ?? c.valorFinal ?? null,
+          data_assinatura: c.dataAssinatura || null,
+          data_vigencia_inicio: c.dataInicioVigencia || null,
+          data_vigencia_fim: c.dataFimVigencia || null,
+          data_publicacao: c.dataPublicacaoDOU || c.dataPublicacao || null,
+          situacao: c.situacaoCompra || c.situacao || null,
+          categoria: c.categoria || null,
+          modalidade_compra: c.modalidadeCompra?.descricao || (typeof c.modalidadeCompra === 'string' ? c.modalidadeCompra : null),
+          numero_licitacao: c.licitacao?.numero || null,
+          raw_json: c,
+          fonte: "PORTAL_TRANSPARENCIA",
+        };
+      });
+
+      for (let i = 0; i < rows.length; i += 50) {
+        const batch = rows.slice(i, i + 50);
+        const { error } = await supabase
+          .from("contratos")
+          .upsert(batch, { onConflict: "cnpj_orgao,numero_contrato" });
+        if (error) errors.push(`Page ${pagina}: ${error.message}`);
+        else total += batch.length;
+      }
+
+      hasMore = contratos.length >= 500;
+      pagina++;
+      await new Promise((r) => setTimeout(r, 250));
+    } catch (e) {
+      errors.push(`Page ${pagina}: ${e instanceof Error ? e.message : "unknown"}`);
+      hasMore = false;
+    }
+  }
+
+  return { total, pages: pagina - 1, errors };
+}
+
+/**
  * Fetch contract details by contract number from Portal da Transparência
  */
 async function fetchContratoByNumero(
@@ -258,6 +347,37 @@ serve(async (req) => {
       );
     }
 
+    if (mode === "bulk-contratos") {
+      // Bulk fetch contracts by date range (no orgao required)
+      const dataInicial = body.dataInicial;
+      const dataFinal = body.dataFinal;
+      const maxPages = body.maxPages || 50;
+
+      if (!dataInicial || !dataFinal) {
+        return new Response(
+          JSON.stringify({ success: false, error: "Required: dataInicial (DD/MM/YYYY), dataFinal (DD/MM/YYYY)" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const result = await fetchContratosBulk(supabase, apiKey, dataInicial, dataFinal, maxPages);
+
+      await supabase.from("ingestao_logs").insert({
+        fonte: "PORTAL_TRANSPARENCIA",
+        endpoint: `contratos/bulk ${dataInicial}→${dataFinal}`,
+        status: result.errors.length > 0 ? "parcial" : "sucesso",
+        registros_processados: result.total,
+        data_inicio: dataInicial,
+        data_fim: dataFinal,
+        erro: result.errors.length > 0 ? result.errors.join("; ").slice(0, 1000) : null,
+      });
+
+      return new Response(
+        JSON.stringify({ success: true, totalProcessed: result.total, pages: result.pages, errors: result.errors.length }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     if (mode === "contratos") {
       // Fetch contract by number
       const numero = body.numero;
@@ -290,7 +410,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ success: false, error: "Invalid mode. Use: licitacoes, contratos, or test" }),
+      JSON.stringify({ success: false, error: "Invalid mode. Use: licitacoes, contratos, bulk-contratos, or test" }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
