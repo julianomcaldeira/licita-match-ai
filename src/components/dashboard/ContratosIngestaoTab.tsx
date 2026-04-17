@@ -167,7 +167,7 @@ export function ContratosIngestaoTab() {
             </div>
           ) : !topOrgaos?.length ? (
             <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-              Nenhum contrato ingerido nos últimos 30 dias.
+              Nenhum contrato ingerido nos últimos {periodDays} dias.
             </div>
           ) : (
             <div className="max-h-96 overflow-y-auto">
