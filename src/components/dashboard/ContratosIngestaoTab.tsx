@@ -18,6 +18,8 @@ function formatDay(d: string) {
 }
 
 export function ContratosIngestaoTab() {
+  const [periodDays, setPeriodDays] = useState<PeriodDays>(30);
+
   const { data: stats, isLoading: loadingStats } = useQuery({
     queryKey: ["contratos-stats"],
     queryFn: async () => {
@@ -29,9 +31,9 @@ export function ContratosIngestaoTab() {
   });
 
   const { data: porDia, isLoading: loadingDia } = useQuery({
-    queryKey: ["contratos-por-dia"],
+    queryKey: ["contratos-por-dia", periodDays],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("contratos_por_dia", { p_days: 30 });
+      const { data, error } = await supabase.rpc("contratos_por_dia", { p_days: periodDays });
       if (error) throw error;
       return data || [];
     },
@@ -39,9 +41,9 @@ export function ContratosIngestaoTab() {
   });
 
   const { data: topOrgaos, isLoading: loadingOrgaos } = useQuery({
-    queryKey: ["contratos-top-orgaos"],
+    queryKey: ["contratos-top-orgaos", periodDays],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("contratos_top_orgaos", { p_days: 30, p_limit: 10 });
+      const { data, error } = await supabase.rpc("contratos_top_orgaos", { p_days: periodDays, p_limit: 10 });
       if (error) throw error;
       return data || [];
     },
@@ -56,6 +58,8 @@ export function ContratosIngestaoTab() {
     { label: "Últimos 7 dias", value: stats?.total_7d, icon: TrendingUp, color: "text-module-purple" },
     { label: "Hoje", value: stats?.total_hoje, icon: TrendingUp, color: "text-success" },
   ];
+
+  const periodOptions: PeriodDays[] = [7, 30, 90];
 
   return (
     <div className="space-y-4">
