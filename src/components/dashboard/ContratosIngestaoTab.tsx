@@ -83,6 +83,27 @@ export function ContratosIngestaoTab() {
         ))}
       </div>
 
+      {/* Seletor de período */}
+      <div className="flex items-center justify-end gap-2">
+        <span className="text-xs text-muted-foreground">Janela de análise:</span>
+        <div className="inline-flex rounded-lg border border-border bg-card p-0.5 shadow-sm">
+          {periodOptions.map((d) => (
+            <button
+              key={d}
+              onClick={() => setPeriodDays(d)}
+              className={cn(
+                "rounded-md px-3 py-1 text-xs font-medium transition-colors",
+                periodDays === d
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+              )}
+            >
+              {d} dias
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Contratos por dia */}
         <motion.div
