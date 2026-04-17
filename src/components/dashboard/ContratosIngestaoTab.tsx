@@ -1,7 +1,11 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { FileText, Calendar, Building2, TrendingUp, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+type PeriodDays = 7 | 30 | 90;
 
 function formatBR(n: number | null | undefined) {
   return (n ?? 0).toLocaleString("pt-BR");
