@@ -13,9 +13,13 @@ const PAGE_SIZE = 50;
 const MODALIDADES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_FETCH_RETRIES = 5;
-const MAX_RANGE_SPLIT_DEPTH = 4;
+const MAX_RANGE_SPLIT_DEPTH = 8;
 const MAX_BACKFILL_WINDOW_DAYS = 3;
 const MAX_MANUAL_INGEST_WINDOW_DAYS = 7;
+// Modalidades de altíssimo volume (Dispensa=8) que estouram o limite de paginação do PNCP (~10k registros)
+// quando consultadas em janelas longas — usamos janela diária para evitar HTTP 422.
+const HIGH_VOLUME_MODALIDADES = new Set<number>([8]);
+const HIGH_VOLUME_BACKFILL_WINDOW_DAYS = 1;
 
 interface PNCPContratacao {
   numeroControlePNCP?: string;
@@ -88,6 +92,16 @@ function capDateRange(dataInicial: string, dataFinal: string, maxDaysInclusive: 
 
 function isRetryableFetchError(message: string): boolean {
   return /HTTP\s(?:429|5\d\d)|timed out|timeout|fetch failed|connection|network|abort|aborted|signal has been aborted/i.test(message);
+}
+
+// HTTP 422 do PNCP normalmente significa "janela retorna mais registros do que o limite paginável (~10k)".
+// Tratamos como sinal para subdividir a janela de datas até caber.
+function isWindowTooLargeError(message: string): boolean {
+  return /HTTP\s422/i.test(message);
+}
+
+function isSplittableError(message: string): boolean {
+  return isRetryableFetchError(message) || isWindowTooLargeError(message);
 }
 
 function mergeFetchResults(results: Array<{ total: number; winners: number; errors: string[]; pagesOk: number }>) {
@@ -266,13 +280,21 @@ async function fetchRangeResilient(
   if (
     result.errors.length === 0 ||
     depth >= MAX_RANGE_SPLIT_DEPTH ||
-    !result.errors.every(isRetryableFetchError)
+    !result.errors.every(isSplittableError)
   ) {
     return result;
   }
 
   const ranges = splitDateRange(dataInicial, dataFinal);
   if (!ranges) {
+    // Janela já está em 1 dia e ainda há 422 → estouro real do limite do PNCP.
+    // Não há como recuperar via split: marcamos como sucesso parcial para destravar o progresso.
+    if (result.errors.every(isWindowTooLargeError)) {
+      console.warn(
+        `PNCP: janela mínima ${dataInicial} (mod ${modalidade}) ainda retorna HTTP 422 — aceitando parcial para destravar backfill.`
+      );
+      return { ...result, errors: [] };
+    }
     return result;
   }
 
@@ -583,9 +605,12 @@ async function handleBulkBackfill(supabase: any, body: any) {
     );
   }
 
-  const monthEnd = capDateRange(startDate, backfillEnd, MAX_BACKFILL_WINDOW_DAYS);
+  const windowDays = HIGH_VOLUME_MODALIDADES.has(targetMod)
+    ? HIGH_VOLUME_BACKFILL_WINDOW_DAYS
+    : MAX_BACKFILL_WINDOW_DAYS;
+  const monthEnd = capDateRange(startDate, backfillEnd, windowDays);
 
-  console.log(`Backfill: Mod ${targetMod} ${startDate} → ${monthEnd}`);
+  console.log(`Backfill: Mod ${targetMod} ${startDate} → ${monthEnd} (janela ${windowDays}d)`);
   const result = await fetchRangeResilient(supabase, targetMod, startDate, monthEnd, false);
   console.log(`Backfill: Mod ${targetMod} done: ${result.total} records, ${result.errors.length} errors`);
 
