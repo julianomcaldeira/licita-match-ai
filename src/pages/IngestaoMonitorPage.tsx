@@ -4,12 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   CheckCircle2, XCircle, AlertTriangle, Clock, Database, Activity,
-  RefreshCw, Loader2, Brain, Building2, Search, ChevronLeft, ChevronRight,
+  RefreshCw, Loader2, Brain, Building2, Search, ChevronLeft, ChevronRight, FileText,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { IngerirContratosDialog } from "@/components/dashboard/IngerirContratosDialog";
+import { ContratosIngestaoTab } from "@/components/dashboard/ContratosIngestaoTab";
 
 const LOG_PAGE_SIZE = 20;
 
@@ -173,8 +174,13 @@ export default function IngestaoMonitorPage() {
       <Tabs defaultValue="ingestao" className="space-y-4">
         <TabsList>
           <TabsTrigger value="ingestao" className="gap-1.5"><Database className="h-3.5 w-3.5" /> Ingestão</TabsTrigger>
+          <TabsTrigger value="contratos" className="gap-1.5"><FileText className="h-3.5 w-3.5" /> Contratos</TabsTrigger>
           <TabsTrigger value="analise" className="gap-1.5"><Brain className="h-3.5 w-3.5" /> Auto-Análise IA</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="contratos">
+          <ContratosIngestaoTab />
+        </TabsContent>
 
         <TabsContent value="ingestao">
           {isLoading ? (

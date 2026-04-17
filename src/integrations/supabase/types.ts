@@ -678,6 +678,31 @@ export type Database = {
           total_vitorias: number
         }[]
       }
+      contratos_por_dia: {
+        Args: { p_days?: number }
+        Returns: {
+          dia: string
+          total: number
+        }[]
+      }
+      contratos_stats: {
+        Args: never
+        Returns: {
+          total: number
+          total_30d: number
+          total_7d: number
+          total_hoje: number
+        }[]
+      }
+      contratos_top_orgaos: {
+        Args: { p_days?: number; p_limit?: number }
+        Returns: {
+          cnpj_orgao: string
+          orgao_nome: string
+          total: number
+          valor_total: number
+        }[]
+      }
       get_distinct_situacoes: {
         Args: never
         Returns: {
