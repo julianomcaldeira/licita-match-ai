@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
+import { IngerirContratosDialog } from "@/components/dashboard/IngerirContratosDialog";
 
 const LOG_PAGE_SIZE = 20;
 
@@ -27,6 +29,8 @@ function formatDate(d: string | null) {
 }
 
 export default function IngestaoMonitorPage() {
+  const { role } = useAuth();
+  const isAdminCentral = role === "admin_central";
   const [logPage, setLogPage] = useState(0);
 
   const { data: logsResult, isLoading, refetch, isFetching } = useQuery({
@@ -116,14 +120,17 @@ export default function IngestaoMonitorPage() {
           <h1 className="font-display text-2xl font-bold text-foreground">Monitor de Ingestão</h1>
           <p className="text-sm text-muted-foreground">Acompanhe as execuções diárias automáticas do PNCP</p>
         </div>
-        <button
-          onClick={() => refetch()}
-          disabled={isFetching}
-          className="flex h-10 items-center gap-2 rounded-lg border border-input bg-card px-4 text-sm font-medium text-foreground hover:bg-secondary transition disabled:opacity-50"
-        >
-          {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          Atualizar
-        </button>
+        <div className="flex items-center gap-2">
+          {isAdminCentral && <IngerirContratosDialog />}
+          <button
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="flex h-10 items-center gap-2 rounded-lg border border-input bg-card px-4 text-sm font-medium text-foreground hover:bg-secondary transition disabled:opacity-50"
+          >
+            {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            Atualizar
+          </button>
+        </div>
       </div>
 
       {/* Stats cards */}
