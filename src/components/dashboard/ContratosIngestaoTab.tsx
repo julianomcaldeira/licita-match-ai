@@ -159,7 +159,7 @@ export function ContratosIngestaoTab() {
         >
           <div className="flex items-center gap-2 border-b border-border px-4 py-3">
             <Building2 className="h-4 w-4 text-primary" />
-            <h3 className="font-display text-sm font-semibold text-foreground">Top Órgãos (30d)</h3>
+            <h3 className="font-display text-sm font-semibold text-foreground">Top Órgãos ({periodDays}d)</h3>
           </div>
           {loadingOrgaos ? (
             <div className="flex items-center justify-center py-12">
