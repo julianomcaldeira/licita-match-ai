@@ -578,20 +578,37 @@ export default function LicitacoesPage() {
   const cancelIngestion = () => { abortRef.current = true; toast.info("Cancelando..."); };
 
   const [exporting, setExporting] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportPreview, setExportPreview] = useState<{
+    uiCount: number;
+    serverCount: number | null;
+    diff: number | null;
+    tolerance: number;
+    inconsistent: boolean;
+    loading: boolean;
+  } | null>(null);
 
-  const exportToExcel = useCallback(async () => {
-    setExporting(true);
+  // Build a human-readable summary of currently applied filters
+  const appliedFiltersSummary = useCallback(() => {
+    const items: { label: string; value: string }[] = [];
+    items.push({ label: "Aba", value: appliedFilters.tab === "abertas" ? "Abertas / Em Andamento" : "Encerradas / Com Resultado" });
+    if (appliedFilters.search) items.push({ label: "Palavra-chave", value: appliedFilters.search });
+    if (appliedFilters.orgao) items.push({ label: "Órgão", value: appliedFilters.orgao });
+    if (appliedFilters.uf) items.push({ label: "UF", value: appliedFilters.uf });
+    if (appliedFilters.situacao) items.push({ label: "Situação", value: appliedFilters.situacao });
+    if (appliedFilters.vencedor) items.push({ label: "Vencedor", value: appliedFilters.vencedor.split("||").join(", ") });
+    if (appliedFilters.dateFrom) items.push({ label: "Data inicial", value: appliedFilters.dateFrom });
+    if (appliedFilters.dateTo) items.push({ label: "Data final", value: appliedFilters.dateTo });
+    return items;
+  }, [appliedFilters]);
+
+  // Compute server-side count using the same filter logic as the export
+  const computeExportCount = useCallback(async (): Promise<number | null> => {
+    const MAX_EXPORT = 10000;
+    const hasResultadoStatus = appliedFilters.situacao === "Concluída";
+    const useRpcExport = !!(appliedFilters.vencedor || appliedFilters.search);
     try {
-      const MAX_EXPORT = 10000;
-      const batchSize = 1000;
-      const hasResultadoStatus = appliedFilters.situacao === "Concluída";
-      const useRpcExport = !!(appliedFilters.vencedor || appliedFilters.search);
-
-      // ===== Pre-export validation: compare server count w/ filters vs UI total =====
-      const uiCount = totalCount;
-      let serverCount: number | null = null;
-      try {
-        if (useRpcExport) {
+      if (useRpcExport) {
           // Probe RPC with same filters; count via incremental fetch up to MAX_EXPORT+1
           const rpcSituacao = isAbertas
             ? (appliedFilters.situacao || null)
