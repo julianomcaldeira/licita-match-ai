@@ -587,6 +587,91 @@ export default function LicitacoesPage() {
       const hasResultadoStatus = appliedFilters.situacao === "Concluída";
       const useRpcExport = !!(appliedFilters.vencedor || appliedFilters.search);
 
+      // ===== Pre-export validation: compare server count w/ filters vs UI total =====
+      const uiCount = totalCount;
+      let serverCount: number | null = null;
+      try {
+        if (useRpcExport) {
+          // Probe RPC with same filters; count via incremental fetch up to MAX_EXPORT+1
+          const rpcSituacao = isAbertas
+            ? (appliedFilters.situacao || null)
+            : (hasResultadoStatus ? null : appliedFilters.situacao || null);
+          const probeBatch = 1000;
+          let probed = 0;
+          let off = 0;
+          let more = true;
+          while (more && probed <= MAX_EXPORT) {
+            const { data, error } = await (supabase as any).rpc("search_licitacoes", {
+              p_search: appliedFilters.search || null,
+              p_orgao: appliedFilters.orgao || null,
+              p_date_from: appliedFilters.dateFrom || null,
+              p_date_to: appliedFilters.dateTo || null,
+              p_uf: appliedFilters.uf || null,
+              p_situacao: rpcSituacao,
+              p_vencedor: appliedFilters.vencedor || null,
+              p_modalidade: null,
+              p_com_vencedor: !isAbertas && hasResultadoStatus,
+              p_sem_resultado: isAbertas,
+              p_limit: probeBatch,
+              p_offset: off,
+            });
+            if (error) throw error;
+            const n = (data || []).length;
+            probed += n;
+            more = n === probeBatch;
+            off += probeBatch;
+          }
+          serverCount = probed;
+        } else {
+          let cq = supabase
+            .from("licitacoes")
+            .select("id", { count: "exact", head: true });
+          if (appliedFilters.dateFrom) cq = cq.gte("data_publicacao", appliedFilters.dateFrom);
+          if (appliedFilters.dateTo) cq = cq.lte("data_publicacao", appliedFilters.dateTo);
+          if (appliedFilters.uf) cq = cq.eq("uf", appliedFilters.uf);
+          if (isAbertas) {
+            if (appliedFilters.situacao) cq = cq.eq("situacao", appliedFilters.situacao);
+            cq = cq.or("valor_homologado.is.null,valor_homologado.eq.0");
+            cq = cq.not("situacao", "in", "(Revogada,Anulada)");
+          } else {
+            if (hasResultadoStatus) {
+              cq = cq.not("valor_homologado", "is", null).gt("valor_homologado", 0);
+            } else if (appliedFilters.situacao) {
+              cq = cq.eq("situacao", appliedFilters.situacao);
+            } else {
+              cq = cq.or("valor_homologado.gt.0,situacao.in.(Revogada,Anulada)");
+            }
+          }
+          if (appliedFilters.orgao) cq = cq.ilike("orgao", `%${appliedFilters.orgao}%`);
+          const { count, error } = await cq;
+          if (error) throw error;
+          serverCount = count || 0;
+        }
+      } catch (e) {
+        console.warn("Count validation failed, proceeding without check:", e);
+      }
+
+      if (serverCount !== null && uiCount > 0) {
+        // Tolerância: 5% ou 10 registros (o que for maior) — UI usa range+1 e RPC pode divergir levemente
+        const diff = Math.abs(serverCount - uiCount);
+        const tolerance = Math.max(10, Math.ceil(uiCount * 0.05));
+        if (diff > tolerance) {
+          const proceed = window.confirm(
+            `⚠️ Validação de filtros\n\n` +
+            `A pesquisa exibe ${uiCount.toLocaleString("pt-BR")} registros, ` +
+            `mas a contagem do export retornou ${serverCount.toLocaleString("pt-BR")}.\n\n` +
+            `Os filtros aplicados podem estar inconsistentes. Deseja exportar mesmo assim?`
+          );
+          if (!proceed) {
+            toast.info("Exportação cancelada pelo usuário.");
+            return;
+          }
+        } else {
+          console.log(`✓ Validação OK: UI=${uiCount}, Export=${serverCount}, diff=${diff}`);
+        }
+      }
+      // ===== Fim da validação =====
+
       // Build a filtered base query (mirrors buildBaseQuery in main fetch, no pagination)
       const buildFilteredQuery = (from: number, to: number) => {
         let q = supabase
