@@ -778,7 +778,7 @@ export default function LicitacoesPage() {
       toast.success(`${rows.length.toLocaleString("pt-BR")} registros exportados com sucesso!`);
     } catch (err) { console.error("Export error:", err); toast.error("Erro ao exportar dados."); }
     finally { setExporting(false); }
-  }, [appliedFilters, isAbertas]);
+  }, [appliedFilters, isAbertas, totalCount]);
 
   return (
     <div className="space-y-4">
