@@ -578,99 +578,117 @@ export default function LicitacoesPage() {
   const cancelIngestion = () => { abortRef.current = true; toast.info("Cancelando..."); };
 
   const [exporting, setExporting] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportPreview, setExportPreview] = useState<{
+    uiCount: number;
+    serverCount: number | null;
+    diff: number | null;
+    tolerance: number;
+    inconsistent: boolean;
+    loading: boolean;
+  } | null>(null);
+
+  // Build a human-readable summary of currently applied filters
+  const appliedFiltersSummary = useCallback(() => {
+    const items: { label: string; value: string }[] = [];
+    items.push({ label: "Aba", value: appliedFilters.tab === "abertas" ? "Abertas / Em Andamento" : "Encerradas / Com Resultado" });
+    if (appliedFilters.search) items.push({ label: "Palavra-chave", value: appliedFilters.search });
+    if (appliedFilters.orgao) items.push({ label: "Órgão", value: appliedFilters.orgao });
+    if (appliedFilters.uf) items.push({ label: "UF", value: appliedFilters.uf });
+    if (appliedFilters.situacao) items.push({ label: "Situação", value: appliedFilters.situacao });
+    if (appliedFilters.vencedor) items.push({ label: "Vencedor", value: appliedFilters.vencedor.split("||").join(", ") });
+    if (appliedFilters.dateFrom) items.push({ label: "Data inicial", value: appliedFilters.dateFrom });
+    if (appliedFilters.dateTo) items.push({ label: "Data final", value: appliedFilters.dateTo });
+    return items;
+  }, [appliedFilters]);
+
+  // Compute server-side count using the same filter logic as the export
+  const computeExportCount = useCallback(async (): Promise<number | null> => {
+    const MAX_EXPORT = 10000;
+    const hasResultadoStatus = appliedFilters.situacao === "Concluída";
+    const useRpcExport = !!(appliedFilters.vencedor || appliedFilters.search);
+    try {
+      if (useRpcExport) {
+        const rpcSituacao = isAbertas
+          ? (appliedFilters.situacao || null)
+          : (hasResultadoStatus ? null : appliedFilters.situacao || null);
+        const probeBatch = 1000;
+        let probed = 0;
+        let off = 0;
+        let more = true;
+        while (more && probed <= MAX_EXPORT) {
+          const { data, error } = await (supabase as any).rpc("search_licitacoes", {
+            p_search: appliedFilters.search || null,
+            p_orgao: appliedFilters.orgao || null,
+            p_date_from: appliedFilters.dateFrom || null,
+            p_date_to: appliedFilters.dateTo || null,
+            p_uf: appliedFilters.uf || null,
+            p_situacao: rpcSituacao,
+            p_vencedor: appliedFilters.vencedor || null,
+            p_modalidade: null,
+            p_com_vencedor: !isAbertas && hasResultadoStatus,
+            p_sem_resultado: isAbertas,
+            p_limit: probeBatch,
+            p_offset: off,
+          });
+          if (error) throw error;
+          const n = (data || []).length;
+          probed += n;
+          more = n === probeBatch;
+          off += probeBatch;
+        }
+        return probed;
+      } else {
+        let cq = supabase
+          .from("licitacoes")
+          .select("id", { count: "exact", head: true });
+        if (appliedFilters.dateFrom) cq = cq.gte("data_publicacao", appliedFilters.dateFrom);
+        if (appliedFilters.dateTo) cq = cq.lte("data_publicacao", appliedFilters.dateTo);
+        if (appliedFilters.uf) cq = cq.eq("uf", appliedFilters.uf);
+        if (isAbertas) {
+          if (appliedFilters.situacao) cq = cq.eq("situacao", appliedFilters.situacao);
+          cq = cq.or("valor_homologado.is.null,valor_homologado.eq.0");
+          cq = cq.not("situacao", "in", "(Revogada,Anulada)");
+        } else {
+          if (hasResultadoStatus) {
+            cq = cq.not("valor_homologado", "is", null).gt("valor_homologado", 0);
+          } else if (appliedFilters.situacao) {
+            cq = cq.eq("situacao", appliedFilters.situacao);
+          } else {
+            cq = cq.or("valor_homologado.gt.0,situacao.in.(Revogada,Anulada)");
+          }
+        }
+        if (appliedFilters.orgao) cq = cq.ilike("orgao", `%${appliedFilters.orgao}%`);
+        const { count, error } = await cq;
+        if (error) throw error;
+        return count || 0;
+      }
+    } catch (e) {
+      console.warn("Count validation failed:", e);
+      return null;
+    }
+  }, [appliedFilters, isAbertas]);
+
+  // Open the export dialog and pre-compute counts
+  const openExportDialog = useCallback(async () => {
+    const uiCount = totalCount;
+    setExportPreview({ uiCount, serverCount: null, diff: null, tolerance: 0, inconsistent: false, loading: true });
+    setExportDialogOpen(true);
+    const serverCount = await computeExportCount();
+    const tolerance = Math.max(10, Math.ceil(uiCount * 0.05));
+    const diff = serverCount !== null ? Math.abs(serverCount - uiCount) : null;
+    const inconsistent = diff !== null && diff > tolerance;
+    setExportPreview({ uiCount, serverCount, diff, tolerance, inconsistent, loading: false });
+  }, [totalCount, computeExportCount]);
 
   const exportToExcel = useCallback(async () => {
     setExporting(true);
+    setExportDialogOpen(false);
     try {
       const MAX_EXPORT = 10000;
       const batchSize = 1000;
       const hasResultadoStatus = appliedFilters.situacao === "Concluída";
       const useRpcExport = !!(appliedFilters.vencedor || appliedFilters.search);
-
-      // ===== Pre-export validation: compare server count w/ filters vs UI total =====
-      const uiCount = totalCount;
-      let serverCount: number | null = null;
-      try {
-        if (useRpcExport) {
-          // Probe RPC with same filters; count via incremental fetch up to MAX_EXPORT+1
-          const rpcSituacao = isAbertas
-            ? (appliedFilters.situacao || null)
-            : (hasResultadoStatus ? null : appliedFilters.situacao || null);
-          const probeBatch = 1000;
-          let probed = 0;
-          let off = 0;
-          let more = true;
-          while (more && probed <= MAX_EXPORT) {
-            const { data, error } = await (supabase as any).rpc("search_licitacoes", {
-              p_search: appliedFilters.search || null,
-              p_orgao: appliedFilters.orgao || null,
-              p_date_from: appliedFilters.dateFrom || null,
-              p_date_to: appliedFilters.dateTo || null,
-              p_uf: appliedFilters.uf || null,
-              p_situacao: rpcSituacao,
-              p_vencedor: appliedFilters.vencedor || null,
-              p_modalidade: null,
-              p_com_vencedor: !isAbertas && hasResultadoStatus,
-              p_sem_resultado: isAbertas,
-              p_limit: probeBatch,
-              p_offset: off,
-            });
-            if (error) throw error;
-            const n = (data || []).length;
-            probed += n;
-            more = n === probeBatch;
-            off += probeBatch;
-          }
-          serverCount = probed;
-        } else {
-          let cq = supabase
-            .from("licitacoes")
-            .select("id", { count: "exact", head: true });
-          if (appliedFilters.dateFrom) cq = cq.gte("data_publicacao", appliedFilters.dateFrom);
-          if (appliedFilters.dateTo) cq = cq.lte("data_publicacao", appliedFilters.dateTo);
-          if (appliedFilters.uf) cq = cq.eq("uf", appliedFilters.uf);
-          if (isAbertas) {
-            if (appliedFilters.situacao) cq = cq.eq("situacao", appliedFilters.situacao);
-            cq = cq.or("valor_homologado.is.null,valor_homologado.eq.0");
-            cq = cq.not("situacao", "in", "(Revogada,Anulada)");
-          } else {
-            if (hasResultadoStatus) {
-              cq = cq.not("valor_homologado", "is", null).gt("valor_homologado", 0);
-            } else if (appliedFilters.situacao) {
-              cq = cq.eq("situacao", appliedFilters.situacao);
-            } else {
-              cq = cq.or("valor_homologado.gt.0,situacao.in.(Revogada,Anulada)");
-            }
-          }
-          if (appliedFilters.orgao) cq = cq.ilike("orgao", `%${appliedFilters.orgao}%`);
-          const { count, error } = await cq;
-          if (error) throw error;
-          serverCount = count || 0;
-        }
-      } catch (e) {
-        console.warn("Count validation failed, proceeding without check:", e);
-      }
-
-      if (serverCount !== null && uiCount > 0) {
-        // Tolerância: 5% ou 10 registros (o que for maior) — UI usa range+1 e RPC pode divergir levemente
-        const diff = Math.abs(serverCount - uiCount);
-        const tolerance = Math.max(10, Math.ceil(uiCount * 0.05));
-        if (diff > tolerance) {
-          const proceed = window.confirm(
-            `⚠️ Validação de filtros\n\n` +
-            `A pesquisa exibe ${uiCount.toLocaleString("pt-BR")} registros, ` +
-            `mas a contagem do export retornou ${serverCount.toLocaleString("pt-BR")}.\n\n` +
-            `Os filtros aplicados podem estar inconsistentes. Deseja exportar mesmo assim?`
-          );
-          if (!proceed) {
-            toast.info("Exportação cancelada pelo usuário.");
-            return;
-          }
-        } else {
-          console.log(`✓ Validação OK: UI=${uiCount}, Export=${serverCount}, diff=${diff}`);
-        }
-      }
-      // ===== Fim da validação =====
 
       // Build a filtered base query (mirrors buildBaseQuery in main fetch, no pagination)
       const buildFilteredQuery = (from: number, to: number) => {
@@ -705,7 +723,6 @@ export default function LicitacoesPage() {
 
         if (appliedFilters.orgao) q = q.ilike("orgao", `%${appliedFilters.orgao}%`);
 
-        // Keyword AND-search on objeto (when not using RPC)
         const words = (appliedFilters.search || "").toLowerCase().split(/\s+/).filter(Boolean);
         for (const word of words) q = q.ilike("objeto", `%${word}%`);
 
@@ -715,7 +732,6 @@ export default function LicitacoesPage() {
       let allData: any[] = [];
 
       if (useRpcExport) {
-        // Use the same RPC as the main view to honor full-text search and vencedor filter
         const rpcSituacao = isAbertas
           ? (appliedFilters.situacao || null)
           : (hasResultadoStatus ? null : appliedFilters.situacao || null);
@@ -778,7 +794,7 @@ export default function LicitacoesPage() {
       toast.success(`${rows.length.toLocaleString("pt-BR")} registros exportados com sucesso!`);
     } catch (err) { console.error("Export error:", err); toast.error("Erro ao exportar dados."); }
     finally { setExporting(false); }
-  }, [appliedFilters, isAbertas, totalCount]);
+  }, [appliedFilters, isAbertas]);
 
   return (
     <div className="space-y-4">
@@ -791,7 +807,7 @@ export default function LicitacoesPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={exportToExcel} disabled={exporting || !hasData} className="flex h-9 items-center gap-2 rounded-lg border border-input bg-card px-3 text-xs font-medium text-muted-foreground hover:bg-secondary transition disabled:opacity-50">
+          <button onClick={openExportDialog} disabled={exporting || !hasData} className="flex h-9 items-center gap-2 rounded-lg border border-input bg-card px-3 text-xs font-medium text-muted-foreground hover:bg-secondary transition disabled:opacity-50">
             {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileSpreadsheet className="h-3.5 w-3.5" />}
             Exportar Excel
           </button>
@@ -1496,6 +1512,105 @@ export default function LicitacoesPage() {
               </div>
             )}
           </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Export confirmation dialog with filter summary and count comparison */}
+      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="h-5 w-5 text-primary" />
+              Confirmar exportação para Excel
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Filter summary */}
+            <div>
+              <h4 className="text-sm font-semibold text-foreground mb-2">Filtros aplicados</h4>
+              <div className="rounded-lg border border-border bg-muted/30 p-3">
+                {appliedFiltersSummary().length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Nenhum filtro adicional aplicado.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {appliedFiltersSummary().map((f) => (
+                      <Badge key={f.label} variant="secondary" className="text-xs">
+                        <span className="font-medium">{f.label}:</span>
+                        <span className="ml-1 font-normal">{f.value}</span>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Count comparison */}
+            <div>
+              <h4 className="text-sm font-semibold text-foreground mb-2">Validação de contagem</h4>
+              <div className="rounded-lg border border-border bg-card overflow-hidden">
+                <div className="grid grid-cols-3 divide-x divide-border">
+                  <div className="p-3 text-center">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Pesquisa (UI)</p>
+                    <p className="text-lg font-semibold text-foreground mt-1">
+                      {(exportPreview?.uiCount ?? 0).toLocaleString("pt-BR")}
+                    </p>
+                  </div>
+                  <div className="p-3 text-center">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Calculada (Servidor)</p>
+                    <p className="text-lg font-semibold text-foreground mt-1">
+                      {exportPreview?.loading ? (
+                        <Loader2 className="h-4 w-4 animate-spin inline" />
+                      ) : exportPreview?.serverCount === null ? (
+                        <span className="text-muted-foreground text-sm">indisponível</span>
+                      ) : (
+                        (exportPreview?.serverCount ?? 0).toLocaleString("pt-BR")
+                      )}
+                    </p>
+                  </div>
+                  <div className="p-3 text-center">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Diferença</p>
+                    <p className={cn(
+                      "text-lg font-semibold mt-1",
+                      exportPreview?.inconsistent ? "text-destructive" : "text-success"
+                    )}>
+                      {exportPreview?.loading || exportPreview?.diff === null
+                        ? "—"
+                        : (exportPreview?.diff ?? 0).toLocaleString("pt-BR")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {exportPreview && !exportPreview.loading && (
+                <p className={cn(
+                  "text-xs mt-2",
+                  exportPreview.inconsistent ? "text-destructive" : "text-muted-foreground"
+                )}>
+                  {exportPreview.inconsistent
+                    ? `⚠️ Diferença acima da tolerância (${exportPreview.tolerance.toLocaleString("pt-BR")} registros). Os filtros podem estar inconsistentes.`
+                    : `✓ Contagens compatíveis (tolerância: ${exportPreview.tolerance.toLocaleString("pt-BR")} registros).`}
+                </p>
+              )}
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Limite máximo de exportação: 10.000 registros por arquivo.
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setExportDialogOpen(false)} disabled={exporting}>
+              Cancelar
+            </Button>
+            <Button onClick={exportToExcel} disabled={exporting || exportPreview?.loading}>
+              {exporting ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Exportando...</>
+              ) : (
+                <><FileSpreadsheet className="h-4 w-4 mr-2" /> Gerar arquivo</>
+              )}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
