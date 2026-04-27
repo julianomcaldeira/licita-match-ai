@@ -582,20 +582,102 @@ export default function LicitacoesPage() {
   const exportToExcel = useCallback(async () => {
     setExporting(true);
     try {
-      let allData: any[] = [];
-      let offset = 0;
+      const MAX_EXPORT = 10000;
       const batchSize = 1000;
-      let hasMore = true;
-      while (hasMore && allData.length < 10000) {
-        const { data, error } = await supabase
+      const hasResultadoStatus = appliedFilters.situacao === "Concluída";
+      const useRpcExport = !!(appliedFilters.vencedor || appliedFilters.search);
+
+      // Build a filtered base query (mirrors buildBaseQuery in main fetch, no pagination)
+      const buildFilteredQuery = (from: number, to: number) => {
+        let q = supabase
           .from("licitacoes")
           .select("orgao, objeto, modalidade, valor_estimado, valor_homologado, data_publicacao, uf, municipio, situacao")
-          .order("valor_homologado", { ascending: false, nullsFirst: false })
-          .range(offset, offset + batchSize - 1);
-        if (error) throw error;
-        if (data && data.length > 0) { allData = [...allData, ...data]; offset += batchSize; hasMore = data.length === batchSize; }
-        else hasMore = false;
+          .range(from, to);
+
+        if (isAbertas) {
+          q = q.order("data_publicacao", { ascending: false });
+        } else {
+          q = q.order("valor_homologado", { ascending: false, nullsFirst: false });
+        }
+
+        if (appliedFilters.dateFrom) q = q.gte("data_publicacao", appliedFilters.dateFrom);
+        if (appliedFilters.dateTo) q = q.lte("data_publicacao", appliedFilters.dateTo);
+        if (appliedFilters.uf) q = q.eq("uf", appliedFilters.uf);
+
+        if (isAbertas) {
+          if (appliedFilters.situacao) q = q.eq("situacao", appliedFilters.situacao);
+          q = q.or("valor_homologado.is.null,valor_homologado.eq.0");
+          q = q.not("situacao", "in", "(Revogada,Anulada)");
+        } else {
+          if (hasResultadoStatus) {
+            q = q.not("valor_homologado", "is", null).gt("valor_homologado", 0);
+          } else if (appliedFilters.situacao) {
+            q = q.eq("situacao", appliedFilters.situacao);
+          } else {
+            q = q.or("valor_homologado.gt.0,situacao.in.(Revogada,Anulada)");
+          }
+        }
+
+        if (appliedFilters.orgao) q = q.ilike("orgao", `%${appliedFilters.orgao}%`);
+
+        // Keyword AND-search on objeto (when not using RPC)
+        const words = (appliedFilters.search || "").toLowerCase().split(/\s+/).filter(Boolean);
+        for (const word of words) q = q.ilike("objeto", `%${word}%`);
+
+        return q;
+      };
+
+      let allData: any[] = [];
+
+      if (useRpcExport) {
+        // Use the same RPC as the main view to honor full-text search and vencedor filter
+        const rpcSituacao = isAbertas
+          ? (appliedFilters.situacao || null)
+          : (hasResultadoStatus ? null : appliedFilters.situacao || null);
+
+        let offset = 0;
+        let hasMore = true;
+        while (hasMore && allData.length < MAX_EXPORT) {
+          const { data, error } = await (supabase as any).rpc("search_licitacoes", {
+            p_search: appliedFilters.search || null,
+            p_orgao: appliedFilters.orgao || null,
+            p_date_from: appliedFilters.dateFrom || null,
+            p_date_to: appliedFilters.dateTo || null,
+            p_uf: appliedFilters.uf || null,
+            p_situacao: rpcSituacao,
+            p_vencedor: appliedFilters.vencedor || null,
+            p_modalidade: null,
+            p_com_vencedor: !isAbertas && hasResultadoStatus,
+            p_sem_resultado: isAbertas,
+            p_limit: batchSize,
+            p_offset: offset,
+          });
+          if (error) throw error;
+          const rows = (data || []) as any[];
+          allData = allData.concat(rows);
+          hasMore = rows.length === batchSize;
+          offset += batchSize;
+        }
+      } else {
+        let offset = 0;
+        let hasMore = true;
+        while (hasMore && allData.length < MAX_EXPORT) {
+          const { data, error } = await buildFilteredQuery(offset, offset + batchSize - 1);
+          if (error) throw error;
+          const rows = (data || []) as any[];
+          allData = allData.concat(rows);
+          hasMore = rows.length === batchSize;
+          offset += batchSize;
+        }
       }
+
+      if (allData.length > MAX_EXPORT) allData = allData.slice(0, MAX_EXPORT);
+
+      if (allData.length === 0) {
+        toast.info("Nenhum registro encontrado para os filtros aplicados.");
+        return;
+      }
+
       const rows = allData.map((row: any) => ({
         "Órgão": row.orgao, "Objeto": row.objeto, "Modalidade": row.modalidade || "",
         "Valor Estimado": row.valor_estimado || "", "Val. Homologado": row.valor_homologado || "",
@@ -611,7 +693,7 @@ export default function LicitacoesPage() {
       toast.success(`${rows.length.toLocaleString("pt-BR")} registros exportados com sucesso!`);
     } catch (err) { console.error("Export error:", err); toast.error("Erro ao exportar dados."); }
     finally { setExporting(false); }
-  }, []);
+  }, [appliedFilters, isAbertas]);
 
   return (
     <div className="space-y-4">
