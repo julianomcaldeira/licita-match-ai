@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+type PhaseTiming = { startedAt: string; finishedAt?: string; recordsProcessed: number };
+
 type IngestionJob = {
   id: string;
   status: "pending" | "running" | "completed" | "failed" | "cancelled";
@@ -19,7 +21,18 @@ type IngestionJob = {
   started_at: string | null;
   finished_at: string | null;
   error_message: string | null;
+  state: any;
 };
+
+// Default phase weights (rough estimate, used only before any phase has finished)
+const PHASE_WEIGHTS: Record<string, number> = {
+  pncp: 5,        // heaviest
+  winners: 3,
+  contratos: 2,
+  sancionados: 1,
+  auto_analysis: 2,
+};
+const PHASES_ORDER = ["pncp", "winners", "contratos", "sancionados", "auto_analysis"];
 
 const PHASE_LABEL: Record<string, string> = {
   pncp: "1/5 · Licitações PNCP",
