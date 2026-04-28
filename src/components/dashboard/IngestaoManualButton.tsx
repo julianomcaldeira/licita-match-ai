@@ -103,18 +103,86 @@ export function IngestaoManualButton() {
     };
   }, [job?.id, job?.status]);
 
-  // ETA calculation: based on elapsed time + phases completed
+  // Smarter ETA: use measured durations of completed phases to estimate
+  // remaining phases, instead of pure linear extrapolation.
   const eta = useMemo(() => {
     if (!job || !job.started_at || job.status !== "running") return null;
-    const elapsed = Date.now() - new Date(job.started_at).getTime();
-    const phaseFraction = job.phase_progress_total > 0
-      ? Math.min(1, job.phase_progress_current / job.phase_progress_total)
-      : 0;
-    const totalProgress = (job.phases_completed + phaseFraction) / job.phases_total;
-    if (totalProgress <= 0.01) return null;
-    const totalEstimated = elapsed / totalProgress;
-    const remaining = totalEstimated - elapsed;
-    return remaining;
+    const now = Date.now();
+    const phaseTimings: Record<string, PhaseTiming> =
+      (job.state?.__phaseTimings as any) || {};
+
+    // 1. Measure rate of completed phases (ms per "weight unit")
+    const completedDurations: number[] = [];
+    let totalCompletedWeight = 0;
+    for (const p of PHASES_ORDER) {
+      const t = phaseTimings[p];
+      if (t?.finishedAt && t.startedAt) {
+        const dur = new Date(t.finishedAt).getTime() - new Date(t.startedAt).getTime();
+        completedDurations.push(dur / (PHASE_WEIGHTS[p] || 1));
+        totalCompletedWeight += PHASE_WEIGHTS[p] || 1;
+      }
+    }
+    const measuredMsPerWeight =
+      completedDurations.length > 0
+        ? completedDurations.reduce((a, b) => a + b, 0) / completedDurations.length
+        : null;
+
+    // 2. Current phase: estimate remaining via in-phase progress rate
+    let currentPhaseRemainingMs = 0;
+    if (job.current_phase) {
+      const cp = phaseTimings[job.current_phase];
+      const phaseElapsed = cp?.startedAt
+        ? now - new Date(cp.startedAt).getTime()
+        : 0;
+      const fraction =
+        job.phase_progress_total > 0
+          ? Math.min(1, job.phase_progress_current / job.phase_progress_total)
+          : 0;
+      if (fraction > 0.05) {
+        // Extrapolate from in-phase rate
+        const phaseTotalEstimate = phaseElapsed / fraction;
+        currentPhaseRemainingMs = Math.max(0, phaseTotalEstimate - phaseElapsed);
+      } else if (measuredMsPerWeight !== null) {
+        // Not enough in-phase data — use measured rate from previous phases
+        const w = PHASE_WEIGHTS[job.current_phase] || 1;
+        currentPhaseRemainingMs = Math.max(0, measuredMsPerWeight * w - phaseElapsed);
+      } else {
+        return null; // not enough data yet
+      }
+    }
+
+    // 3. Future phases: sum weights and apply measured rate (or fallback heuristic)
+    const currentIdx = job.current_phase ? PHASES_ORDER.indexOf(job.current_phase) : -1;
+    const futureWeight = PHASES_ORDER.slice(currentIdx + 1)
+      .reduce((sum, p) => sum + (PHASE_WEIGHTS[p] || 1), 0);
+
+    let futurePhasesMs = 0;
+    if (futureWeight > 0) {
+      if (measuredMsPerWeight !== null) {
+        futurePhasesMs = measuredMsPerWeight * futureWeight;
+      } else {
+        // No completed phases yet → use current phase elapsed as proxy
+        const cp = job.current_phase ? phaseTimings[job.current_phase] : null;
+        const phaseElapsed = cp?.startedAt
+          ? now - new Date(cp.startedAt).getTime()
+          : now - new Date(job.started_at).getTime();
+        const fraction =
+          job.phase_progress_total > 0
+            ? Math.min(1, job.phase_progress_current / job.phase_progress_total)
+            : 0;
+        if (fraction > 0.1) {
+          const projectedCurrent = phaseElapsed / fraction;
+          const currentWeight = job.current_phase
+            ? PHASE_WEIGHTS[job.current_phase] || 1
+            : 1;
+          futurePhasesMs = (projectedCurrent / currentWeight) * futureWeight;
+        } else {
+          return null;
+        }
+      }
+    }
+
+    return currentPhaseRemainingMs + futurePhasesMs;
   }, [job]);
 
   const overallPct = useMemo(() => {
@@ -149,17 +217,28 @@ export function IngestaoManualButton() {
     }
   }
 
+  const [cancelling, setCancelling] = useState(false);
   async function cancelPipeline() {
     if (!job) return;
-    if (!confirm("Cancelar a ingestão em andamento?")) return;
-    const { error } = await supabase
-      .from("ingestion_jobs" as any)
-      .update({ status: "cancelled", finished_at: new Date().toISOString() })
-      .eq("id", job.id);
-    if (error) toast.error(error.message);
-    else {
-      toast.info("Ingestão cancelada");
-      setJob({ ...job, status: "cancelled" });
+    if (!confirm("Cancelar a ingestão em andamento? O job será encerrado com segurança após o tick atual.")) return;
+    setCancelling(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("cancel-ingestion-pipeline", {
+        body: { jobId: job.id },
+      });
+      if (error) throw error;
+      toast.info("Ingestão cancelada. Aguardando o servidor encerrar o tick atual...");
+      // Refresh immediately
+      const { data: refreshed } = await supabase
+        .from("ingestion_jobs" as any)
+        .select("*")
+        .eq("id", job.id)
+        .maybeSingle();
+      if (refreshed) setJob(refreshed as any);
+    } catch (e: any) {
+      toast.error(e?.message || "Falha ao cancelar");
+    } finally {
+      setCancelling(false);
     }
   }
 
