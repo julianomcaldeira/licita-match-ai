@@ -127,6 +127,8 @@ export default function LicitacoesPage() {
   const [progress, setProgress] = useState<IngestProgress | null>(null);
   const abortRef = useRef(false);
   const queryClient = useQueryClient();
+  const { role } = useAuth();
+  const isAdminCentral = role === "admin_central";
 
   const statusOptions = activeTab === "abertas" ? STATUS_ABERTAS : STATUS_ENCERRADAS;
 
