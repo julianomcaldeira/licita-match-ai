@@ -374,8 +374,9 @@ export function IngestaoManualButton() {
                 <Button variant="outline" className="flex-1" onClick={() => setOpen(false)}>
                   Fechar (continua rodando)
                 </Button>
-                <Button variant="destructive" className="gap-2" onClick={cancelPipeline}>
-                  <X className="h-4 w-4" /> Cancelar
+                <Button variant="destructive" className="gap-2" onClick={cancelPipeline} disabled={cancelling}>
+                  {cancelling ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+                  {cancelling ? "Cancelando..." : "Cancelar ingestão"}
                 </Button>
               </div>
             </div>
