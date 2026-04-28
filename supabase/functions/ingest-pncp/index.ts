@@ -862,13 +862,21 @@ async function authenticateAdmin(req: Request): Promise<{ userId: string } | nul
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) return null;
 
+  const token = authHeader.replace("Bearer ", "").trim();
+
+  // Internal pipeline bypass: requests from pipeline-orchestrator carry the
+  // SERVICE_ROLE_KEY. service_role is never exposed to the client, so trust it.
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  if (serviceKey && token === serviceKey) {
+    return { userId: "internal-pipeline" };
+  }
+
   const supabaseAuth = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || "",
     { global: { headers: { Authorization: authHeader } } }
   );
 
-  const token = authHeader.replace("Bearer ", "");
   const { data, error } = await supabaseAuth.auth.getClaims(token);
   if (error || !data?.claims) return null;
 
