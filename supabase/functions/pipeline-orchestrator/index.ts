@@ -233,23 +233,46 @@ serve(async (req) => {
     phaseError = err instanceof Error ? err.message : String(err);
   }
 
+  // Track per-phase timings for smarter ETA on the client
+  const phaseTimings: Record<string, { startedAt: string; finishedAt?: string; recordsProcessed: number }> =
+    (state.__phaseTimings as any) || {};
+  if (!phaseTimings[phase]) {
+    phaseTimings[phase] = { startedAt: new Date().toISOString(), recordsProcessed: 0 };
+  }
+  phaseTimings[phase].recordsProcessed += phaseRecords;
+
   // Advance phase if needed
   let nextPhase: Phase | null = phase;
   if (advancePhase) {
     phasesCompleted += 1;
+    phaseTimings[phase].finishedAt = new Date().toISOString();
     const idx = PHASES.indexOf(phase);
     if (idx + 1 >= PHASES.length) {
       nextPhase = null;
     } else {
       nextPhase = PHASES[idx + 1];
-      // Reset phase state
-      Object.keys(state).forEach((k) => delete state[k]);
+      // Reset phase state but PRESERVE phaseTimings
+      Object.keys(state).forEach((k) => {
+        if (k !== "__phaseTimings") delete state[k];
+      });
       phaseProgressCurrent = 0;
       phaseProgressTotal = 0;
     }
   }
 
+  state.__phaseTimings = phaseTimings;
+
+  // Re-check cancellation BEFORE writing — avoid overwriting a cancel
+  const { data: preCheck } = await supabase
+    .from("ingestion_jobs").select("status").eq("id", jobId).maybeSingle();
+  if (preCheck?.status === "cancelled") {
+    return new Response(JSON.stringify({ ok: true, cancelled: true }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   const isDone = nextPhase === null;
+  // Update only if status is still running/pending (avoid clobbering a cancel that arrived between reads)
   await supabase.from("ingestion_jobs").update({
     status: isDone ? "completed" : "running",
     current_phase: nextPhase,
@@ -262,9 +285,9 @@ serve(async (req) => {
     last_tick_at: new Date().toISOString(),
     finished_at: isDone ? new Date().toISOString() : null,
     error_message: phaseError,
-  }).eq("id", jobId);
+  }).eq("id", jobId).in("status", ["pending", "running"]);
 
-  // Re-check cancellation between writes
+  // Final cancellation check
   const { data: refreshed } = await supabase
     .from("ingestion_jobs").select("status").eq("id", jobId).maybeSingle();
   if (refreshed?.status === "cancelled") {
