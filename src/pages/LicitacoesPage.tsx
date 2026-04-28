@@ -23,6 +23,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import ComboboxFilter from "@/components/ComboboxFilter";
 import ComboboxMultiFilter from "@/components/ComboboxMultiFilter";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { IngestaoManualButton } from "@/components/dashboard/IngestaoManualButton";
+import { useAuth } from "@/contexts/AuthContext";
 
 
 const UFS = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
