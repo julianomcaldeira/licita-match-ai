@@ -23,6 +23,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import ComboboxFilter from "@/components/ComboboxFilter";
 import ComboboxMultiFilter from "@/components/ComboboxMultiFilter";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { IngestaoManualButton } from "@/components/dashboard/IngestaoManualButton";
+import { useAuth } from "@/contexts/AuthContext";
 
 
 const UFS = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
@@ -125,6 +127,8 @@ export default function LicitacoesPage() {
   const [progress, setProgress] = useState<IngestProgress | null>(null);
   const abortRef = useRef(false);
   const queryClient = useQueryClient();
+  const { role } = useAuth();
+  const isAdminCentral = role === "admin_central";
 
   const statusOptions = activeTab === "abertas" ? STATUS_ABERTAS : STATUS_ENCERRADAS;
 
@@ -811,30 +815,7 @@ export default function LicitacoesPage() {
             {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileSpreadsheet className="h-3.5 w-3.5" />}
             Exportar Excel
           </button>
-          <Popover>
-            <PopoverTrigger asChild>
-              <button className="flex h-9 items-center gap-2 rounded-lg border border-input bg-card px-3 text-xs font-medium text-muted-foreground hover:bg-secondary transition">
-                <Database className="h-3.5 w-3.5" /> Ingestão <ChevronDown className="h-3 w-3" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-56 p-2" align="end">
-              <div className="space-y-1">
-                <button onClick={startBulkIngestion} disabled={progress?.isRunning} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-secondary transition disabled:opacity-50">
-                  {progress?.isRunning && progress.phase === "ingest" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                  Ingerir PNCP (2023–Hoje)
-                </button>
-                <button onClick={startWinnerFetching} disabled={progress?.isRunning} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-secondary transition disabled:opacity-50">
-                  {progress?.isRunning && progress.phase === "winners" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trophy className="h-4 w-4" />}
-                  Buscar Vencedores
-                </button>
-                {progress?.isRunning && (
-                  <button onClick={cancelIngestion} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition">
-                    <X className="h-4 w-4" /> Cancelar
-                  </button>
-                )}
-              </div>
-            </PopoverContent>
-          </Popover>
+          {isAdminCentral && <IngestaoManualButton />}
         </div>
       </div>
 

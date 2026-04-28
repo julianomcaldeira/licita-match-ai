@@ -307,6 +307,66 @@ export type Database = {
         }
         Relationships: []
       }
+      ingestion_jobs: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          current_phase: string | null
+          error_message: string | null
+          finished_at: string | null
+          id: string
+          last_tick_at: string | null
+          phase_label: string | null
+          phase_progress_current: number
+          phase_progress_total: number
+          phases_completed: number
+          phases_total: number
+          started_at: string | null
+          state: Json
+          status: string
+          total_records_processed: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          current_phase?: string | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          last_tick_at?: string | null
+          phase_label?: string | null
+          phase_progress_current?: number
+          phase_progress_total?: number
+          phases_completed?: number
+          phases_total?: number
+          started_at?: string | null
+          state?: Json
+          status?: string
+          total_records_processed?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          current_phase?: string | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          last_tick_at?: string | null
+          phase_label?: string | null
+          phase_progress_current?: number
+          phase_progress_total?: number
+          phases_completed?: number
+          phases_total?: number
+          started_at?: string | null
+          state?: Json
+          status?: string
+          total_records_processed?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       licitacao_itens: {
         Row: {
           created_at: string
