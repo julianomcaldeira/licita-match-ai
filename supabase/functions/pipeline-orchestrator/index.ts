@@ -162,8 +162,9 @@ serve(async (req) => {
           phaseProgressCurrent = state.modIdx;
           phaseProgressTotal = MODALIDADES.length;
         } else {
-          // skip modalidade on error to keep moving
+          // skip modalidade on error to keep moving, but record the error
           console.error("ingest-pncp tick failed", result.status, result.text);
+          phaseError = `PNCP mod ${modalidade}: HTTP ${result.status} ${(result.text || "").slice(0, 200)}`;
           state.modIdx = modIdx + 1;
           state.pagina = 1;
         }
