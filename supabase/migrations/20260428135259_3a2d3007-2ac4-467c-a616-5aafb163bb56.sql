@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.search_licitacoes(text, text, text, text, text, text, text, text, boolean, boolean, integer, integer);
