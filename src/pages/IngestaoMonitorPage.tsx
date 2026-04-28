@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { IngerirContratosDialog } from "@/components/dashboard/IngerirContratosDialog";
 import { ContratosIngestaoTab } from "@/components/dashboard/ContratosIngestaoTab";
+import { IngestaoManualButton } from "@/components/dashboard/IngestaoManualButton";
 
 const LOG_PAGE_SIZE = 20;
 
