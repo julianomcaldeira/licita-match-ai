@@ -869,6 +869,12 @@ export type Database = {
           situacao: string
         }[]
       }
+      get_orfaos_dadosabertos: {
+        Args: { p_limit?: number }
+        Returns: {
+          compra_key: string
+        }[]
+      }
       get_winners_backlog_cursor: { Args: never; Returns: string }
       has_role: {
         Args: {
