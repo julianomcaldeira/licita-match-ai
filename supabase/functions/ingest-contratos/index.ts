@@ -110,44 +110,66 @@ async function fetchLicitacoesByOrgao(
 
 /**
  * Bulk fetch contracts from Portal da Transparência by date range.
- * Endpoint: /contratos?dataInicial=DD/MM/YYYY&dataFinal=DD/MM/YYYY&pagina=N
- * Each page returns up to 500 records.
+ * The API REQUIRES `codigoOrgao` (SIAFI). We iterate over the top federal organs
+ * (configurable list) and aggregate. Each page returns up to 500 records.
  */
+const TOP_ORGAOS_SIAFI = [
+  "26000", // Ministério da Educação
+  "36000", // Ministério da Saúde
+  "39000", // Ministério da Infraestrutura
+  "52000", // Ministério da Defesa
+  "25000", // Ministério da Economia / Fazenda
+  "32000", // Ministério de Minas e Energia
+  "38000", // Ministério do Trabalho
+  "44000", // Ministério do Meio Ambiente
+  "55000", // Ministério da Cidadania
+  "20000", // Presidência da República
+  "30000", // Ministério da Justiça
+  "24000", // Ministério da Ciência e Tecnologia
+  "33000", // Ministério da Previdência
+  "35000", // Ministério das Relações Exteriores
+  "53000", // Ministério da Integração
+  "54000", // Ministério do Turismo
+  "56000", // Ministério das Cidades
+];
+
 async function fetchContratosBulk(
   supabase: any,
   apiKey: string,
   dataInicial: string,
   dataFinal: string,
   maxPages: number = 50,
+  codigosOrgaos: string[] = TOP_ORGAOS_SIAFI,
 ): Promise<{ total: number; pages: number; errors: string[] }> {
-  let pagina = 1;
   let total = 0;
+  let totalPages = 0;
   const errors: string[] = [];
-  let hasMore = true;
 
-  while (hasMore && pagina <= maxPages) {
-    try {
-      const url = `${API_BASE}/contratos?dataInicial=${encodeURIComponent(dataInicial)}&dataFinal=${encodeURIComponent(dataFinal)}&pagina=${pagina}`;
-      console.log(`Fetching contratos: ${url}`);
-      const response = await fetchWithRetry(url, apiKey);
+  for (const codigoOrgao of codigosOrgaos) {
+    let pagina = 1;
+    let hasMore = true;
+    while (hasMore && pagina <= maxPages) {
+      try {
+        const url = `${API_BASE}/contratos?dataInicial=${encodeURIComponent(dataInicial)}&dataFinal=${encodeURIComponent(dataFinal)}&codigoOrgao=${encodeURIComponent(codigoOrgao)}&pagina=${pagina}`;
+        console.log(`[orgao=${codigoOrgao}] p${pagina} ${dataInicial}→${dataFinal}`);
+        const response = await fetchWithRetry(url, apiKey);
 
-      if (!response.ok) {
-        const errText = await response.text();
-        console.warn(`HTTP ${response.status}: ${errText.slice(0, 200)}`);
-        if (response.status === 404 || response.status === 400) {
+        if (!response.ok) {
+          const errText = await response.text();
+          if (response.status === 404 || response.status === 400) {
+            hasMore = false;
+            break;
+          }
+          errors.push(`orgao=${codigoOrgao} p${pagina}: HTTP ${response.status} ${errText.slice(0, 120)}`);
           hasMore = false;
           break;
         }
-        errors.push(`Page ${pagina}: HTTP ${response.status}`);
-        hasMore = false;
-        break;
-      }
 
-      const contratos = await response.json();
-      if (!Array.isArray(contratos) || contratos.length === 0) {
-        hasMore = false;
-        break;
-      }
+        const contratos = await response.json();
+        if (!Array.isArray(contratos) || contratos.length === 0) {
+          hasMore = false;
+          break;
+        }
 
       const rows = contratos.map((c: any) => {
         const cnpjOrgao = (c.unidadeGestora?.orgaoVinculado?.cnpj || c.unidadeGestora?.codigo || "desconhecido")
@@ -181,20 +203,22 @@ async function fetchContratosBulk(
         const { error } = await supabase
           .from("contratos")
           .upsert(batch, { onConflict: "cnpj_orgao,numero_contrato" });
-        if (error) errors.push(`Page ${pagina}: ${error.message}`);
+        if (error) errors.push(`orgao=${codigoOrgao} p${pagina}: ${error.message}`);
         else total += batch.length;
       }
 
-      hasMore = contratos.length >= 500;
-      pagina++;
-      await new Promise((r) => setTimeout(r, 250));
-    } catch (e) {
-      errors.push(`Page ${pagina}: ${e instanceof Error ? e.message : "unknown"}`);
-      hasMore = false;
+        hasMore = contratos.length >= 500;
+        pagina++;
+        totalPages++;
+        await new Promise((r) => setTimeout(r, 250));
+      } catch (e) {
+        errors.push(`orgao=${codigoOrgao} p${pagina}: ${e instanceof Error ? e.message : "unknown"}`);
+        hasMore = false;
+      }
     }
   }
 
-  return { total, pages: pagina - 1, errors };
+  return { total, pages: totalPages, errors };
 }
 
 /**
