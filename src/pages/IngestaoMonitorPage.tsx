@@ -12,6 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { IngerirContratosDialog } from "@/components/dashboard/IngerirContratosDialog";
 import { ContratosIngestaoTab } from "@/components/dashboard/ContratosIngestaoTab";
 import { IngestaoManualButton } from "@/components/dashboard/IngestaoManualButton";
+import { AuditoriaTab } from "@/components/dashboard/AuditoriaTab";
 
 const LOG_PAGE_SIZE = 20;
 
@@ -178,10 +179,15 @@ export default function IngestaoMonitorPage() {
           <TabsTrigger value="ingestao" className="gap-1.5"><Database className="h-3.5 w-3.5" /> Ingestão</TabsTrigger>
           <TabsTrigger value="contratos" className="gap-1.5"><FileText className="h-3.5 w-3.5" /> Contratos</TabsTrigger>
           <TabsTrigger value="analise" className="gap-1.5"><Brain className="h-3.5 w-3.5" /> Auto-Análise IA</TabsTrigger>
+          <TabsTrigger value="auditoria" className="gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" /> Auditoria</TabsTrigger>
         </TabsList>
 
         <TabsContent value="contratos">
           <ContratosIngestaoTab />
+        </TabsContent>
+
+        <TabsContent value="auditoria">
+          <AuditoriaTab />
         </TabsContent>
 
         <TabsContent value="ingestao">
