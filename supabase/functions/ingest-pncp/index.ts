@@ -503,61 +503,61 @@ async function handleCron(supabase: any) {
  * Increased batch size and parallelism for faster processing
  */
 async function handleWinners(supabase: any, body: any) {
-  const batchSize = Math.min(Number(body.limit) || 100, 200);
-  const afterCreatedAt: string | null = body.afterCreatedAt || null;
+  const batchSize = Math.min(Number(body.limit) || 500, 1000);
+  // When body.afterCreatedAt is provided, use legacy non-atomic mode (manual orchestrator).
+  // Otherwise use the atomic claim_winners_batch RPC for safe parallel workers.
+  const explicitCursor: string | null = body.afterCreatedAt ?? null;
 
-  const { data: licitacoes, error: queryErr } = await supabase.rpc("licitacoes_sem_itens", {
-    lim: batchSize,
-    after_created_at: afterCreatedAt,
-  });
+  let licitacoes: any[] | null = null;
+  let queryErr: any = null;
 
-  // CRITICAL: do NOT treat a query error as "done". Surface it so the
-  // orchestrator can retry instead of marking the phase complete.
+  if (explicitCursor !== null) {
+    const r = await supabase.rpc("licitacoes_sem_itens", {
+      lim: batchSize, after_created_at: explicitCursor,
+    });
+    licitacoes = r.data; queryErr = r.error;
+  } else {
+    const r = await supabase.rpc("claim_winners_batch", { p_limit: batchSize });
+    licitacoes = r.data; queryErr = r.error;
+  }
+
   if (queryErr) {
-    console.error("licitacoes_sem_itens failed:", queryErr.message);
+    console.error("claim/list winners failed:", queryErr.message);
     return new Response(
       JSON.stringify({
-        success: false,
-        error: queryErr.message,
-        retryable: true,
-        winnersFound: 0,
-        processed: 0,
-        hasMore: true, // unknown — keep the phase alive
-        nextCursor: afterCreatedAt,
+        success: false, error: queryErr.message, retryable: true,
+        winnersFound: 0, processed: 0, hasMore: true,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 
   if (!licitacoes || licitacoes.length === 0) {
-    // Real end of queue (only if there's no cursor advance happening).
     return new Response(
       JSON.stringify({
         success: true, winnersFound: 0, processed: 0,
-        hasMore: false, nextCursor: afterCreatedAt,
+        hasMore: false, cursorReset: true,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 
-  console.log(`Processing ${licitacoes.length} licitações for winners (cursor=${afterCreatedAt || "start"})`);
+  const minC = licitacoes[0]?.created_at;
+  const maxC = licitacoes[licitacoes.length - 1]?.created_at;
+  console.log(`Claimed ${licitacoes.length} winners batch: ${minC} → ${maxC}`);
+
   let winnersFound = 0;
   let processed = 0;
-  let lastCreatedAt: string | null = afterCreatedAt;
 
-  const PARALLEL = 10;
+  const PARALLEL = 15;
   for (let i = 0; i < licitacoes.length; i += PARALLEL) {
     const batch = licitacoes.slice(i, i + PARALLEL);
     const results = await Promise.allSettled(
       batch.map((lic: any) => processWinner(supabase, lic))
     );
-    for (let j = 0; j < results.length; j++) {
-      const r = results[j];
+    for (const r of results) {
       if (r.status === "fulfilled") winnersFound += r.value;
       processed++;
-      // Track furthest cursor we've actually attempted, so we always advance
-      const cAt = batch[j]?.created_at;
-      if (cAt && (!lastCreatedAt || cAt > lastCreatedAt)) lastCreatedAt = cAt;
     }
   }
 
@@ -572,11 +572,9 @@ async function handleWinners(supabase: any, body: any) {
 
   return new Response(
     JSON.stringify({
-      success: true,
-      winnersFound,
-      processed,
+      success: true, winnersFound, processed,
       hasMore: licitacoes.length >= batchSize,
-      nextCursor: lastCreatedAt,
+      batchRange: { from: minC, to: maxC },
     }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );

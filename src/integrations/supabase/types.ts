@@ -801,6 +801,15 @@ export type Database = {
           total_vitorias: number
         }[]
       }
+      claim_winners_batch: {
+        Args: { p_limit?: number }
+        Returns: {
+          created_at: string
+          id: string
+          numero_controle_pncp: string
+          raw_json: Json
+        }[]
+      }
       contratos_por_dia: {
         Args: { p_days?: number }
         Returns: {
@@ -833,6 +842,7 @@ export type Database = {
           situacao: string
         }[]
       }
+      get_winners_backlog_cursor: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -968,6 +978,10 @@ export type Database = {
           valor_homologado: number
           vencedor_nome: string
         }[]
+      }
+      set_winners_backlog_cursor: {
+        Args: { p_cursor: string; p_processed?: number }
+        Returns: undefined
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
