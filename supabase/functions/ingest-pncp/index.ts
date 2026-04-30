@@ -503,38 +503,41 @@ async function handleCron(supabase: any) {
  * Increased batch size and parallelism for faster processing
  */
 async function handleWinners(supabase: any, body: any) {
-  const batchSize = Math.min(Number(body.limit) || 100, 200);
-  const afterCreatedAt: string | null = body.afterCreatedAt || null;
+  const batchSize = Math.min(Number(body.limit) || 500, 1000);
+  // Use persistent cursor unless caller explicitly passes one
+  let afterCreatedAt: string | null = body.afterCreatedAt ?? null;
+  const usePersistentCursor = afterCreatedAt === null;
+
+  if (usePersistentCursor) {
+    const { data: cur } = await supabase.rpc("get_winners_backlog_cursor");
+    afterCreatedAt = cur && cur !== "" ? cur : null;
+  }
 
   const { data: licitacoes, error: queryErr } = await supabase.rpc("licitacoes_sem_itens", {
     lim: batchSize,
     after_created_at: afterCreatedAt,
   });
 
-  // CRITICAL: do NOT treat a query error as "done". Surface it so the
-  // orchestrator can retry instead of marking the phase complete.
   if (queryErr) {
     console.error("licitacoes_sem_itens failed:", queryErr.message);
     return new Response(
       JSON.stringify({
-        success: false,
-        error: queryErr.message,
-        retryable: true,
-        winnersFound: 0,
-        processed: 0,
-        hasMore: true, // unknown — keep the phase alive
-        nextCursor: afterCreatedAt,
+        success: false, error: queryErr.message, retryable: true,
+        winnersFound: 0, processed: 0, hasMore: true, nextCursor: afterCreatedAt,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 
   if (!licitacoes || licitacoes.length === 0) {
-    // Real end of queue (only if there's no cursor advance happening).
+    // End of queue → reset cursor so next cycle restarts from beginning
+    if (usePersistentCursor) {
+      await supabase.rpc("set_winners_backlog_cursor", { p_cursor: "", p_processed: 0 });
+    }
     return new Response(
       JSON.stringify({
         success: true, winnersFound: 0, processed: 0,
-        hasMore: false, nextCursor: afterCreatedAt,
+        hasMore: false, nextCursor: null, cursorReset: true,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
@@ -545,7 +548,7 @@ async function handleWinners(supabase: any, body: any) {
   let processed = 0;
   let lastCreatedAt: string | null = afterCreatedAt;
 
-  const PARALLEL = 10;
+  const PARALLEL = 15;
   for (let i = 0; i < licitacoes.length; i += PARALLEL) {
     const batch = licitacoes.slice(i, i + PARALLEL);
     const results = await Promise.allSettled(
@@ -555,10 +558,16 @@ async function handleWinners(supabase: any, body: any) {
       const r = results[j];
       if (r.status === "fulfilled") winnersFound += r.value;
       processed++;
-      // Track furthest cursor we've actually attempted, so we always advance
       const cAt = batch[j]?.created_at;
       if (cAt && (!lastCreatedAt || cAt > lastCreatedAt)) lastCreatedAt = cAt;
     }
+  }
+
+  // Persist cursor advance
+  if (usePersistentCursor && lastCreatedAt) {
+    await supabase.rpc("set_winners_backlog_cursor", {
+      p_cursor: lastCreatedAt, p_processed: winnersFound,
+    });
   }
 
   await supabase.from("ingestao_logs").insert({
@@ -572,11 +581,10 @@ async function handleWinners(supabase: any, body: any) {
 
   return new Response(
     JSON.stringify({
-      success: true,
-      winnersFound,
-      processed,
+      success: true, winnersFound, processed,
       hasMore: licitacoes.length >= batchSize,
       nextCursor: lastCreatedAt,
+      cursorPersisted: usePersistentCursor,
     }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
