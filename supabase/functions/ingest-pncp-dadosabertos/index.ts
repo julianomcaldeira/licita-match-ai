@@ -420,6 +420,58 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (mode === "cleanup-orfaos") {
+      // Process orphan compras: those with contratos in pncp_raw but missing licitacoes
+      const batchSize = Math.min(+body.batchSize || 100, 300);
+      const { data: orphans, error: orphErr } = await supabase.rpc("get_orfaos_dadosabertos", {
+        p_limit: batchSize,
+      });
+      if (orphErr) throw orphErr;
+      const keys: string[] = (orphans ?? []).map((r: any) => r.compra_key).filter(Boolean);
+
+      let totalItems = 0;
+      let totalWinners = 0;
+      let processed = 0;
+      const errors: string[] = [];
+      await pMap(
+        keys,
+        async (k) => {
+          try {
+            const r = await ingestCompraDetails(supabase, k);
+            totalItems += r.items;
+            totalWinners += r.winners;
+            processed++;
+          } catch (e) {
+            errors.push(`${k}: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        },
+        COMPRA_CONCURRENCY,
+      );
+
+      await logRun(
+        supabase,
+        `cleanup-orfaos`,
+        errors.length ? "parcial" : "sucesso",
+        processed + totalItems + totalWinners,
+        startedAt,
+        new Date().toISOString(),
+        errors.slice(0, 3).join(" | ") || undefined,
+      );
+
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          mode,
+          orfaosProcessados: processed,
+          orfaosTentados: keys.length,
+          itensInseridos: totalItems,
+          vencedoresInseridos: totalWinners,
+          errors: errors.slice(0, 10),
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     let dataInicial: string;
     let dataFinal: string;
 
