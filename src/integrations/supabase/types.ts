@@ -801,6 +801,15 @@ export type Database = {
           total_vitorias: number
         }[]
       }
+      claim_winners_batch: {
+        Args: { p_limit?: number }
+        Returns: {
+          created_at: string
+          id: string
+          numero_controle_pncp: string
+          raw_json: Json
+        }[]
+      }
       contratos_por_dia: {
         Args: { p_days?: number }
         Returns: {
