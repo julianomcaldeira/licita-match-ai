@@ -38,3 +38,6 @@ verify_jwt = false
 
 [functions.internal-cron-dispatcher]
 verify_jwt = false
+
+[functions.ingest-pncp-dadosabertos]
+verify_jwt = false

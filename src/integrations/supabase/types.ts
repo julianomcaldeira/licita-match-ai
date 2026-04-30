@@ -626,6 +626,33 @@ export type Database = {
           },
         ]
       }
+      pncp_raw: {
+        Row: {
+          chave_origem: string
+          coletado_em: string
+          id: string
+          payload: Json
+          processado: boolean
+          tipo: string
+        }
+        Insert: {
+          chave_origem: string
+          coletado_em?: string
+          id?: string
+          payload: Json
+          processado?: boolean
+          tipo: string
+        }
+        Update: {
+          chave_origem?: string
+          coletado_em?: string
+          id?: string
+          payload?: Json
+          processado?: boolean
+          tipo?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null

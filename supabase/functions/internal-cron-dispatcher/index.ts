@@ -15,6 +15,7 @@ const ALLOWED_TARGETS = new Set([
   "ingest-contratos",
   "ingest-ceis-cnep",
   "ingest-pncp",
+  "ingest-pncp-dadosabertos",
   "ingest-querido-diario",
   "auto-analysis",
 ]);
