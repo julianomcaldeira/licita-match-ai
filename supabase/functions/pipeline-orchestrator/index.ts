@@ -1,23 +1,9 @@
-// Pipeline orchestrator: processes one "tick" of the manual ingestion pipeline
-// and self-reschedules in fire-and-forget mode until the job is complete.
-//
-// Phases (in order):
-//   1. pncp        - ingest new biddings (last 7 days)
-//   2. winners     - fetch winners for homologated biddings (loop until no more)
-//   3. contratos   - ingest contracts from Portal da Transparência (last 7 days)
-//   4. sancionados - refresh CEIS/CNEP
-//   5. auto_analysis - run AI auto analysis
-//
-// Each tick advances the state and updates the ingestion_jobs row so the UI
-// can show progress and ETA.
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -25,6 +11,23 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const PHASES = ["pncp", "winners", "contratos", "sancionados", "auto_analysis"] as const;
 type Phase = typeof PHASES[number];
+
+type PhaseTiming = {
+  startedAt: string;
+  finishedAt?: string;
+  recordsProcessed: number;
+};
+
+type WatchdogState = {
+  lastProgressAt?: string;
+  lastProgressKey?: string;
+  stalledSince?: string | null;
+  stallCount?: number;
+  nextRetryAt?: string | null;
+  lastRestartAt?: string;
+  lastKickAt?: string;
+  retries?: Record<string, number>;
+};
 
 const PHASE_LABELS: Record<Phase, string> = {
   pncp: "Ingerindo licitações do PNCP",
@@ -34,8 +37,11 @@ const PHASE_LABELS: Record<Phase, string> = {
   auto_analysis: "Executando auto-análise IA",
 };
 
-// Modalidades to ingest in the PNCP phase (kept small to fit in tick budget)
 const MODALIDADES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+const WATCHDOG_STALL_MS = 3 * 60_000;
+const WATCHDOG_BASE_BACKOFF_MS = 30_000;
+const WATCHDOG_MAX_BACKOFF_MS = 10 * 60_000;
+const WATCHDOG_MAX_RETRIES = 6;
 
 function fmtDate(d: Date) {
   return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
@@ -51,8 +57,38 @@ function daysAgoYYYYMMDD(n: number) {
   return fmtDate(d);
 }
 
+function parseIsoMs(value?: string | null) {
+  if (!value) return null;
+  const ms = new Date(value).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function formatDelay(ms: number) {
+  const seconds = Math.max(1, Math.round(ms / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return rest === 0 ? `${minutes}m` : `${minutes}m ${rest}s`;
+}
+
+function makeProgressKey(
+  phase: Phase | null,
+  phasesCompleted: number,
+  phaseProgressCurrent: number,
+  phaseProgressTotal: number,
+  totalRecords: number,
+) {
+  return [phase ?? "done", phasesCompleted, phaseProgressCurrent, phaseProgressTotal, totalRecords].join("|");
+}
+
+function nextBackoff(retryCount: number) {
+  return Math.min(
+    WATCHDOG_MAX_BACKOFF_MS,
+    WATCHDOG_BASE_BACKOFF_MS * Math.pow(2, Math.max(0, retryCount - 1)),
+  );
+}
+
 async function selfSchedule(jobId: string) {
-  // Fire-and-forget call to ourselves. We don't await the response.
   fetch(`${SUPABASE_URL}/functions/v1/pipeline-orchestrator`, {
     method: "POST",
     headers: {
@@ -74,7 +110,11 @@ async function invokeFn(name: string, body: unknown) {
   });
   const text = await res.text();
   let json: any = null;
-  try { json = JSON.parse(text); } catch { /* ignore */ }
+  try {
+    json = JSON.parse(text);
+  } catch {
+    json = null;
+  }
   return { ok: res.ok, status: res.status, json, text };
 }
 
@@ -86,55 +126,87 @@ serve(async (req) => {
   });
 
   let body: any = {};
-  try { body = await req.json(); } catch { /* ignore */ }
+  try {
+    body = await req.json();
+  } catch {
+    body = {};
+  }
 
   const jobId: string | undefined = body.jobId;
   if (!jobId) {
     return new Response(JSON.stringify({ error: "jobId required" }), {
-      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
-  // Load job
   const { data: job, error: loadErr } = await supabase
-    .from("ingestion_jobs").select("*").eq("id", jobId).maybeSingle();
+    .from("ingestion_jobs")
+    .select("*")
+    .eq("id", jobId)
+    .maybeSingle();
+
   if (loadErr || !job) {
     return new Response(JSON.stringify({ error: "job not found" }), {
-      status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 404,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
-  if (job.status === "cancelled" || job.status === "completed" || job.status === "failed") {
+  if (["cancelled", "completed", "failed"].includes(job.status)) {
     return new Response(JSON.stringify({ ok: true, finalStatus: job.status }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
+  const nowIso = new Date().toISOString();
+  const nowMs = Date.now();
   const state: any = job.state || {};
+  const watchdog: WatchdogState = state.__watchdog || {};
   let phase: Phase = (job.current_phase as Phase) || "pncp";
   let phasesCompleted = job.phases_completed || 0;
   let totalRecords = job.total_records_processed || 0;
   let phaseProgressCurrent = job.phase_progress_current || 0;
   let phaseProgressTotal = job.phase_progress_total || 0;
+  const initialProgressKey = makeProgressKey(
+    phase,
+    phasesCompleted,
+    phaseProgressCurrent,
+    phaseProgressTotal,
+    totalRecords,
+  );
 
-  // Mark running on first tick
+  if (!watchdog.lastProgressKey) watchdog.lastProgressKey = initialProgressKey;
+  if (!watchdog.lastProgressAt) watchdog.lastProgressAt = job.started_at || job.created_at || nowIso;
+
+  const nextRetryAtMs = parseIsoMs(watchdog.nextRetryAt);
+  if (nextRetryAtMs && nextRetryAtMs > nowMs) {
+    return new Response(JSON.stringify({ ok: true, sleepingUntil: watchdog.nextRetryAt }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   if (job.status === "pending") {
-    await supabase.from("ingestion_jobs").update({
-      status: "running",
-      started_at: new Date().toISOString(),
-      current_phase: phase,
-      phase_label: PHASE_LABELS[phase],
-      last_tick_at: new Date().toISOString(),
-    }).eq("id", jobId);
+    await supabase
+      .from("ingestion_jobs")
+      .update({
+        status: "running",
+        started_at: nowIso,
+        current_phase: phase,
+        phase_label: PHASE_LABELS[phase],
+        last_tick_at: nowIso,
+      })
+      .eq("id", jobId);
   }
 
   let advancePhase = false;
   let phaseRecords = 0;
   let phaseError: string | null = null;
+  let needsBackoff = false;
+  let phaseLabelOverride: string | null = null;
 
   try {
     if (phase === "pncp") {
-      // Ingest one (modalidade, page) per tick.
       const dataInicial = state.dataInicial || daysAgoYYYYMMDD(7);
       const dataFinal = state.dataFinal || todayYYYYMMDD();
       const modIdx = state.modIdx ?? 0;
@@ -145,57 +217,64 @@ serve(async (req) => {
       } else {
         const modalidade = MODALIDADES[modIdx];
         const result = await invokeFn("ingest-pncp", {
-          dataInicial, dataFinal, modalidade, pagina,
+          dataInicial,
+          dataFinal,
+          modalidade,
+          pagina,
         });
+
         if (result.ok && result.json) {
           phaseRecords = Number(result.json.totalProcessed || 0);
           totalRecords += phaseRecords;
           const hasMore = !!result.json.hasMore;
+
           if (hasMore) {
             state.pagina = pagina + 1;
           } else {
             state.modIdx = modIdx + 1;
             state.pagina = 1;
           }
+
           state.dataInicial = dataInicial;
           state.dataFinal = dataFinal;
-          phaseProgressCurrent = state.modIdx;
+          phaseProgressCurrent = Number(state.modIdx || 0);
           phaseProgressTotal = MODALIDADES.length;
         } else {
-          // skip modalidade on error to keep moving, but record the error
-          console.error("ingest-pncp tick failed", result.status, result.text);
-          phaseError = `PNCP mod ${modalidade}: HTTP ${result.status} ${(result.text || "").slice(0, 200)}`;
-          state.modIdx = modIdx + 1;
-          state.pagina = 1;
+          phaseError = `PNCP mod ${modalidade} pág ${pagina}: HTTP ${result.status} ${(result.text || "").slice(0, 200)}`;
+          needsBackoff = true;
         }
       }
     } else if (phase === "winners") {
       const result = await invokeFn("ingest-pncp", { mode: "winners", limit: 50 });
+
       if (result.ok && result.json) {
         const processed = Number(result.json.processed || 0);
         const winners = Number(result.json.winnersFound || 0);
+        phaseRecords = processed;
         totalRecords += winners;
-        phaseProgressCurrent = (state.processed || 0) + processed;
+        phaseProgressCurrent = Number(state.processed || 0) + processed;
         state.processed = phaseProgressCurrent;
         phaseProgressTotal = phaseProgressCurrent + (result.json.hasMore ? 50 : 0);
         if (!result.json.hasMore) advancePhase = true;
       } else {
-        console.error("winners tick failed", result.status, result.text);
-        // tolerate transient errors a few times, then advance
-        state.winnerErrors = (state.winnerErrors || 0) + 1;
-        if (state.winnerErrors >= 3) advancePhase = true;
+        phaseError = `Vencedores: HTTP ${result.status} ${(result.text || "").slice(0, 200)}`;
+        needsBackoff = true;
       }
     } else if (phase === "contratos") {
       const dataInicial = state.cDataInicial || daysAgoYYYYMMDD(7).replace(/(\d{4})(\d{2})(\d{2})/, "$3/$2/$1");
       const dataFinal = state.cDataFinal || todayYYYYMMDD().replace(/(\d{4})(\d{2})(\d{2})/, "$3/$2/$1");
       const pagina = state.cPagina || 1;
       const result = await invokeFn("ingest-contratos", {
-        dataInicial, dataFinal, pagina,
+        dataInicial,
+        dataFinal,
+        pagina,
       });
+
       if (result.ok && result.json) {
         const processed = Number(result.json.totalProcessed || 0);
+        phaseRecords = processed;
         totalRecords += processed;
-        phaseProgressCurrent = (state.cProcessed || 0) + processed;
+        phaseProgressCurrent = Number(state.cProcessed || 0) + processed;
         state.cProcessed = phaseProgressCurrent;
         state.cDataInicial = dataInicial;
         state.cDataFinal = dataFinal;
@@ -206,103 +285,176 @@ serve(async (req) => {
           advancePhase = true;
         }
       } else {
-        console.error("contratos tick failed", result.status, result.text);
-        state.cErrors = (state.cErrors || 0) + 1;
-        if (state.cErrors >= 3) advancePhase = true;
+        phaseError = `Contratos: HTTP ${result.status} ${(result.text || "").slice(0, 200)}`;
+        needsBackoff = true;
       }
     } else if (phase === "sancionados") {
       const result = await invokeFn("ingest-ceis-cnep", {});
       if (result.ok && result.json) {
-        totalRecords += Number(result.json.totalProcessed || 0);
+        phaseRecords = Number(result.json.totalProcessed || 0);
+        totalRecords += phaseRecords;
+        advancePhase = true;
+        phaseProgressCurrent = 1;
+        phaseProgressTotal = 1;
       } else {
-        console.error("sancionados tick failed", result.status, result.text);
+        phaseError = `Sancionados: HTTP ${result.status} ${(result.text || "").slice(0, 200)}`;
+        needsBackoff = true;
       }
-      advancePhase = true; // single shot
-      phaseProgressCurrent = 1; phaseProgressTotal = 1;
     } else if (phase === "auto_analysis") {
       const result = await invokeFn("auto-analysis", {});
       if (result.ok && result.json) {
-        totalRecords += Number(result.json.totalAnalyzed || result.json.processed || 0);
+        phaseRecords = Number(result.json.totalAnalyzed || result.json.processed || 0);
+        totalRecords += phaseRecords;
+        advancePhase = true;
+        phaseProgressCurrent = 1;
+        phaseProgressTotal = 1;
       } else {
-        console.error("auto-analysis tick failed", result.status, result.text);
+        phaseError = `Auto-análise: HTTP ${result.status} ${(result.text || "").slice(0, 200)}`;
+        needsBackoff = true;
       }
-      advancePhase = true; // single shot
-      phaseProgressCurrent = 1; phaseProgressTotal = 1;
     }
   } catch (err) {
-    console.error("tick error", err);
     phaseError = err instanceof Error ? err.message : String(err);
+    needsBackoff = true;
+    console.error("tick error", err);
   }
 
-  // Track per-phase timings for smarter ETA on the client
-  const phaseTimings: Record<string, { startedAt: string; finishedAt?: string; recordsProcessed: number }> =
-    (state.__phaseTimings as any) || {};
+  const phaseTimings: Record<string, PhaseTiming> = state.__phaseTimings || {};
   if (!phaseTimings[phase]) {
-    phaseTimings[phase] = { startedAt: new Date().toISOString(), recordsProcessed: 0 };
+    phaseTimings[phase] = { startedAt: nowIso, recordsProcessed: 0 };
   }
   phaseTimings[phase].recordsProcessed += phaseRecords;
 
-  // Advance phase if needed
   let nextPhase: Phase | null = phase;
   if (advancePhase) {
     phasesCompleted += 1;
-    phaseTimings[phase].finishedAt = new Date().toISOString();
+    phaseTimings[phase].finishedAt = nowIso;
     const idx = PHASES.indexOf(phase);
+
     if (idx + 1 >= PHASES.length) {
       nextPhase = null;
     } else {
       nextPhase = PHASES[idx + 1];
-      // Reset phase state but PRESERVE phaseTimings
-      Object.keys(state).forEach((k) => {
-        if (k !== "__phaseTimings") delete state[k];
+      Object.keys(state).forEach((key) => {
+        if (key !== "__phaseTimings" && key !== "__watchdog") delete state[key];
       });
       phaseProgressCurrent = 0;
       phaseProgressTotal = 0;
     }
   }
 
-  state.__phaseTimings = phaseTimings;
+  const afterProgressKey = makeProgressKey(
+    nextPhase,
+    phasesCompleted,
+    phaseProgressCurrent,
+    phaseProgressTotal,
+    totalRecords,
+  );
+  let progressed = initialProgressKey !== afterProgressKey;
 
-  // Re-check cancellation BEFORE writing — avoid overwriting a cancel
+  if (!progressed && !needsBackoff && nextPhase !== null) {
+    const lastProgressAtMs = parseIsoMs(watchdog.lastProgressAt) ?? nowMs;
+    if (nowMs - lastProgressAtMs >= WATCHDOG_STALL_MS) {
+      phaseError = phaseError || `Sem progresso na fase ${phase} há ${formatDelay(nowMs - lastProgressAtMs)}`;
+      needsBackoff = true;
+    }
+  }
+
+  let finalStatus: "running" | "completed" | "failed" = nextPhase === null ? "completed" : "running";
+  let suppressImmediateReschedule = false;
+
+  if (progressed) {
+    watchdog.lastProgressAt = nowIso;
+    watchdog.lastProgressKey = afterProgressKey;
+    watchdog.stalledSince = null;
+    watchdog.stallCount = 0;
+    watchdog.nextRetryAt = null;
+    watchdog.retries = { ...(watchdog.retries || {}), [phase]: 0 };
+  } else if (nextPhase !== null) {
+    watchdog.stallCount = (watchdog.stallCount || 0) + 1;
+    watchdog.stalledSince = watchdog.stalledSince || watchdog.lastProgressAt || nowIso;
+  }
+
+  if (needsBackoff && nextPhase !== null) {
+    const retries = { ...(watchdog.retries || {}) };
+    const retryCount = (retries[phase] || 0) + 1;
+    retries[phase] = retryCount;
+    watchdog.retries = retries;
+
+    if (retryCount > WATCHDOG_MAX_RETRIES) {
+      finalStatus = "failed";
+      phaseError = `Watchdog excedeu ${WATCHDOG_MAX_RETRIES} tentativas automáticas na fase ${phase}. Último erro: ${phaseError || "sem detalhes"}`;
+      phaseLabelOverride = `Falhou na fase ${phase}`;
+    } else {
+      const backoffMs = nextBackoff(retryCount);
+      watchdog.nextRetryAt = new Date(nowMs + backoffMs).toISOString();
+      watchdog.lastRestartAt = nowIso;
+      suppressImmediateReschedule = true;
+      phaseLabelOverride = `${PHASE_LABELS[phase]} · nova tentativa em ${formatDelay(backoffMs)}`;
+      phaseError = `${phaseError || `Sem progresso na fase ${phase}`}. Retry ${retryCount}/${WATCHDOG_MAX_RETRIES} em ${formatDelay(backoffMs)}.`;
+      if (phase === "winners") delete state.winnerErrors;
+      if (phase === "contratos") delete state.cErrors;
+    }
+  }
+
+  state.__phaseTimings = phaseTimings;
+  state.__watchdog = watchdog;
+
   const { data: preCheck } = await supabase
-    .from("ingestion_jobs").select("status").eq("id", jobId).maybeSingle();
+    .from("ingestion_jobs")
+    .select("status")
+    .eq("id", jobId)
+    .maybeSingle();
+
   if (preCheck?.status === "cancelled") {
     return new Response(JSON.stringify({ ok: true, cancelled: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
-  const isDone = nextPhase === null;
-  // Update only if status is still running/pending (avoid clobbering a cancel that arrived between reads)
-  await supabase.from("ingestion_jobs").update({
-    status: isDone ? "completed" : "running",
-    current_phase: nextPhase,
-    phase_label: nextPhase ? PHASE_LABELS[nextPhase] : "Concluído",
-    phases_completed: phasesCompleted,
-    phase_progress_current: phaseProgressCurrent,
-    phase_progress_total: phaseProgressTotal,
-    total_records_processed: totalRecords,
-    state,
-    last_tick_at: new Date().toISOString(),
-    finished_at: isDone ? new Date().toISOString() : null,
-    error_message: phaseError,
-  }).eq("id", jobId).in("status", ["pending", "running"]);
+  const isDone = finalStatus !== "running";
+  await supabase
+    .from("ingestion_jobs")
+    .update({
+      status: finalStatus,
+      current_phase: nextPhase,
+      phase_label: phaseLabelOverride || (nextPhase ? PHASE_LABELS[nextPhase] : finalStatus === "completed" ? "Concluído" : `Falhou na fase ${phase}`),
+      phases_completed: phasesCompleted,
+      phase_progress_current: phaseProgressCurrent,
+      phase_progress_total: phaseProgressTotal,
+      total_records_processed: totalRecords,
+      state,
+      last_tick_at: nowIso,
+      finished_at: isDone ? nowIso : null,
+      error_message: phaseError,
+    })
+    .eq("id", jobId)
+    .in("status", ["pending", "running"]);
 
-  // Final cancellation check
   const { data: refreshed } = await supabase
-    .from("ingestion_jobs").select("status").eq("id", jobId).maybeSingle();
+    .from("ingestion_jobs")
+    .select("status")
+    .eq("id", jobId)
+    .maybeSingle();
+
   if (refreshed?.status === "cancelled") {
     return new Response(JSON.stringify({ ok: true, cancelled: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
-  if (!isDone) {
-    // Self-schedule next tick (fire-and-forget)
+  if (finalStatus === "running" && !suppressImmediateReschedule) {
     selfSchedule(jobId);
   }
 
-  return new Response(JSON.stringify({ ok: true, phase: nextPhase, isDone, totalRecords }), {
+  return new Response(JSON.stringify({
+    ok: true,
+    phase: nextPhase,
+    isDone: finalStatus !== "running",
+    totalRecords,
+    backedOff: suppressImmediateReschedule,
+    nextRetryAt: watchdog.nextRetryAt || null,
+  }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 });

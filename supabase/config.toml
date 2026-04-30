@@ -23,3 +23,15 @@ verify_jwt = false
 
 [functions.ingest-querido-diario]
 verify_jwt = false
+
+[functions.pipeline-orchestrator]
+verify_jwt = false
+
+[functions.start-ingestion-pipeline]
+verify_jwt = false
+
+[functions.cancel-ingestion-pipeline]
+verify_jwt = false
+
+[functions.ingestion-watchdog]
+verify_jwt = false
