@@ -245,19 +245,28 @@ serve(async (req) => {
         }
       }
     } else if (phase === "winners") {
-      const result = await invokeFn("ingest-pncp", { mode: "winners", limit: 50 });
+      const cursor: string | null = state.winnersCursor || null;
+      const result = await invokeFn("ingest-pncp", {
+        mode: "winners",
+        limit: 100,
+        afterCreatedAt: cursor,
+      });
 
-      if (result.ok && result.json) {
+      if (result.ok && result.json && result.json.success !== false) {
         const processed = Number(result.json.processed || 0);
         const winners = Number(result.json.winnersFound || 0);
         phaseRecords = processed;
         totalRecords += winners;
         phaseProgressCurrent = Number(state.processed || 0) + processed;
         state.processed = phaseProgressCurrent;
-        phaseProgressTotal = phaseProgressCurrent + (result.json.hasMore ? 50 : 0);
+        // Always remember how far we have walked, even if processed==0 (avoids loops)
+        if (result.json.nextCursor) state.winnersCursor = result.json.nextCursor;
+        phaseProgressTotal = phaseProgressCurrent + (result.json.hasMore ? 100 : 0);
         if (!result.json.hasMore) advancePhase = true;
       } else {
-        phaseError = `Vencedores: HTTP ${result.status} ${(result.text || "").slice(0, 200)}`;
+        // Either HTTP error or { success:false, retryable:true } from the worker.
+        const err = result.json?.error || `HTTP ${result.status}`;
+        phaseError = `Vencedores: ${err}`.slice(0, 240);
         needsBackoff = true;
       }
     } else if (phase === "contratos") {

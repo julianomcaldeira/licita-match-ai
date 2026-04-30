@@ -777,9 +777,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      licitacoes_pendentes_winners_count: {
+        Args: { p_max?: number }
+        Returns: number
+      }
       licitacoes_sem_itens: {
-        Args: { lim?: number }
+        Args: { after_created_at?: string; lim?: number }
         Returns: {
+          created_at: string
           id: string
           numero_controle_pncp: string
           raw_json: Json
