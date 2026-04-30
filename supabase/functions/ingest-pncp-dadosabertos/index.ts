@@ -219,6 +219,55 @@ async function flushContratos(supabase: any, rows: any[]) {
   if (error) console.error("[contratos upsert]", error.message);
 }
 
+async function ensureLicitacao(
+  supabase: any,
+  compraKey: string,
+  cnpj: string,
+  ano: number,
+  sequencial: number,
+): Promise<string | null> {
+  // Try existing
+  const { data: existing } = await supabase
+    .from("licitacoes")
+    .select("id")
+    .eq("numero_controle_pncp", compraKey)
+    .maybeSingle();
+  if (existing?.id) return existing.id;
+
+  // Fetch full compra details from PNCP and insert
+  const detailUrl = `${PNCP_CONSULTA}/orgaos/${cnpj}/compras/${ano}/${sequencial}`;
+  const c = await fetchJson(detailUrl).catch(() => null);
+  if (!c || !c.numeroControlePNCP) return null;
+
+  const row = {
+    id_origem: c.numeroControlePNCP,
+    fonte: "PNCP_DADOS_ABERTOS",
+    orgao: c.orgaoEntidade?.razaoSocial ?? "—",
+    modalidade: c.modalidadeNome ?? null,
+    objeto: c.objetoCompra ?? "—",
+    data_publicacao: c.dataPublicacaoPncp ? c.dataPublicacaoPncp.slice(0, 10) : null,
+    data_resultado: c.dataResultadoCompra ? c.dataResultadoCompra.slice(0, 10) : null,
+    valor_estimado: c.valorTotalEstimado ?? null,
+    valor_homologado: c.valorTotalHomologado ?? null,
+    situacao: c.situacaoCompraNome ?? null,
+    numero_controle_pncp: c.numeroControlePNCP,
+    uf: c.unidadeOrgao?.ufSigla ?? null,
+    municipio: c.unidadeOrgao?.municipioNome ?? null,
+    raw_json: c,
+  };
+
+  const { data: inserted, error } = await supabase
+    .from("licitacoes")
+    .upsert(row, { onConflict: "id_origem", ignoreDuplicates: false })
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error("[licitacoes upsert]", error.message);
+    return null;
+  }
+  return inserted?.id ?? null;
+}
+
 async function ingestCompraDetails(
   supabase: any,
   compraKey: string,
@@ -227,12 +276,8 @@ async function ingestCompraDetails(
   if (!parsed) return { items: 0, winners: 0 };
   const { cnpj, ano, sequencial } = parsed;
 
-  // 1) Find parent licitacao in our base (might not exist if not yet ingested)
-  const { data: lic } = await supabase
-    .from("licitacoes")
-    .select("id")
-    .eq("numero_controle_pncp", compraKey)
-    .maybeSingle();
+  // 1) Ensure parent licitacao exists (creates from PNCP detail if missing)
+  const licId = await ensureLicitacao(supabase, compraKey, cnpj, ano, sequencial);
 
   // 2) Items
   const itemsUrl = `${PNCP_DATA}/orgaos/${cnpj}/compras/${ano}/${sequencial}/itens`;
@@ -250,7 +295,15 @@ async function ingestCompraDetails(
   let insertedItems = 0;
   let insertedWinners = 0;
 
-  if (lic?.id) {
+  if (licId) {
+    const lic = { id: licId };
+    // Insert/normalize items
+    const itemRows = items.map((it: any) => ({
+      licitacao_id: lic.id,
+      numero_item: it.numeroItem,
+      descricao: it.descricao ?? "",
+      quantidade: it.quantidade ?? null,
+      unidade: it.unidadeMedida ?? null,
     // Insert/normalize items
     const itemRows = items.map((it: any) => ({
       licitacao_id: lic.id,
