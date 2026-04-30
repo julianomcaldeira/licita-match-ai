@@ -203,20 +203,22 @@ async function fetchContratosBulk(
         const { error } = await supabase
           .from("contratos")
           .upsert(batch, { onConflict: "cnpj_orgao,numero_contrato" });
-        if (error) errors.push(`Page ${pagina}: ${error.message}`);
+        if (error) errors.push(`orgao=${codigoOrgao} p${pagina}: ${error.message}`);
         else total += batch.length;
       }
 
-      hasMore = contratos.length >= 500;
-      pagina++;
-      await new Promise((r) => setTimeout(r, 250));
-    } catch (e) {
-      errors.push(`Page ${pagina}: ${e instanceof Error ? e.message : "unknown"}`);
-      hasMore = false;
+        hasMore = contratos.length >= 500;
+        pagina++;
+        totalPages++;
+        await new Promise((r) => setTimeout(r, 250));
+      } catch (e) {
+        errors.push(`orgao=${codigoOrgao} p${pagina}: ${e instanceof Error ? e.message : "unknown"}`);
+        hasMore = false;
+      }
     }
   }
 
-  return { total, pages: pagina - 1, errors };
+  return { total, pages: totalPages, errors };
 }
 
 /**
