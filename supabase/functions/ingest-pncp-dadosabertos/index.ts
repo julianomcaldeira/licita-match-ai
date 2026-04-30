@@ -304,13 +304,6 @@ async function ingestCompraDetails(
       descricao: it.descricao ?? "",
       quantidade: it.quantidade ?? null,
       unidade: it.unidadeMedida ?? null,
-    // Insert/normalize items
-    const itemRows = items.map((it: any) => ({
-      licitacao_id: lic.id,
-      numero_item: it.numeroItem,
-      descricao: it.descricao ?? "",
-      quantidade: it.quantidade ?? null,
-      unidade: it.unidadeMedida ?? null,
       valor_unitario_estimado: it.valorUnitarioEstimado ?? null,
     }));
     // Need to fetch existing item ids
