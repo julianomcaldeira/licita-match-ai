@@ -833,6 +833,7 @@ export type Database = {
           situacao: string
         }[]
       }
+      get_winners_backlog_cursor: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -968,6 +969,10 @@ export type Database = {
           valor_homologado: number
           vencedor_nome: string
         }[]
+      }
+      set_winners_backlog_cursor: {
+        Args: { p_cursor: string; p_processed?: number }
+        Returns: undefined
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
