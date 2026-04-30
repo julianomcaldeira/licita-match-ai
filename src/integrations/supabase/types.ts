@@ -44,6 +44,69 @@ export type Database = {
         }
         Relationships: []
       }
+      auditoria_ingestao: {
+        Row: {
+          contratos_sem_licitacao: number
+          created_at: string
+          duration_ms: number | null
+          executed_at: string
+          homologadas_sem_itens: number
+          homologadas_sem_vencedores: number
+          id: string
+          inconsistencias: Json
+          itens_sem_vencedores: number
+          pct_cobertura_homologadas: number
+          pct_cobertura_vencedores: number
+          severity: string
+          total_com_itens: number
+          total_com_vencedores: number
+          total_contratos: number
+          total_homologadas: number
+          total_licitacoes: number
+          total_vencedores: number
+        }
+        Insert: {
+          contratos_sem_licitacao?: number
+          created_at?: string
+          duration_ms?: number | null
+          executed_at?: string
+          homologadas_sem_itens?: number
+          homologadas_sem_vencedores?: number
+          id?: string
+          inconsistencias?: Json
+          itens_sem_vencedores?: number
+          pct_cobertura_homologadas?: number
+          pct_cobertura_vencedores?: number
+          severity?: string
+          total_com_itens?: number
+          total_com_vencedores?: number
+          total_contratos?: number
+          total_homologadas?: number
+          total_licitacoes?: number
+          total_vencedores?: number
+        }
+        Update: {
+          contratos_sem_licitacao?: number
+          created_at?: string
+          duration_ms?: number | null
+          executed_at?: string
+          homologadas_sem_itens?: number
+          homologadas_sem_vencedores?: number
+          id?: string
+          inconsistencias?: Json
+          itens_sem_vencedores?: number
+          pct_cobertura_homologadas?: number
+          pct_cobertura_vencedores?: number
+          severity?: string
+          total_com_itens?: number
+          total_com_vencedores?: number
+          total_contratos?: number
+          total_homologadas?: number
+          total_licitacoes?: number
+          total_vencedores?: number
+        }
+        Relationships: []
+      }
       contratos: {
         Row: {
           categoria: string | null
@@ -874,6 +937,7 @@ export type Database = {
         }[]
       }
       refresh_all_mvs: { Args: never; Returns: undefined }
+      run_ingestion_audit: { Args: never; Returns: string }
       search_licitacoes: {
         Args: {
           p_com_vencedor?: boolean
