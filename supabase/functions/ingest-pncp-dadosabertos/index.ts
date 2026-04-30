@@ -258,7 +258,7 @@ async function ensureLicitacao(
 
   const { data: inserted, error } = await supabase
     .from("licitacoes")
-    .upsert(row, { onConflict: "id_origem", ignoreDuplicates: false })
+    .upsert(row, { onConflict: "numero_controle_pncp", ignoreDuplicates: false })
     .select("id")
     .maybeSingle();
   if (error) {
