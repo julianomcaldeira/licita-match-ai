@@ -34,9 +34,12 @@ function parseIsoMs(value?: string | null) {
 }
 
 function isAuthorized(req: Request) {
-  const authorization = req.headers.get("Authorization") || "";
-  const apikey = req.headers.get("apikey") || "";
-  return authorization === `Bearer ${SERVICE_KEY}` || authorization === `Bearer ${ANON_KEY}` || apikey === ANON_KEY;
+  const authorization = (req.headers.get("Authorization") || req.headers.get("authorization") || "").trim();
+  const apikey = (req.headers.get("apikey") || req.headers.get("x-api-key") || "").trim();
+  const cronSecret = (Deno.env.get("CRON_SECRET") || "").trim();
+  const authToken = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : authorization;
+  return [SERVICE_KEY, ANON_KEY, cronSecret].filter(Boolean).includes(authToken)
+    || [SERVICE_KEY, ANON_KEY, cronSecret].filter(Boolean).includes(apikey);
 }
 
 async function kick(jobId: string) {
