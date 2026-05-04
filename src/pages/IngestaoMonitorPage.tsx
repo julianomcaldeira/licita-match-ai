@@ -13,6 +13,7 @@ import { IngerirContratosDialog } from "@/components/dashboard/IngerirContratosD
 import { ContratosIngestaoTab } from "@/components/dashboard/ContratosIngestaoTab";
 import { IngestaoManualButton } from "@/components/dashboard/IngestaoManualButton";
 import { AuditoriaTab } from "@/components/dashboard/AuditoriaTab";
+import { DashboardValidationTab } from "@/components/dashboard/DashboardValidationTab";
 
 const LOG_PAGE_SIZE = 20;
 
