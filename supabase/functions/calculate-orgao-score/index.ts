@@ -172,7 +172,7 @@ async function calculateForOrgao(supabase: any, cnpj: string, nome: string, uf: 
   let scorePagamento = 0;
   let pctPago = 0;
   if (pt && pt.empenhado > 0) {
-    fontes.push("portal_transparencia");
+    fontes.push(`portal_transparencia:${pt.tipoId}`);
     pctPago = (pt.pago / pt.empenhado) * 100;
     // 100% pago → 500pts; 50% → 200pts; 0% → 0pts
     scorePagamento = Math.min(500, Math.round((pctPago / 100) * 500));
