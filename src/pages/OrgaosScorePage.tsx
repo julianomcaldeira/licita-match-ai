@@ -184,7 +184,7 @@ export default function OrgaosScorePage() {
                   ? { label: "Atenção", color: "bg-yellow-500 text-white", icon: "!" }
                   : { label: "Não confiável", color: "bg-red-500 text-white", icon: "✕" };
                 return (
-                <TableRow key={r.cnpj_orgao}>
+                <TableRow key={r.cnpj_orgao} className="cursor-pointer hover:bg-muted/40" onClick={() => setAuditCnpj(r.cnpj_orgao)}>
                   <TableCell className="text-muted-foreground text-xs">{page * limit + i + 1}</TableCell>
                   <TableCell className="font-medium text-sm">{r.nome_orgao}</TableCell>
                   <TableCell><Badge variant="secondary">{r.uf || "—"}</Badge></TableCell>
@@ -198,6 +198,15 @@ export default function OrgaosScorePage() {
                     </div>
                   </TableCell>
                   <TableCell className="text-right text-sm">{r.qtd_contratos_analisados}</TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => { e.stopPropagation(); setAuditCnpj(r.cnpj_orgao); }}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
                 );
               })}
