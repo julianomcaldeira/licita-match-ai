@@ -13,6 +13,7 @@ import { IngerirContratosDialog } from "@/components/dashboard/IngerirContratosD
 import { ContratosIngestaoTab } from "@/components/dashboard/ContratosIngestaoTab";
 import { IngestaoManualButton } from "@/components/dashboard/IngestaoManualButton";
 import { AuditoriaTab } from "@/components/dashboard/AuditoriaTab";
+import { DashboardValidationTab } from "@/components/dashboard/DashboardValidationTab";
 
 const LOG_PAGE_SIZE = 20;
 
@@ -180,6 +181,7 @@ export default function IngestaoMonitorPage() {
           <TabsTrigger value="contratos" className="gap-1.5"><FileText className="h-3.5 w-3.5" /> Contratos</TabsTrigger>
           <TabsTrigger value="analise" className="gap-1.5"><Brain className="h-3.5 w-3.5" /> Auto-Análise IA</TabsTrigger>
           <TabsTrigger value="auditoria" className="gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" /> Auditoria</TabsTrigger>
+          <TabsTrigger value="validacao" className="gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" /> Validação Dashboard</TabsTrigger>
         </TabsList>
 
         <TabsContent value="contratos">
@@ -188,6 +190,10 @@ export default function IngestaoMonitorPage() {
 
         <TabsContent value="auditoria">
           <AuditoriaTab />
+        </TabsContent>
+
+        <TabsContent value="validacao">
+          <DashboardValidationTab />
         </TabsContent>
 
         <TabsContent value="ingestao">
