@@ -203,7 +203,8 @@ async function calculateForOrgao(supabase: any, cnpj: string, nome: string, uf: 
 
   // Normaliza pelo peso das fontes disponíveis (se faltam fontes públicas,
   // o score interno representa 100% do que conseguimos avaliar).
-  const pesoMax = (fontes.includes("portal_transparencia") ? 500 : 0)
+  const temPortal = fontes.some((f) => f.startsWith("portal_transparencia"));
+  const pesoMax = (temPortal ? 500 : 0)
                 + (fontes.includes("siconfi") ? 300 : 0)
                 + (fontes.includes("contratos_internos") ? 200 : 0);
   const somaBruta = scorePagamento + scoreFiscal + scoreExecucao;
