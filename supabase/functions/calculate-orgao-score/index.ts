@@ -203,7 +203,7 @@ async function calculateForOrgao(supabase: any, cnpj: string, nome: string, uf: 
 
   // Roda em paralelo
   const [pt, sf, ct] = await Promise.all([
-    fetchPortalPagamentos(cnpj, ano - 1).catch(() => null),
+    fetchPortalPagamentos(supabase, cnpj, ano - 1).catch(() => null),
     fetchSiconfi(cnpj, ano - 1).catch(() => null),
     fetchContratosInternos(supabase, cnpj).catch(() => null),
   ]);
