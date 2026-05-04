@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -10,7 +11,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ShieldCheck, Loader2, Play, Info } from "lucide-react";
+import { ShieldCheck, Loader2, Play, Info, Search, X } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 const UFS = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
@@ -23,14 +24,21 @@ const colorByClass: Record<string, string> = {
 
 export default function OrgaosScorePage() {
   const [uf, setUf] = useState<string>("");
+  const [nome, setNome] = useState<string>("");
+  const [nomeInput, setNomeInput] = useState<string>("");
+  const [trust, setTrust] = useState<string>("");
   const [page, setPage] = useState(0);
   const limit = 50;
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ["top-orgaos-score", uf, page],
+    queryKey: ["top-orgaos-score", uf, nome, trust, page],
     queryFn: async () => {
       const { data, error } = await (supabase as any).rpc("list_top_orgaos_score", {
-        p_uf: uf || null, p_limit: limit, p_offset: page * limit,
+        p_uf: uf || null,
+        p_nome: nome || null,
+        p_trust: trust || null,
+        p_limit: limit,
+        p_offset: page * limit,
       });
       if (error) throw error;
       return data as any[];
@@ -88,18 +96,58 @@ export default function OrgaosScorePage() {
         </div>
       </Card>
 
-      <div className="flex gap-3">
-        <Select value={uf} onValueChange={(v) => { setUf(v === "all" ? "" : v); setPage(0); }}>
-          <SelectTrigger className="w-[140px]"><SelectValue placeholder="UF" /></SelectTrigger>
+      <div className="flex flex-wrap gap-3 items-center">
+        <form
+          className="relative flex-1 min-w-[240px] max-w-md"
+          onSubmit={(e) => { e.preventDefault(); setNome(nomeInput.trim()); setPage(0); }}
+        >
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={nomeInput}
+            onChange={(e) => setNomeInput(e.target.value)}
+            placeholder="Buscar por nome do órgão..."
+            className="pl-8 pr-8 h-9"
+          />
+          {nomeInput && (
+            <button
+              type="button"
+              onClick={() => { setNomeInput(""); setNome(""); setPage(0); }}
+              className="absolute right-2 top-2.5 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </form>
+        <Select value={uf || "all"} onValueChange={(v) => { setUf(v === "all" ? "" : v); setPage(0); }}>
+          <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="UF" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas UFs</SelectItem>
             {UFS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
           </SelectContent>
         </Select>
+        <Select value={trust || "all"} onValueChange={(v) => { setTrust(v === "all" ? "" : v); setPage(0); }}>
+          <SelectTrigger className="w-[180px] h-9"><SelectValue placeholder="Confiabilidade" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas</SelectItem>
+            <SelectItem value="confiavel">✓ Confiável</SelectItem>
+            <SelectItem value="atencao">! Atenção</SelectItem>
+            <SelectItem value="nao_confiavel">✕ Não confiável</SelectItem>
+          </SelectContent>
+        </Select>
+        {(nome || uf || trust) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => { setNome(""); setNomeInput(""); setUf(""); setTrust(""); setPage(0); }}
+          >
+            Limpar filtros
+          </Button>
+        )}
         <div className="ml-auto flex items-center text-sm text-muted-foreground">
           <strong className="text-foreground mr-1">{total.toLocaleString("pt-BR")}</strong> órgãos com score
         </div>
       </div>
+
 
       <Card className="overflow-hidden">
         {isLoading ? (

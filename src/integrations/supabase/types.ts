@@ -1130,7 +1130,13 @@ export type Database = {
             }[]
           }
       list_top_orgaos_score: {
-        Args: { p_limit?: number; p_offset?: number; p_uf?: string }
+        Args: {
+          p_limit?: number
+          p_nome?: string
+          p_offset?: number
+          p_trust?: string
+          p_uf?: string
+        }
         Returns: {
           cnpj_orgao: string
           nome_orgao: string
