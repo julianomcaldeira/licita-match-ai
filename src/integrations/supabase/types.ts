@@ -1036,6 +1036,7 @@ export type Database = {
           valor_estimado: number
         }[]
       }
+      pncp_dadosabertos_backfill_fast_tick: { Args: never; Returns: Json }
       pncp_dadosabertos_backfill_tick: { Args: never; Returns: Json }
       refresh_all_mvs: { Args: never; Returns: undefined }
       run_ingestion_audit: { Args: never; Returns: string }
