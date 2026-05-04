@@ -16,6 +16,7 @@ import PlaceholderPage from "@/components/PlaceholderPage";
 import UsuariosPage from "@/pages/UsuariosPage";
 import RelatoriosPage from "@/pages/RelatoriosPage";
 import SancionadasPage from "@/pages/SancionadasPage";
+import OrgaosScorePage from "@/pages/OrgaosScorePage";
 import ApiKeysPage from "@/pages/ApiKeysPage";
 import NotFound from "@/pages/NotFound";
 import { Users, FileText, Settings } from "lucide-react";
@@ -46,6 +47,7 @@ const App = () => (
               <Route path="/usuarios" element={<UsuariosPage />} />
               <Route path="/relatorios" element={<RelatoriosPage />} />
               <Route path="/sancionadas" element={<SancionadasPage />} />
+              <Route path="/score-orgaos" element={<OrgaosScorePage />} />
               <Route path="/api" element={<ApiKeysPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/monitor-ingestao" element={<IngestaoMonitorPage />} />
