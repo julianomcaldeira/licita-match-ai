@@ -80,22 +80,39 @@ export function OrgaoScoreBadge({ cnpj, nome, uf, showRefresh, size = "sm" }: Pr
   }
 
   const cls = colorByClass[data.score_classificacao] || colorByClass.SD;
+  const score = data.score_numerico || 0;
+  const trust = score >= 700
+    ? { label: "Confiável", color: "bg-emerald-500 text-white", icon: "✓" }
+    : score >= 500
+    ? { label: "Atenção", color: "bg-yellow-500 text-white", icon: "!" }
+    : { label: "Não confiável", color: "bg-red-500 text-white", icon: "✕" };
+  const isSD = data.score_classificacao === "SD";
 
   return (
     <TooltipProvider>
       <div className="flex items-center gap-1.5">
         <Tooltip>
           <TooltipTrigger asChild>
-            <Badge className={`${cls} ${size === "md" ? "text-sm px-3 py-1" : "text-xs"} font-bold`}>
-              {data.score_classificacao}
-              {data.score_classificacao !== "SD" && (
-                <span className="ml-1.5 opacity-90 font-mono">{data.score_numerico}</span>
+            <div className="flex items-center gap-1">
+              {!isSD && (
+                <Badge className={`${trust.color} ${size === "md" ? "text-sm px-3 py-1" : "text-xs"} font-bold`}>
+                  {trust.icon} {trust.label}
+                </Badge>
               )}
-            </Badge>
+              <Badge variant="outline" className={`${size === "md" ? "text-sm" : "text-xs"} font-mono`}>
+                {data.score_classificacao}
+                {!isSD && <span className="ml-1 opacity-70">{score}</span>}
+              </Badge>
+            </div>
           </TooltipTrigger>
           <TooltipContent className="max-w-xs">
             <div className="space-y-1.5 text-xs">
-              <div className="font-semibold text-sm">Score do Órgão: {data.score_numerico}/1000</div>
+              <div className="font-semibold text-sm">
+                {isSD ? "Sem dados suficientes" : `${trust.label} — Score ${score}/1000`}
+              </div>
+              <div className="text-muted-foreground text-[11px]">
+                ≥700 Confiável · 500-699 Atenção · &lt;500 Não confiável
+              </div>
               <div className="border-t pt-1.5 space-y-0.5">
                 <div className="flex justify-between gap-4">
                   <span>💰 Pagamento (50%)</span><span className="font-mono">{data.score_pagamento}/500</span>

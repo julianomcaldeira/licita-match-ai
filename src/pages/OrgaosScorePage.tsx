@@ -111,33 +111,45 @@ export default function OrgaosScorePage() {
             <p className="text-xs mt-1">Clique em "Calcular agora" para começar.</p>
           </div>
         ) : (
-          <Table>
+            <Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="w-12">#</TableHead>
                 <TableHead>Órgão</TableHead>
                 <TableHead className="w-20">UF</TableHead>
-                <TableHead className="w-32">Score</TableHead>
+                <TableHead className="w-40">Confiável?</TableHead>
+                <TableHead className="w-28">Score</TableHead>
                 <TableHead className="text-right w-24">Contratos</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((r, i) => (
+              {data.map((r, i) => {
+                const score = r.score_numerico || 0;
+                const trust = r.score_classificacao === "SD"
+                  ? { label: "Sem dados", color: "bg-muted text-muted-foreground", icon: "?" }
+                  : score >= 700
+                  ? { label: "Confiável", color: "bg-emerald-500 text-white", icon: "✓" }
+                  : score >= 500
+                  ? { label: "Atenção", color: "bg-yellow-500 text-white", icon: "!" }
+                  : { label: "Não confiável", color: "bg-red-500 text-white", icon: "✕" };
+                return (
                 <TableRow key={r.cnpj_orgao}>
                   <TableCell className="text-muted-foreground text-xs">{page * limit + i + 1}</TableCell>
                   <TableCell className="font-medium text-sm">{r.nome_orgao}</TableCell>
                   <TableCell><Badge variant="secondary">{r.uf || "—"}</Badge></TableCell>
                   <TableCell>
+                    <Badge className={`${trust.color} font-bold`}>{trust.icon} {trust.label}</Badge>
+                  </TableCell>
+                  <TableCell>
                     <div className="flex items-center gap-2">
-                      <Badge className={`${colorByClass[r.score_classificacao] || "bg-muted"} text-white font-bold`}>
-                        {r.score_classificacao}
-                      </Badge>
-                      <span className="font-mono text-sm">{r.score_numerico}</span>
+                      <span className="font-mono text-sm font-semibold">{score}</span>
+                      <span className="text-xs text-muted-foreground">({r.score_classificacao})</span>
                     </div>
                   </TableCell>
                   <TableCell className="text-right text-sm">{r.qtd_contratos_analisados}</TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         )}
