@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Activity,
   ShieldAlert,
+  ShieldCheck,
   Key,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,7 @@ const navigation = [
   { name: "Licitações", href: "/licitacoes", icon: Search },
   { name: "Empresas", href: "/empresas", icon: Building2 },
   { name: "Sancionadas", href: "/sancionadas", icon: ShieldAlert },
+  { name: "Score Órgãos", href: "/score-orgaos", icon: ShieldCheck },
   { name: "Usuários", href: "/usuarios", icon: Users },
   { name: "Relatórios", href: "/relatorios", icon: FileText },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
