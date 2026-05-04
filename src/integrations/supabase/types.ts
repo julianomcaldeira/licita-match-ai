@@ -1074,6 +1074,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_siafi_cache_hit: {
+        Args: { p_cnpj: string }
+        Returns: undefined
+      }
       licitacoes_pendentes_winners_count: {
         Args: { p_max?: number }
         Returns: number
