@@ -96,18 +96,58 @@ export default function OrgaosScorePage() {
         </div>
       </Card>
 
-      <div className="flex gap-3">
-        <Select value={uf} onValueChange={(v) => { setUf(v === "all" ? "" : v); setPage(0); }}>
-          <SelectTrigger className="w-[140px]"><SelectValue placeholder="UF" /></SelectTrigger>
+      <div className="flex flex-wrap gap-3 items-center">
+        <form
+          className="relative flex-1 min-w-[240px] max-w-md"
+          onSubmit={(e) => { e.preventDefault(); setNome(nomeInput.trim()); setPage(0); }}
+        >
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={nomeInput}
+            onChange={(e) => setNomeInput(e.target.value)}
+            placeholder="Buscar por nome do órgão..."
+            className="pl-8 pr-8 h-9"
+          />
+          {nomeInput && (
+            <button
+              type="button"
+              onClick={() => { setNomeInput(""); setNome(""); setPage(0); }}
+              className="absolute right-2 top-2.5 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </form>
+        <Select value={uf || "all"} onValueChange={(v) => { setUf(v === "all" ? "" : v); setPage(0); }}>
+          <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="UF" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas UFs</SelectItem>
             {UFS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
           </SelectContent>
         </Select>
+        <Select value={trust || "all"} onValueChange={(v) => { setTrust(v === "all" ? "" : v); setPage(0); }}>
+          <SelectTrigger className="w-[180px] h-9"><SelectValue placeholder="Confiabilidade" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas</SelectItem>
+            <SelectItem value="confiavel">✓ Confiável</SelectItem>
+            <SelectItem value="atencao">! Atenção</SelectItem>
+            <SelectItem value="nao_confiavel">✕ Não confiável</SelectItem>
+          </SelectContent>
+        </Select>
+        {(nome || uf || trust) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => { setNome(""); setNomeInput(""); setUf(""); setTrust(""); setPage(0); }}
+          >
+            Limpar filtros
+          </Button>
+        )}
         <div className="ml-auto flex items-center text-sm text-muted-foreground">
           <strong className="text-foreground mr-1">{total.toLocaleString("pt-BR")}</strong> órgãos com score
         </div>
       </div>
+
 
       <Card className="overflow-hidden">
         {isLoading ? (
