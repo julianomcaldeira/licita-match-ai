@@ -271,6 +271,125 @@ Deno.serve(async (req) => {
     });
   }
 
+  // Modo 3: reprocessamento em lote em background, com progresso em ingestion_jobs
+  if (body.mode === "rescore") {
+    const scope: "existing" | "pending" | "all" = body.scope || "all";
+    const max = Math.min(Number(body.max) || 5000, 20000);
+    const sleepMs = Math.max(Number(body.sleepMs) || 700, 200);
+
+    // monta a fila
+    const queue: { cnpj: string; nome: string; uf: string | null }[] = [];
+    const seen = new Set<string>();
+
+    if (scope === "existing" || scope === "all") {
+      const { data } = await supabase
+        .from("orgaos_score")
+        .select("cnpj_orgao, nome_orgao, uf")
+        .limit(max);
+      for (const r of data || []) {
+        if (r.cnpj_orgao && !seen.has(r.cnpj_orgao)) {
+          seen.add(r.cnpj_orgao);
+          queue.push({ cnpj: r.cnpj_orgao, nome: r.nome_orgao, uf: r.uf });
+        }
+      }
+    }
+
+    if ((scope === "pending" || scope === "all") && queue.length < max) {
+      const { data } = await supabase
+        .from("licitacoes")
+        .select("orgao, uf, raw_json")
+        .not("raw_json", "is", null)
+        .limit(max * 4);
+      for (const l of data || []) {
+        const cnpj = onlyDigits((l as any).raw_json?.orgaoEntidade?.cnpj);
+        if (cnpj.length === 14 && !seen.has(cnpj)) {
+          seen.add(cnpj);
+          queue.push({ cnpj, nome: (l as any).orgao, uf: (l as any).uf });
+          if (queue.length >= max) break;
+        }
+      }
+    }
+
+    // cria job
+    const { data: jobRow, error: jobErr } = await supabase
+      .from("ingestion_jobs")
+      .insert({
+        status: "running",
+        current_phase: "rescore",
+        phase_label: `Reprocessando scores (${scope})`,
+        phases_total: 1,
+        phases_completed: 0,
+        phase_progress_current: 0,
+        phase_progress_total: queue.length,
+        started_at: new Date().toISOString(),
+        last_tick_at: new Date().toISOString(),
+        state: { scope, max, queue_size: queue.length, ok: 0, fail: 0, recent: [] },
+      })
+      .select("id")
+      .single();
+
+    if (jobErr || !jobRow) {
+      return new Response(JSON.stringify({ error: jobErr?.message || "job_create_failed" }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const jobId = jobRow.id;
+
+    // background runner
+    const run = async () => {
+      let ok = 0, fail = 0;
+      const recent: any[] = [];
+      for (let i = 0; i < queue.length; i++) {
+        const item = queue[i];
+        const t0 = Date.now();
+        let entry: any = { cnpj: item.cnpj, nome: item.nome, uf: item.uf };
+        try {
+          const res = await calculateForOrgao(supabase, item.cnpj, item.nome, item.uf);
+          ok++;
+          entry = {
+            ...entry, status: "ok",
+            score: res.score_numerico, classe: res.score_classificacao,
+            fontes: res.fontes_utilizadas, ms: Date.now() - t0,
+          };
+        } catch (e: any) {
+          fail++;
+          entry = { ...entry, status: "error", error: String(e?.message || e), ms: Date.now() - t0 };
+          console.error("rescore fail", item.cnpj, e);
+        }
+        recent.unshift(entry);
+        if (recent.length > 25) recent.pop();
+
+        // atualiza job a cada 5 ou no último
+        if (i % 5 === 0 || i === queue.length - 1) {
+          await supabase.from("ingestion_jobs").update({
+            phase_progress_current: i + 1,
+            last_tick_at: new Date().toISOString(),
+            total_records_processed: ok + fail,
+            state: { scope, max, queue_size: queue.length, ok, fail, recent },
+          }).eq("id", jobId);
+        }
+        await new Promise((r) => setTimeout(r, sleepMs));
+      }
+      await supabase.from("ingestion_jobs").update({
+        status: "completed",
+        phases_completed: 1,
+        phase_progress_current: queue.length,
+        finished_at: new Date().toISOString(),
+        last_tick_at: new Date().toISOString(),
+        total_records_processed: ok + fail,
+        state: { scope, max, queue_size: queue.length, ok, fail, recent, finished: true },
+      }).eq("id", jobId);
+    };
+
+    // @ts-ignore — EdgeRuntime is provided by Supabase Functions runtime
+    EdgeRuntime.waitUntil(run());
+
+    return new Response(JSON.stringify({ ok: true, job_id: jobId, queue_size: queue.length }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   // Modo 2: lote (cron diário) — pega top órgãos por nº de licitações
   const limit = Math.min(Number(body.limit) || 100, 300);
   const { data: orgaos } = await supabase
@@ -306,7 +425,6 @@ Deno.serve(async (req) => {
       console.error("score fail", item.cnpj, e);
       fail++;
     }
-    // pequena espera para não estourar rate-limit do Portal (90 req/min)
     await new Promise((r) => setTimeout(r, 700));
   }
 
