@@ -24,14 +24,21 @@ const colorByClass: Record<string, string> = {
 
 export default function OrgaosScorePage() {
   const [uf, setUf] = useState<string>("");
+  const [nome, setNome] = useState<string>("");
+  const [nomeInput, setNomeInput] = useState<string>("");
+  const [trust, setTrust] = useState<string>("");
   const [page, setPage] = useState(0);
   const limit = 50;
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ["top-orgaos-score", uf, page],
+    queryKey: ["top-orgaos-score", uf, nome, trust, page],
     queryFn: async () => {
       const { data, error } = await (supabase as any).rpc("list_top_orgaos_score", {
-        p_uf: uf || null, p_limit: limit, p_offset: page * limit,
+        p_uf: uf || null,
+        p_nome: nome || null,
+        p_trust: trust || null,
+        p_limit: limit,
+        p_offset: page * limit,
       });
       if (error) throw error;
       return data as any[];
