@@ -166,7 +166,13 @@ async function calculateForOrgao(supabase: any, cnpj: string, nome: string, uf: 
     scoreExecucao = Math.round((pctEmDia / 100) * 200);
   }
 
-  const scoreTotal = scorePagamento + scoreFiscal + scoreExecucao;
+  // Normaliza pelo peso das fontes disponíveis (se faltam fontes públicas,
+  // o score interno representa 100% do que conseguimos avaliar).
+  const pesoMax = (fontes.includes("portal_transparencia") ? 500 : 0)
+                + (fontes.includes("siconfi") ? 300 : 0)
+                + (fontes.includes("contratos_internos") ? 200 : 0);
+  const somaBruta = scorePagamento + scoreFiscal + scoreExecucao;
+  const scoreTotal = pesoMax > 0 ? Math.round((somaBruta / pesoMax) * 1000) : 0;
   const classificacao = fontes.length === 0 ? "SD" : classify(scoreTotal);
 
   const row = {
