@@ -97,14 +97,18 @@ async function fetchContratosInternos(supabase: any, cnpj: string) {
   if (!data || data.length === 0) return null;
   let total = 0, em_dia = 0, atraso_total = 0, com_data = 0;
   const hoje = new Date();
+  const TOLERANCIA_DIAS = 90;
   for (const c of data) {
     total++;
     const fim = c.data_vigencia_fim ? new Date(c.data_vigencia_fim) : null;
     const sit = String(c.situacao || "").toLowerCase();
-    if (sit.includes("encerrado") || sit.includes("conclu")) {
+    const problema = sit.includes("rescind") || sit.includes("anulad") || sit.includes("suspens") || sit.includes("inadimpl");
+    if (problema) {
+      atraso_total += 180; com_data++;
+    } else if (sit.includes("encerrado") || sit.includes("conclu") || sit.includes("vigente") || sit.includes("ativo")) {
       em_dia++;
-    } else if (fim && fim < hoje) {
-      const dias = Math.floor((hoje.getTime() - fim.getTime()) / 86400000);
+    } else if (fim && (hoje.getTime() - fim.getTime()) / 86400000 > TOLERANCIA_DIAS) {
+      const dias = Math.floor((hoje.getTime() - fim.getTime()) / 86400000) - TOLERANCIA_DIAS;
       atraso_total += dias;
       com_data++;
     } else {
