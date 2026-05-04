@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { OrgaoScoreBadge } from "@/components/OrgaoScoreBadge";
 import ComboboxFilter from "@/components/ComboboxFilter";
 import ComboboxMultiFilter from "@/components/ComboboxMultiFilter";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -1270,8 +1271,17 @@ export default function LicitacoesPage() {
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                       <FileText className="h-5 w-5 text-primary" />
                     </div>
-                    <div className="space-y-1 min-w-0">
-                      <p className="text-sm font-semibold text-foreground leading-tight">{selectedLicitacao.orgao}</p>
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-sm font-semibold text-foreground leading-tight">{selectedLicitacao.orgao}</p>
+                        <OrgaoScoreBadge
+                          cnpj={selectedLicitacao.raw_json?.orgaoEntidade?.cnpj}
+                          nome={selectedLicitacao.orgao}
+                          uf={selectedLicitacao.uf}
+                          showRefresh
+                          size="md"
+                        />
+                      </div>
                       <p className="text-xs text-muted-foreground leading-relaxed">{selectedLicitacao.objeto}</p>
                     </div>
                   </div>
