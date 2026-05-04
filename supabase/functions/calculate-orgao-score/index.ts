@@ -37,27 +37,62 @@ function classify(score: number): string {
 }
 
 // ---------- Fonte 1: Portal da Transparência ----------
-async function fetchPortalPagamentos(cnpj: string, ano: number) {
-  // /despesas/por-orgao retorna empenhado/liquidado/pago por órgão e ano
-  // doc: https://api.portaldatransparencia.gov.br/swagger-ui.html
-  const url = `https://api.portaldatransparencia.gov.br/api-de-dados/despesas/por-orgao?ano=${ano}&codigoOrgao=${cnpj}&pagina=1`;
+// O endpoint /despesas/por-orgao espera o **código SIAFI** (6 dígitos), não CNPJ.
+// Estratégia: 1) tenta direto com o valor recebido (caso já seja SIAFI),
+//             2) se falhar, consulta /orgaos-siafi pelo CNPJ para descobrir o código,
+//             3) tenta novamente com o SIAFI descoberto.
+// Registra em `idUsado` qual identificador efetivamente funcionou.
+const PT_HEADERS = { "chave-api-dados": PT_API_KEY, accept: "application/json" };
+
+async function lookupSiafiByCnpj(cnpj: string): Promise<string | null> {
   try {
-    const r = await fetch(url, {
-      headers: { "chave-api-dados": PT_API_KEY, accept: "application/json" },
-    });
-    if (!r.ok) {
-      // tenta endpoint alternativo (por favorecido) se o 1o não funcionar
-      return null;
-    }
+    const url = `https://api.portaldatransparencia.gov.br/api-de-dados/orgaos-siafi?codigo=&descricao=&pagina=1`;
+    // O endpoint não filtra por CNPJ diretamente; usamos /orgaos-siafi/{cnpj}
+    const direto = `https://api.portaldatransparencia.gov.br/api-de-dados/orgaos-siafi?cnpj=${cnpj}&pagina=1`;
+    const r = await fetch(direto, { headers: PT_HEADERS });
+    if (!r.ok) return null;
     const arr = await r.json();
     if (!Array.isArray(arr) || arr.length === 0) return null;
-    let empenhado = 0, liquidado = 0, pago = 0;
-    for (const x of arr) {
-      empenhado += Number(x.empenhado || x.valorEmpenhado || 0);
-      liquidado += Number(x.liquidado || x.valorLiquidado || 0);
-      pago += Number(x.pago || x.valorPago || 0);
+    const codigo = String(arr[0].codigo || arr[0].codigoSiafi || arr[0].codigoOrgao || "").trim();
+    return codigo || null;
+  } catch {
+    return null;
+  }
+}
+
+async function tentarDespesasPorOrgao(codigo: string, ano: number) {
+  const url = `https://api.portaldatransparencia.gov.br/api-de-dados/despesas/por-orgao?ano=${ano}&codigoOrgao=${codigo}&pagina=1`;
+  const r = await fetch(url, { headers: PT_HEADERS });
+  if (!r.ok) return { ok: false as const, status: r.status };
+  const arr = await r.json();
+  if (!Array.isArray(arr) || arr.length === 0) return { ok: false as const, status: 204 };
+  let empenhado = 0, liquidado = 0, pago = 0;
+  for (const x of arr) {
+    empenhado += Number(x.empenhado || x.valorEmpenhado || 0);
+    liquidado += Number(x.liquidado || x.valorLiquidado || 0);
+    pago += Number(x.pago || x.valorPago || 0);
+  }
+  return { ok: true as const, empenhado, liquidado, pago, qtd: arr.length };
+}
+
+async function fetchPortalPagamentos(cnpj: string, ano: number) {
+  try {
+    // 1) tenta com o CNPJ (raro funcionar, mas mantemos por compatibilidade)
+    let res = await tentarDespesasPorOrgao(cnpj, ano);
+    if (res.ok) {
+      return { ...res, idUsado: cnpj, tipoId: "cnpj" as const };
     }
-    return { empenhado, liquidado, pago, qtd: arr.length };
+
+    // 2) consulta SIAFI pelo CNPJ
+    const siafi = await lookupSiafiByCnpj(cnpj);
+    if (!siafi) return null;
+
+    // 3) reexecuta com o código SIAFI
+    res = await tentarDespesasPorOrgao(siafi, ano);
+    if (res.ok) {
+      return { ...res, idUsado: siafi, tipoId: "siafi" as const };
+    }
+    return null;
   } catch {
     return null;
   }
@@ -137,7 +172,7 @@ async function calculateForOrgao(supabase: any, cnpj: string, nome: string, uf: 
   let scorePagamento = 0;
   let pctPago = 0;
   if (pt && pt.empenhado > 0) {
-    fontes.push("portal_transparencia");
+    fontes.push(`portal_transparencia:${pt.tipoId}`);
     pctPago = (pt.pago / pt.empenhado) * 100;
     // 100% pago → 500pts; 50% → 200pts; 0% → 0pts
     scorePagamento = Math.min(500, Math.round((pctPago / 100) * 500));
@@ -168,7 +203,8 @@ async function calculateForOrgao(supabase: any, cnpj: string, nome: string, uf: 
 
   // Normaliza pelo peso das fontes disponíveis (se faltam fontes públicas,
   // o score interno representa 100% do que conseguimos avaliar).
-  const pesoMax = (fontes.includes("portal_transparencia") ? 500 : 0)
+  const temPortal = fontes.some((f) => f.startsWith("portal_transparencia"));
+  const pesoMax = (temPortal ? 500 : 0)
                 + (fontes.includes("siconfi") ? 300 : 0)
                 + (fontes.includes("contratos_internos") ? 200 : 0);
   const somaBruta = scorePagamento + scoreFiscal + scoreExecucao;
