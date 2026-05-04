@@ -11,8 +11,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ShieldCheck, Loader2, Play, Info, Search, X } from "lucide-react";
+import { ShieldCheck, Loader2, Play, Info, Search, X, Eye } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { ScoreAuditDialog } from "@/components/ScoreAuditDialog";
 
 const UFS = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
 
@@ -28,6 +29,7 @@ export default function OrgaosScorePage() {
   const [nomeInput, setNomeInput] = useState<string>("");
   const [trust, setTrust] = useState<string>("");
   const [page, setPage] = useState(0);
+  const [auditCnpj, setAuditCnpj] = useState<string | null>(null);
   const limit = 50;
 
   const { data, isLoading, refetch } = useQuery({
@@ -168,6 +170,7 @@ export default function OrgaosScorePage() {
                 <TableHead className="w-40">Confiável?</TableHead>
                 <TableHead className="w-28">Score</TableHead>
                 <TableHead className="text-right w-24">Contratos</TableHead>
+                <TableHead className="w-24 text-right">Auditar</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -181,7 +184,7 @@ export default function OrgaosScorePage() {
                   ? { label: "Atenção", color: "bg-yellow-500 text-white", icon: "!" }
                   : { label: "Não confiável", color: "bg-red-500 text-white", icon: "✕" };
                 return (
-                <TableRow key={r.cnpj_orgao}>
+                <TableRow key={r.cnpj_orgao} className="cursor-pointer hover:bg-muted/40" onClick={() => setAuditCnpj(r.cnpj_orgao)}>
                   <TableCell className="text-muted-foreground text-xs">{page * limit + i + 1}</TableCell>
                   <TableCell className="font-medium text-sm">{r.nome_orgao}</TableCell>
                   <TableCell><Badge variant="secondary">{r.uf || "—"}</Badge></TableCell>
@@ -195,6 +198,15 @@ export default function OrgaosScorePage() {
                     </div>
                   </TableCell>
                   <TableCell className="text-right text-sm">{r.qtd_contratos_analisados}</TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => { e.stopPropagation(); setAuditCnpj(r.cnpj_orgao); }}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
                 );
               })}
@@ -212,6 +224,12 @@ export default function OrgaosScorePage() {
           </div>
         </div>
       )}
+
+      <ScoreAuditDialog
+        open={!!auditCnpj}
+        onOpenChange={(v) => !v && setAuditCnpj(null)}
+        cnpj={auditCnpj}
+      />
     </div>
   );
 }
