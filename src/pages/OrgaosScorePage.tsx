@@ -170,6 +170,7 @@ export default function OrgaosScorePage() {
                 <TableHead className="w-40">Confiável?</TableHead>
                 <TableHead className="w-28">Score</TableHead>
                 <TableHead className="text-right w-24">Contratos</TableHead>
+                <TableHead className="w-24 text-right">Auditar</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
