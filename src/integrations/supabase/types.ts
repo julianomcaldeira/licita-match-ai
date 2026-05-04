@@ -671,6 +671,93 @@ export type Database = {
           },
         ]
       }
+      orgaos_score: {
+        Row: {
+          ano_referencia: number
+          atraso_medio_dias: number | null
+          calculado_em: string
+          cnpj_orgao: string
+          created_at: string
+          divida_consolidada_liquida: number | null
+          fontes_utilizadas: string[] | null
+          id: string
+          nome_orgao: string
+          observacoes: string | null
+          pct_contratos_em_dia: number | null
+          pct_divida_rcl: number | null
+          pct_pago_sobre_empenhado: number | null
+          qtd_contratos_analisados: number | null
+          qtd_pagamentos: number | null
+          receita_corrente_liquida: number | null
+          score_classificacao: string
+          score_execucao: number | null
+          score_fiscal: number | null
+          score_numerico: number
+          score_pagamento: number | null
+          total_empenhado: number | null
+          total_liquidado: number | null
+          total_pago: number | null
+          uf: string | null
+          updated_at: string
+        }
+        Insert: {
+          ano_referencia?: number
+          atraso_medio_dias?: number | null
+          calculado_em?: string
+          cnpj_orgao: string
+          created_at?: string
+          divida_consolidada_liquida?: number | null
+          fontes_utilizadas?: string[] | null
+          id?: string
+          nome_orgao: string
+          observacoes?: string | null
+          pct_contratos_em_dia?: number | null
+          pct_divida_rcl?: number | null
+          pct_pago_sobre_empenhado?: number | null
+          qtd_contratos_analisados?: number | null
+          qtd_pagamentos?: number | null
+          receita_corrente_liquida?: number | null
+          score_classificacao?: string
+          score_execucao?: number | null
+          score_fiscal?: number | null
+          score_numerico?: number
+          score_pagamento?: number | null
+          total_empenhado?: number | null
+          total_liquidado?: number | null
+          total_pago?: number | null
+          uf?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ano_referencia?: number
+          atraso_medio_dias?: number | null
+          calculado_em?: string
+          cnpj_orgao?: string
+          created_at?: string
+          divida_consolidada_liquida?: number | null
+          fontes_utilizadas?: string[] | null
+          id?: string
+          nome_orgao?: string
+          observacoes?: string | null
+          pct_contratos_em_dia?: number | null
+          pct_divida_rcl?: number | null
+          pct_pago_sobre_empenhado?: number | null
+          qtd_contratos_analisados?: number | null
+          qtd_pagamentos?: number | null
+          receita_corrente_liquida?: number | null
+          score_classificacao?: string
+          score_execucao?: number | null
+          score_fiscal?: number | null
+          score_numerico?: number
+          score_pagamento?: number | null
+          total_empenhado?: number | null
+          total_liquidado?: number | null
+          total_pago?: number | null
+          uf?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pncp_raw: {
         Row: {
           chave_origem: string
@@ -932,6 +1019,26 @@ export type Database = {
           compra_key: string
         }[]
       }
+      get_orgao_score: {
+        Args: { p_cnpj: string }
+        Returns: {
+          atraso_medio_dias: number
+          calculado_em: string
+          cnpj_orgao: string
+          fontes_utilizadas: string[]
+          nome_orgao: string
+          pct_contratos_em_dia: number
+          pct_divida_rcl: number
+          pct_pago_sobre_empenhado: number
+          qtd_contratos_analisados: number
+          score_classificacao: string
+          score_execucao: number
+          score_fiscal: number
+          score_numerico: number
+          score_pagamento: number
+          uf: string
+        }[]
+      }
       get_winners_backlog_cursor: { Args: never; Returns: string }
       has_role: {
         Args: {
@@ -1022,6 +1129,18 @@ export type Database = {
               uf: string
             }[]
           }
+      list_top_orgaos_score: {
+        Args: { p_limit?: number; p_offset?: number; p_uf?: string }
+        Returns: {
+          cnpj_orgao: string
+          nome_orgao: string
+          qtd_contratos_analisados: number
+          score_classificacao: string
+          score_numerico: number
+          total_count: number
+          uf: string
+        }[]
+      }
       match_licitacoes_por_keywords: {
         Args: { p_empresa_id: string; p_limit?: number }
         Returns: {
