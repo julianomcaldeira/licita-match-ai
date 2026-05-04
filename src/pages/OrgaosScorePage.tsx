@@ -30,6 +30,7 @@ export default function OrgaosScorePage() {
   const [trust, setTrust] = useState<string>("");
   const [page, setPage] = useState(0);
   const [auditCnpj, setAuditCnpj] = useState<string | null>(null);
+  const limit = 50;
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["top-orgaos-score", uf, nome, trust, page],
