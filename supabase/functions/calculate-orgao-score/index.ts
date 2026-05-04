@@ -115,7 +115,7 @@ async function tentarDespesasPorOrgao(codigo: string, ano: number) {
   return { ok: true as const, empenhado, liquidado, pago, qtd: arr.length };
 }
 
-async function fetchPortalPagamentos(cnpj: string, ano: number) {
+async function fetchPortalPagamentos(supabase: any, cnpj: string, ano: number) {
   try {
     // 1) tenta com o CNPJ (raro funcionar, mas mantemos por compatibilidade)
     let res = await tentarDespesasPorOrgao(cnpj, ano);
@@ -123,8 +123,8 @@ async function fetchPortalPagamentos(cnpj: string, ano: number) {
       return { ...res, idUsado: cnpj, tipoId: "cnpj" as const };
     }
 
-    // 2) consulta SIAFI pelo CNPJ
-    const siafi = await lookupSiafiByCnpj(cnpj);
+    // 2) consulta SIAFI pelo CNPJ (com cache)
+    const siafi = await lookupSiafiByCnpj(supabase, cnpj);
     if (!siafi) return null;
 
     // 3) reexecuta com o código SIAFI
