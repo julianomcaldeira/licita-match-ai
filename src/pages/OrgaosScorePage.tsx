@@ -224,6 +224,12 @@ export default function OrgaosScorePage() {
           </div>
         </div>
       )}
+
+      <ScoreAuditDialog
+        open={!!auditCnpj}
+        onOpenChange={(v) => !v && setAuditCnpj(null)}
+        cnpj={auditCnpj}
+      />
     </div>
   );
 }
