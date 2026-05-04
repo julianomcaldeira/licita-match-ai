@@ -99,6 +99,8 @@ export default function OrgaosScorePage() {
         </div>
       </Card>
 
+      <RescoreJobPanel onCompleted={() => refetch()} />
+
       <div className="flex flex-wrap gap-3 items-center">
         <form
           className="relative flex-1 min-w-[240px] max-w-md"
