@@ -44,10 +44,14 @@ function classify(score: number): string {
 // Registra em `idUsado` qual identificador efetivamente funcionou.
 const PT_HEADERS = { "chave-api-dados": PT_API_KEY, accept: "application/json" };
 
-async function lookupSiafiByCnpj(cnpj: string): Promise<string | null> {
+// Cache em memória por execução da function (zera quando a instância é reciclada)
+const memSiafiCache = new Map<string, string | null>();
+// TTL de re-checagem: misses ficam 30 dias, hits ficam 180 dias antes de revalidar
+const SIAFI_HIT_TTL_DAYS = 180;
+const SIAFI_MISS_TTL_DAYS = 30;
+
+async function lookupSiafiRemote(cnpj: string): Promise<string | null> {
   try {
-    const url = `https://api.portaldatransparencia.gov.br/api-de-dados/orgaos-siafi?codigo=&descricao=&pagina=1`;
-    // O endpoint não filtra por CNPJ diretamente; usamos /orgaos-siafi/{cnpj}
     const direto = `https://api.portaldatransparencia.gov.br/api-de-dados/orgaos-siafi?cnpj=${cnpj}&pagina=1`;
     const r = await fetch(direto, { headers: PT_HEADERS });
     if (!r.ok) return null;
@@ -58,6 +62,42 @@ async function lookupSiafiByCnpj(cnpj: string): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+async function lookupSiafiByCnpj(supabase: any, cnpj: string): Promise<string | null> {
+  // 1) memória
+  if (memSiafiCache.has(cnpj)) return memSiafiCache.get(cnpj) ?? null;
+
+  // 2) banco
+  const { data: cached } = await supabase
+    .from("orgao_siafi_cache")
+    .select("codigo_siafi, found, last_checked_at")
+    .eq("cnpj", cnpj)
+    .maybeSingle();
+
+  if (cached) {
+    const ageDays = (Date.now() - new Date(cached.last_checked_at).getTime()) / 86_400_000;
+    const ttl = cached.found ? SIAFI_HIT_TTL_DAYS : SIAFI_MISS_TTL_DAYS;
+    if (ageDays < ttl) {
+      const val = cached.found ? (cached.codigo_siafi || null) : null;
+      memSiafiCache.set(cnpj, val);
+      // incrementa contador (fire-and-forget)
+      supabase.rpc("increment_siafi_cache_hit", { p_cnpj: cnpj }).then(() => {}).catch(() => {});
+      return val;
+    }
+  }
+
+  // 3) remoto + grava cache
+  const codigo = await lookupSiafiRemote(cnpj);
+  memSiafiCache.set(cnpj, codigo);
+  await supabase.from("orgao_siafi_cache").upsert({
+    cnpj,
+    codigo_siafi: codigo,
+    found: !!codigo,
+    last_checked_at: new Date().toISOString(),
+    lookup_count: (cached?.lookup_count ?? 0) + 1,
+  }, { onConflict: "cnpj" });
+  return codigo;
 }
 
 async function tentarDespesasPorOrgao(codigo: string, ano: number) {
@@ -75,7 +115,7 @@ async function tentarDespesasPorOrgao(codigo: string, ano: number) {
   return { ok: true as const, empenhado, liquidado, pago, qtd: arr.length };
 }
 
-async function fetchPortalPagamentos(cnpj: string, ano: number) {
+async function fetchPortalPagamentos(supabase: any, cnpj: string, ano: number) {
   try {
     // 1) tenta com o CNPJ (raro funcionar, mas mantemos por compatibilidade)
     let res = await tentarDespesasPorOrgao(cnpj, ano);
@@ -83,8 +123,8 @@ async function fetchPortalPagamentos(cnpj: string, ano: number) {
       return { ...res, idUsado: cnpj, tipoId: "cnpj" as const };
     }
 
-    // 2) consulta SIAFI pelo CNPJ
-    const siafi = await lookupSiafiByCnpj(cnpj);
+    // 2) consulta SIAFI pelo CNPJ (com cache)
+    const siafi = await lookupSiafiByCnpj(supabase, cnpj);
     if (!siafi) return null;
 
     // 3) reexecuta com o código SIAFI
@@ -163,7 +203,7 @@ async function calculateForOrgao(supabase: any, cnpj: string, nome: string, uf: 
 
   // Roda em paralelo
   const [pt, sf, ct] = await Promise.all([
-    fetchPortalPagamentos(cnpj, ano - 1).catch(() => null),
+    fetchPortalPagamentos(supabase, cnpj, ano - 1).catch(() => null),
     fetchSiconfi(cnpj, ano - 1).catch(() => null),
     fetchContratosInternos(supabase, cnpj).catch(() => null),
   ]);

@@ -671,6 +671,33 @@ export type Database = {
           },
         ]
       }
+      orgao_siafi_cache: {
+        Row: {
+          cnpj: string
+          codigo_siafi: string | null
+          created_at: string
+          found: boolean
+          last_checked_at: string
+          lookup_count: number
+        }
+        Insert: {
+          cnpj: string
+          codigo_siafi?: string | null
+          created_at?: string
+          found?: boolean
+          last_checked_at?: string
+          lookup_count?: number
+        }
+        Update: {
+          cnpj?: string
+          codigo_siafi?: string | null
+          created_at?: string
+          found?: boolean
+          last_checked_at?: string
+          lookup_count?: number
+        }
+        Relationships: []
+      }
       orgaos_score: {
         Row: {
           ano_referencia: number
@@ -1046,6 +1073,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      increment_siafi_cache_hit: {
+        Args: { p_cnpj: string }
+        Returns: undefined
       }
       licitacoes_pendentes_winners_count: {
         Args: { p_max?: number }
