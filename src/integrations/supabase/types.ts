@@ -193,6 +193,51 @@ export type Database = {
           },
         ]
       }
+      dashboard_validation_runs: {
+        Row: {
+          actual: number | null
+          date_from: string | null
+          date_to: string | null
+          detail: string | null
+          diff: number | null
+          executed_at: string
+          expected: number | null
+          id: string
+          metric: string
+          periodo: string
+          run_id: string
+          status: string
+        }
+        Insert: {
+          actual?: number | null
+          date_from?: string | null
+          date_to?: string | null
+          detail?: string | null
+          diff?: number | null
+          executed_at?: string
+          expected?: number | null
+          id?: string
+          metric: string
+          periodo: string
+          run_id: string
+          status: string
+        }
+        Update: {
+          actual?: number | null
+          date_from?: string | null
+          date_to?: string | null
+          detail?: string | null
+          diff?: number | null
+          executed_at?: string
+          expected?: number | null
+          id?: string
+          metric?: string
+          periodo?: string
+          run_id?: string
+          status?: string
+        }
+        Relationships: []
+      }
       diarios_oficiais: {
         Row: {
           created_at: string
@@ -862,6 +907,18 @@ export type Database = {
           valor_total: number
         }[]
       }
+      get_dashboard_validation_summary: {
+        Args: never
+        Returns: {
+          divergences: Json
+          divergent_count: number
+          error_count: number
+          executed_at: string
+          ok_count: number
+          run_id: string
+          total: number
+        }[]
+      }
       get_distinct_situacoes: {
         Args: never
         Returns: {
@@ -1019,6 +1076,7 @@ export type Database = {
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      validate_dashboard_metrics: { Args: never; Returns: string }
     }
     Enums: {
       app_role: "admin_central" | "admin_empresa" | "usuario_empresa"
