@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.ingest-pncp-dadosabertos]
 verify_jwt = false
+
+[functions.calculate-orgao-score]
+verify_jwt = false
