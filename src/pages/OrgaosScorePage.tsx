@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { ShieldCheck, Loader2, Play, Info, Search, X, Eye } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { ScoreAuditDialog } from "@/components/ScoreAuditDialog";
+import { RescoreJobPanel } from "@/components/RescoreJobPanel";
 
 const UFS = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
 
@@ -97,6 +98,8 @@ export default function OrgaosScorePage() {
           </div>
         </div>
       </Card>
+
+      <RescoreJobPanel onCompleted={() => refetch()} />
 
       <div className="flex flex-wrap gap-3 items-center">
         <form
