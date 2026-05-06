@@ -101,37 +101,38 @@ export default function OrgaosScorePage() {
 
       <RescoreJobPanel onCompleted={() => refetch()} />
 
-      <div className="flex flex-wrap gap-3 items-center">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap gap-3 lg:items-center">
         <form
-          className="relative flex-1 min-w-[240px] max-w-md"
+          className="relative col-span-full lg:flex-1 lg:min-w-[240px] lg:max-w-md"
           onSubmit={(e) => { e.preventDefault(); setNome(nomeInput.trim()); setPage(0); }}
         >
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             value={nomeInput}
             onChange={(e) => setNomeInput(e.target.value)}
             placeholder="Buscar por nome do órgão..."
-            className="pl-8 pr-8 h-9"
+            className="pl-8 pr-8 h-10 lg:h-9 w-full"
           />
           {nomeInput && (
             <button
               type="button"
               onClick={() => { setNomeInput(""); setNome(""); setPage(0); }}
-              className="absolute right-2 top-2.5 text-muted-foreground hover:text-foreground"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label="Limpar"
             >
               <X className="h-4 w-4" />
             </button>
           )}
         </form>
         <Select value={uf || "all"} onValueChange={(v) => { setUf(v === "all" ? "" : v); setPage(0); }}>
-          <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="UF" /></SelectTrigger>
+          <SelectTrigger className="w-full h-10 lg:h-9 lg:w-[140px]"><SelectValue placeholder="UF" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas UFs</SelectItem>
             {UFS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={trust || "all"} onValueChange={(v) => { setTrust(v === "all" ? "" : v); setPage(0); }}>
-          <SelectTrigger className="w-[180px] h-9"><SelectValue placeholder="Confiabilidade" /></SelectTrigger>
+          <SelectTrigger className="w-full h-10 lg:h-9 lg:w-[180px]"><SelectValue placeholder="Confiabilidade" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas</SelectItem>
             <SelectItem value="confiavel">✓ Confiável</SelectItem>

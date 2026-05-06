@@ -182,7 +182,7 @@ export default function SancionadasPage() {
 
       {/* Search + table */}
       <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between sm:flex-wrap">
           <h2 className="font-display text-sm font-semibold text-foreground">
             Lista de Sancionados
             <span className="text-muted-foreground font-normal ml-2">
@@ -190,19 +190,20 @@ export default function SancionadasPage() {
               {activeCount} vigentes nesta página)
             </span>
           </h2>
-          <div className="relative w-72">
+          <div className="relative w-full sm:w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Buscar por nome ou CNPJ..."
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="pl-9"
+              className="pl-9 h-10"
               maxLength={100}
             />
             {search && (
               <button
                 onClick={() => onSearchChange("")}
                 className="absolute right-3 top-1/2 -translate-y-1/2"
+                aria-label="Limpar busca"
               >
                 <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
               </button>
