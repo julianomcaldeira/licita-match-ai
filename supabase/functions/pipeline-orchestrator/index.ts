@@ -38,6 +38,9 @@ const PHASE_LABELS: Record<Phase, string> = {
 };
 
 const MODALIDADES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+// Hard cap to prevent infinite pagination loops when the PNCP API keeps returning hasMore=true
+// indefinitely. The real PNCP limit is ~200 pages (10k records) per window/modalidade.
+const PNCP_MAX_PAGES_PER_MODALIDADE = 250;
 const WATCHDOG_STALL_MS = 3 * 60_000;
 const WATCHDOG_BASE_BACKOFF_MS = 30_000;
 const WATCHDOG_MAX_BACKOFF_MS = 10 * 60_000;
