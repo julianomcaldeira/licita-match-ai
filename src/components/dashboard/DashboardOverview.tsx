@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import heroBanner from "@/assets/hero-banner.jpg";
-import SancionadosAlertCard from "./SancionadosAlertCard";
+
 
 const container = {
   hidden: { opacity: 0 },
@@ -186,8 +186,6 @@ export default function DashboardOverview() {
         </div>
       </div>
 
-      {/* Sancionados Alert */}
-      <SancionadosAlertCard />
 
       {/* KPI Cards */}
       <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
