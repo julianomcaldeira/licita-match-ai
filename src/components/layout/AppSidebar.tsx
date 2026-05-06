@@ -72,7 +72,9 @@ export default function AppSidebar({ mobileOpen = false, onMobileClose }: AppSid
       >
         {/* Brand */}
         <div className="flex h-16 items-center gap-3 px-4">
-          <img src={logoImg} alt="i-pesquisei" className="h-9 w-9 shrink-0 rounded-lg object-contain" />
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white p-1 shadow-sm">
+            <img src={logoImg} alt="i-pesquisei" className="h-full w-full object-contain" />
+          </div>
           {!collapsed && (
             <div className="flex flex-1 items-center justify-between animate-fade-in">
               <div>
