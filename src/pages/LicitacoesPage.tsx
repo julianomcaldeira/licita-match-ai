@@ -1247,7 +1247,7 @@ export default function LicitacoesPage() {
                 <thead>
                   <tr className="border-b border-border bg-secondary/50">
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground w-16"></th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Órgão</th>
+                    <th className="table-sticky-col px-4 py-3 text-left font-medium text-muted-foreground">Órgão</th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Objeto</th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Modalidade</th>
                     <th className="px-4 py-3 text-right font-medium text-muted-foreground">Valor Est.</th>
