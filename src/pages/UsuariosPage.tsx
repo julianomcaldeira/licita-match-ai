@@ -443,6 +443,7 @@ export default function UsuariosPage() {
                   })}
                 </tbody>
               </table>
+            </div>
           </div>
         </motion.div>
       )}
