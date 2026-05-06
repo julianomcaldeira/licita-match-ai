@@ -838,7 +838,7 @@ export default function LicitacoesPage() {
 
       {/* Totalizador de auditoria */}
       {tabCounts && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="rounded-xl border border-border bg-card p-3 flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
               <Database className="h-5 w-5 text-primary" />
