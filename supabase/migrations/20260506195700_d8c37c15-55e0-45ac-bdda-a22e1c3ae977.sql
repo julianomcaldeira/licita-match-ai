@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.schedule_auto_ingestion(boolean) FROM PUBLIC, anon, authenticated;

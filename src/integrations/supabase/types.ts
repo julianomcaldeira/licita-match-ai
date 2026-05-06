@@ -1196,6 +1196,7 @@ export type Database = {
       pncp_dadosabertos_backfill_tick: { Args: never; Returns: Json }
       refresh_all_mvs: { Args: never; Returns: undefined }
       run_ingestion_audit: { Args: never; Returns: string }
+      schedule_auto_ingestion: { Args: { p_force?: boolean }; Returns: Json }
       search_licitacoes: {
         Args: {
           p_com_vencedor?: boolean
