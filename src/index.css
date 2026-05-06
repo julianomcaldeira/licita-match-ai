@@ -121,3 +121,37 @@
     font-family: 'Space Grotesk', system-ui, sans-serif;
   }
 }
+
+@layer components {
+  /* Tabelas com cabeçalho sticky, zebra striping e linhas hover */
+  .table-sticky {
+    @apply w-full text-sm border-separate border-spacing-0;
+  }
+  .table-sticky thead tr {
+    @apply bg-secondary/95 backdrop-blur supports-[backdrop-filter]:bg-secondary/80;
+  }
+  .table-sticky thead th {
+    @apply sticky top-0 z-10 border-b border-border px-4 py-3 text-left font-semibold text-muted-foreground;
+  }
+  .table-sticky tbody tr {
+    @apply transition-colors hover:bg-secondary/40;
+  }
+  .table-sticky tbody tr:nth-child(even) {
+    @apply bg-muted/20;
+  }
+  .table-sticky tbody td {
+    @apply border-b border-border/60 px-4 py-3 align-middle;
+  }
+  /* Container scroll vertical com altura limitada para o sticky funcionar */
+  .table-scroll {
+    @apply overflow-auto max-h-[70vh];
+  }
+  /* Coluna fixada à esquerda no mobile (primeira coluna importante) */
+  .table-sticky-col {
+    @apply sticky left-0 z-[5] bg-card;
+  }
+  .table-sticky thead .table-sticky-col {
+    @apply z-20 bg-secondary;
+  }
+}
+

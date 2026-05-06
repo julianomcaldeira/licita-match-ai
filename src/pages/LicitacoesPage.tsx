@@ -1242,12 +1242,12 @@ export default function LicitacoesPage() {
 
           {/* Desktop: tabela */}
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="hidden md:block overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            <div className="table-scroll">
+              <table className="table-sticky">
                 <thead>
                   <tr className="border-b border-border bg-secondary/50">
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground w-16"></th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Órgão</th>
+                    <th className="table-sticky-col px-4 py-3 text-left font-medium text-muted-foreground">Órgão</th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Objeto</th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Modalidade</th>
                     <th className="px-4 py-3 text-right font-medium text-muted-foreground">Valor Est.</th>
@@ -1282,7 +1282,7 @@ export default function LicitacoesPage() {
                             <Eye className="h-3.5 w-3.5" />
                           </button>
                         </td>
-                        <td className="px-4 py-3 font-medium text-foreground max-w-[220px]">
+                        <td className="table-sticky-col px-4 py-3 font-medium text-foreground max-w-[220px]">
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <span className="block truncate">

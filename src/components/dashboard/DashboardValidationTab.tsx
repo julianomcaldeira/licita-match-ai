@@ -117,8 +117,8 @@ export function DashboardValidationTab() {
             <CheckCircle2 className="h-4 w-4" /> Nenhuma divergência. Dashboard 100% consistente com o banco.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="table-scroll">
+            <table className="table-sticky">
               <thead>
                 <tr className="text-left text-xs text-muted-foreground border-b border-border">
                   <th className="py-2 pr-3">Período</th>
