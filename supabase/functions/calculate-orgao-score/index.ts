@@ -75,14 +75,17 @@ async function lookupSiafiRemote(cnpj: string): Promise<string | null> {
   }
 }
 
-async function lookupSiafiByCnpj(supabase: any, cnpj: string): Promise<string | null> {
+async function lookupSiafiByCnpj(supabase: any, cnpjInput: string): Promise<string | null> {
+  const cnpj = normalizeCnpj(cnpjInput);
+  if (!cnpj) return null;
+
   // 1) memória
   if (memSiafiCache.has(cnpj)) return memSiafiCache.get(cnpj) ?? null;
 
   // 2) banco
   const { data: cached } = await supabase
     .from("orgao_siafi_cache")
-    .select("codigo_siafi, found, last_checked_at")
+    .select("codigo_siafi, found, last_checked_at, lookup_count")
     .eq("cnpj", cnpj)
     .maybeSingle();
 
@@ -98,7 +101,7 @@ async function lookupSiafiByCnpj(supabase: any, cnpj: string): Promise<string | 
     }
   }
 
-  // 3) remoto + grava cache
+  // 3) remoto + grava cache (sempre com CNPJ normalizado)
   const codigo = await lookupSiafiRemote(cnpj);
   memSiafiCache.set(cnpj, codigo);
   await supabase.from("orgao_siafi_cache").upsert({
