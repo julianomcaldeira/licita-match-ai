@@ -1135,7 +1135,104 @@ export default function LicitacoesPage() {
         </motion.div>
       ) : (
         <>
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+          {/* Mobile: cards empilhados */}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="md:hidden space-y-3"
+          >
+            {licitacoes.map((row: any) => {
+              let pncpLink: string | null = null;
+              if (row.numero_controle_pncp) {
+                const match = row.numero_controle_pncp.match(/^(\d+)-\d+-(\d+)\/(\d+)$/);
+                if (match) pncpLink = `https://pncp.gov.br/app/editais/${match[1]}/${match[3]}/${parseInt(match[2])}`;
+              }
+              const formattedDate = row.data_publicacao
+                ? (() => { const [y, m, d] = row.data_publicacao.split("-"); return `${d}/${m}/${y}`; })()
+                : "—";
+              const economia = row.valor_estimado && row.valor_homologado
+                ? row.valor_estimado - row.valor_homologado
+                : null;
+              return (
+                <button
+                  key={row.id}
+                  onClick={() => openDetail(row)}
+                  className="w-full text-left rounded-xl border border-border bg-card shadow-sm p-3 active:bg-secondary/40 transition"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      {pncpLink ? (
+                        <a
+                          href={pncpLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                        >
+                          {row.orgao} <ExternalLink className="h-3 w-3 shrink-0" />
+                        </a>
+                      ) : (
+                        <p className="text-xs font-semibold text-foreground line-clamp-2">{row.orgao}</p>
+                      )}
+                      <p className="mt-1 text-sm text-foreground line-clamp-2">{row.objeto}</p>
+                    </div>
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-primary/30 bg-primary/5 text-primary">
+                      <Eye className="h-3.5 w-3.5" />
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Valor Est.</p>
+                      <p className="font-medium text-foreground tabular-nums">{formatCurrency(row.valor_estimado)}</p>
+                    </div>
+                    {activeTab === "encerradas" ? (
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Homologado</p>
+                        <p className="font-medium text-success tabular-nums">{row.valor_homologado ? formatCurrency(row.valor_homologado) : "—"}</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Situação</p>
+                        <div className="mt-0.5"><StatusBadge situacao={row.situacao} valorHomologado={row.valor_homologado} /></div>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Modalidade</p>
+                      <p className="text-foreground truncate">{row.modalidade || "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Data / UF</p>
+                      <p className="text-foreground">{formattedDate} · {row.uf || "—"}</p>
+                    </div>
+                    {activeTab === "encerradas" && economia !== null && (
+                      <div className="col-span-2">
+                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Economia</p>
+                        <p className={cn("font-medium tabular-nums", economia > 0 ? "text-success" : "text-destructive")}>
+                          {formatCurrency(economia)}
+                        </p>
+                      </div>
+                    )}
+                    {activeTab === "encerradas" && row.vencedor_nome && (
+                      <div className="col-span-2">
+                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Vencedor</p>
+                        <span
+                          role="button"
+                          onClick={(e) => { e.stopPropagation(); searchByWinner(row.vencedor_nome); }}
+                          className="block truncate text-primary text-xs font-medium hover:underline"
+                        >
+                          {row.vencedor_nome}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </motion.div>
+
+          {/* Desktop: tabela */}
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="hidden md:block overflow-hidden rounded-xl border border-border bg-card shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
