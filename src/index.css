@@ -43,14 +43,14 @@
     --radius: 0.75rem;
 
     /* Sidebar */
-   --sidebar-background: 215 40% 97%;
-   --sidebar-foreground: 220 20% 30%;
-   --sidebar-primary: 215 70% 50%;
+   --sidebar-background: 215 55% 88%;
+   --sidebar-foreground: 220 25% 25%;
+   --sidebar-primary: 215 75% 45%;
    --sidebar-primary-foreground: 0 0% 100%;
-   --sidebar-accent: 215 60% 93%;
-   --sidebar-accent-foreground: 215 70% 40%;
-   --sidebar-border: 215 25% 90%;
-   --sidebar-ring: 215 70% 55%;
+   --sidebar-accent: 215 65% 80%;
+   --sidebar-accent-foreground: 215 75% 30%;
+   --sidebar-border: 215 35% 78%;
+   --sidebar-ring: 215 75% 50%;
 
     /* Custom tokens */
     --success: 152 69% 40%;
@@ -71,8 +71,8 @@
     --module-yellow: 45 93% 47%;
 
     /* Gradient */
-   --gradient-hero: linear-gradient(135deg, hsl(215 60% 93%) 0%, hsl(210 55% 95%) 50%, hsl(220 50% 96%) 100%);
-   --gradient-sidebar: linear-gradient(180deg, hsl(215 50% 98%) 0%, hsl(215 45% 95%) 100%);
+   --gradient-hero: linear-gradient(135deg, hsl(215 65% 82%) 0%, hsl(210 60% 86%) 50%, hsl(220 55% 88%) 100%);
+   --gradient-sidebar: linear-gradient(180deg, hsl(215 60% 90%) 0%, hsl(215 55% 85%) 100%);
 
     font-family: 'Inter', system-ui, sans-serif;
   }
