@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import heroBanner from "@/assets/hero-banner.jpg";
-import SancionadosAlertCard from "./SancionadosAlertCard";
+
 
 const container = {
   hidden: { opacity: 0 },
@@ -159,20 +159,20 @@ export default function DashboardOverview() {
     <div className="space-y-6">
       {/* Hero */}
       <div className="relative overflow-hidden rounded-2xl p-6 sm:p-8" style={{ background: "var(--gradient-hero)" }}>
-        <img src={heroBanner} alt="" className="absolute inset-0 h-full w-full object-cover opacity-10 mix-blend-overlay" />
+        <img src={heroBanner} alt="" className="absolute inset-0 h-full w-full object-cover opacity-20 mix-blend-overlay" />
         <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="font-display text-2xl sm:text-3xl font-bold text-foreground">
+            <h1 className="font-display text-2xl sm:text-3xl font-bold text-primary-foreground">
               {greeting}, {displayName}! 👋
             </h1>
-            <p className="mt-1 text-sm sm:text-base text-muted-foreground">
+            <p className="mt-1 text-sm sm:text-base text-primary-foreground/80">
               Inteligência B2G — Visão geral da plataforma
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <CalendarDays className="h-4 w-4 text-muted-foreground" />
+            <CalendarDays className="h-4 w-4 text-primary-foreground/70" />
             <Select value={period} onValueChange={setPeriod}>
-              <SelectTrigger className="w-[160px] bg-background/70 border-border text-foreground text-sm h-9">
+              <SelectTrigger className="w-[160px] bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground text-sm h-9">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -186,8 +186,6 @@ export default function DashboardOverview() {
         </div>
       </div>
 
-      {/* Sancionados Alert */}
-      <SancionadosAlertCard />
 
       {/* KPI Cards */}
       <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
