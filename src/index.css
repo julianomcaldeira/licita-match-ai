@@ -71,7 +71,7 @@
     --module-yellow: 45 93% 47%;
 
     /* Gradient */
-    --gradient-hero: linear-gradient(135deg, hsl(234 85% 55%) 0%, hsl(270 70% 55%) 50%, hsl(330 80% 55%) 100%);
+    --gradient-hero: linear-gradient(135deg, hsl(340 70% 92%) 0%, hsl(320 60% 94%) 50%, hsl(280 50% 95%) 100%);
     --gradient-sidebar: linear-gradient(180deg, hsl(340 65% 98%) 0%, hsl(340 55% 95%) 100%);
 
     font-family: 'Inter', system-ui, sans-serif;
