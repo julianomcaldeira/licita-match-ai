@@ -1023,16 +1023,25 @@ export default function LicitacoesPage() {
         </div>
 
         {/* Search + Clear buttons */}
-        <div className="flex items-center justify-between pt-1 border-t border-border">
-          <div className="text-xs text-muted-foreground">
-            {hasActiveFilters && (
-              <button onClick={handleClearFilters} className="text-primary hover:underline font-medium">
-                Limpar filtros
-              </button>
-            )}
-          </div>
-          <Button onClick={handleSearch} disabled={isFetching} className="h-9 gap-2 px-6">
-            {isFetching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+        <div className="flex flex-col-reverse gap-2 pt-3 border-t border-border sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:pt-1">
+          {hasActiveFilters ? (
+            <Button
+              variant="outline"
+              onClick={handleClearFilters}
+              className="h-10 w-full gap-2 sm:h-9 sm:w-auto"
+            >
+              <X className="h-3.5 w-3.5" />
+              Limpar filtros
+            </Button>
+          ) : (
+            <span className="hidden sm:block" />
+          )}
+          <Button
+            onClick={handleSearch}
+            disabled={isFetching}
+            className="h-11 w-full gap-2 px-6 text-sm font-semibold sm:h-9 sm:w-auto sm:text-sm"
+          >
+            {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
             {isFetching ? "Pesquisando..." : "Pesquisar"}
           </Button>
         </div>
