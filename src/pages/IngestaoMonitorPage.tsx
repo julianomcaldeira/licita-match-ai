@@ -211,8 +211,8 @@ export default function IngestaoMonitorPage() {
             <>
               <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                 className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                <div className="table-scroll">
+                  <table className="table-sticky">
                     <thead>
                       <tr className="border-b border-border bg-secondary/50">
                         <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
@@ -308,8 +308,8 @@ export default function IngestaoMonitorPage() {
           ) : (
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
               className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              <div className="table-scroll">
+                <table className="table-sticky">
                   <thead>
                     <tr className="border-b border-border bg-secondary/50">
                       <th className="px-4 py-3 text-left font-medium text-muted-foreground">Empresa</th>

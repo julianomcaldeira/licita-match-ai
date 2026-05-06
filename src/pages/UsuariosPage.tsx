@@ -351,8 +351,8 @@ export default function UsuariosPage() {
 
           {/* Desktop table */}
           <div className="hidden md:block rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            <div className="table-scroll">
+              <table className="table-sticky">
                 <thead>
                   <tr className="border-b border-border bg-muted/50">
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Usuário</th>

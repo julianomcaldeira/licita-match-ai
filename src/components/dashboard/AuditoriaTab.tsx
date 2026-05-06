@@ -313,8 +313,8 @@ export function AuditoriaTab() {
                 {fonteFilter !== "all" && ` com inconsistências em ${FONTE_LABEL[fonteFilter]}`}
               </p>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            <div className="table-scroll">
+              <table className="table-sticky">
                 <thead className="bg-muted/50 text-xs text-muted-foreground">
                   <tr>
                     <th className="px-4 py-2 text-left font-medium">Quando</th>
