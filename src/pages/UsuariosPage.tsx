@@ -285,99 +285,164 @@ export default function UsuariosPage() {
           <p className="mt-2 text-sm text-muted-foreground">Convide usuários para começar.</p>
         </motion.div>
       ) : (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/50">
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Usuário</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Email</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Permissão</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Empresa</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Cadastro</th>
-                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((u, i) => {
-                  const RoleIcon = ROLE_ICONS[u.role || ""] || User;
-                  const isCurrentUser = u.user_id === user?.id;
-                  return (
-                    <motion.tr
-                      key={u.id}
-                      initial={{ opacity: 0, y: 4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.03 }}
-                      className="border-b border-border/50 hover:bg-muted/30 transition"
-                    >
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
-                            <User className="h-4 w-4 text-primary" />
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
+          {/* Mobile cards */}
+          <div className="md:hidden space-y-3">
+            {users.map((u, i) => {
+              const RoleIcon = ROLE_ICONS[u.role || ""] || User;
+              const isCurrentUser = u.user_id === user?.id;
+              return (
+                <motion.div
+                  key={u.id}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.03 }}
+                  className="rounded-xl border border-border bg-card shadow-sm p-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                        <User className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-foreground truncate">
+                          {u.display_name || "—"}
+                          {isCurrentUser && <span className="ml-2 text-xs text-muted-foreground">(você)</span>}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">{u.email || "—"}</p>
+                      </div>
+                    </div>
+                    {!isCurrentUser && u.role_id && (
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button onClick={() => openEdit(u)} className="rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground transition" title="Editar">
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => { if (confirm(`Remover acesso de ${u.display_name || u.email}?`)) deleteRoleMutation.mutate(u.role_id!); }}
+                          className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition"
+                          title="Remover"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                    {u.role ? (
+                      <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${ROLE_COLORS[u.role] || "bg-muted text-muted-foreground border-border"}`}>
+                        <RoleIcon className="h-3 w-3" />
+                        {ROLE_LABELS[u.role] || u.role}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Sem permissão</span>
+                    )}
+                    {u.empresa_nome && (
+                      <span className="inline-flex items-center gap-1 text-muted-foreground">
+                        <Building2 className="h-3.5 w-3.5" />
+                        {u.empresa_nome}
+                      </span>
+                    )}
+                    <span className="ml-auto text-muted-foreground">{new Date(u.created_at).toLocaleDateString("pt-BR")}</span>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden md:block rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/50">
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Usuário</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Email</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Permissão</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Empresa</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Cadastro</th>
+                    <th className="px-4 py-3 text-right font-medium text-muted-foreground">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((u, i) => {
+                    const RoleIcon = ROLE_ICONS[u.role || ""] || User;
+                    const isCurrentUser = u.user_id === user?.id;
+                    return (
+                      <motion.tr
+                        key={u.id}
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.03 }}
+                        className="border-b border-border/50 hover:bg-muted/30 transition"
+                      >
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
+                              <User className="h-4 w-4 text-primary" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-foreground">
+                                {u.display_name || "—"}
+                                {isCurrentUser && (
+                                  <span className="ml-2 text-xs text-muted-foreground">(você)</span>
+                                )}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-medium text-foreground">
-                              {u.display_name || "—"}
-                              {isCurrentUser && (
-                                <span className="ml-2 text-xs text-muted-foreground">(você)</span>
-                              )}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">{u.email || "—"}</td>
-                      <td className="px-4 py-3">
-                        {u.role ? (
-                          <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${ROLE_COLORS[u.role] || "bg-muted text-muted-foreground border-border"}`}>
-                            <RoleIcon className="h-3 w-3" />
-                            {ROLE_LABELS[u.role] || u.role}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">Sem permissão</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        {u.empresa_nome ? (
-                          <span className="inline-flex items-center gap-1 text-sm">
-                            <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-                            {u.empresa_nome}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground text-xs">
-                        {new Date(u.created_at).toLocaleDateString("pt-BR")}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {!isCurrentUser && u.role_id && (
-                          <div className="flex items-center justify-end gap-1">
-                            <button
-                              onClick={() => openEdit(u)}
-                              className="rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground transition"
-                              title="Editar permissão"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => {
-                                if (confirm(`Remover acesso de ${u.display_name || u.email}?`)) {
-                                  deleteRoleMutation.mutate(u.role_id!);
-                                }
-                              }}
-                              className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition"
-                              title="Remover acesso"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </motion.tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">{u.email || "—"}</td>
+                        <td className="px-4 py-3">
+                          {u.role ? (
+                            <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${ROLE_COLORS[u.role] || "bg-muted text-muted-foreground border-border"}`}>
+                              <RoleIcon className="h-3 w-3" />
+                              {ROLE_LABELS[u.role] || u.role}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Sem permissão</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {u.empresa_nome ? (
+                            <span className="inline-flex items-center gap-1 text-sm">
+                              <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                              {u.empresa_nome}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground text-xs">
+                          {new Date(u.created_at).toLocaleDateString("pt-BR")}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {!isCurrentUser && u.role_id && (
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={() => openEdit(u)}
+                                className="rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground transition"
+                                title="Editar permissão"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (confirm(`Remover acesso de ${u.display_name || u.email}?`)) {
+                                    deleteRoleMutation.mutate(u.role_id!);
+                                  }
+                                }}
+                                className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition"
+                                title="Remover acesso"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </motion.tr>
+                    );
+                  })}
+                </tbody>
+              </table>
           </div>
         </motion.div>
       )}
