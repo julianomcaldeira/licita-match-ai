@@ -230,8 +230,13 @@ serve(async (req) => {
           phaseRecords = Number(result.json.totalProcessed || 0);
           totalRecords += phaseRecords;
           const hasMore = !!result.json.hasMore;
+          const reachedPageCap = pagina >= PNCP_MAX_PAGES_PER_MODALIDADE;
 
-          if (hasMore) {
+          if (reachedPageCap && hasMore) {
+            console.warn(`PNCP page cap (${PNCP_MAX_PAGES_PER_MODALIDADE}) reached for mod ${modalidade} — advancing to next modalidade to prevent infinite loop.`);
+          }
+
+          if (hasMore && !reachedPageCap) {
             state.pagina = pagina + 1;
           } else {
             state.modIdx = modIdx + 1;
