@@ -23,6 +23,17 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const onlyDigits = (s: string | null | undefined) =>
   (s || "").replace(/\D/g, "");
 
+// Normaliza CNPJ para forma canônica de 14 dígitos:
+// 1) remove pontuação/qualquer não-dígito
+// 2) remove zeros à esquerda (evita duplicidade de cache para "0001..." vs "1...")
+// 3) re-padroniza com left-pad até 14 dígitos
+// Retorna "" se não houver dígitos.
+const normalizeCnpj = (s: string | null | undefined): string => {
+  const digits = onlyDigits(s).replace(/^0+/, "");
+  if (!digits) return "";
+  return digits.padStart(14, "0");
+};
+
 function classify(score: number): string {
   if (score >= 950) return "AAA";
   if (score >= 900) return "AA";
