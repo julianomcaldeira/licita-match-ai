@@ -1282,7 +1282,7 @@ export default function LicitacoesPage() {
                             <Eye className="h-3.5 w-3.5" />
                           </button>
                         </td>
-                        <td className="px-4 py-3 font-medium text-foreground max-w-[220px]">
+                        <td className="table-sticky-col px-4 py-3 font-medium text-foreground max-w-[220px]">
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <span className="block truncate">
