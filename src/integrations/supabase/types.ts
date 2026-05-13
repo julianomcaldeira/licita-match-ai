@@ -434,6 +434,11 @@ export type Database = {
           status: string
           total_records_processed: number
           updated_at: string
+          watchdog_last_check_at: string | null
+          watchdog_last_phase: string | null
+          watchdog_last_progress: number | null
+          watchdog_parent_job: string | null
+          watchdog_restart_count: number
         }
         Insert: {
           created_at?: string
@@ -453,6 +458,11 @@ export type Database = {
           status?: string
           total_records_processed?: number
           updated_at?: string
+          watchdog_last_check_at?: string | null
+          watchdog_last_phase?: string | null
+          watchdog_last_progress?: number | null
+          watchdog_parent_job?: string | null
+          watchdog_restart_count?: number
         }
         Update: {
           created_at?: string
@@ -472,6 +482,11 @@ export type Database = {
           status?: string
           total_records_processed?: number
           updated_at?: string
+          watchdog_last_check_at?: string | null
+          watchdog_last_phase?: string | null
+          watchdog_last_progress?: number | null
+          watchdog_parent_job?: string | null
+          watchdog_restart_count?: number
         }
         Relationships: []
       }
@@ -1078,6 +1093,7 @@ export type Database = {
         Args: { p_cnpj: string }
         Returns: undefined
       }
+      ingestion_watchdog: { Args: never; Returns: Json }
       licitacoes_pendentes_winners_count: {
         Args: { p_max?: number }
         Returns: number
