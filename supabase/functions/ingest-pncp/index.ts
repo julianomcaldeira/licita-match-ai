@@ -203,6 +203,22 @@ async function fetchAllPages(
   let pagesOk = 0;
   const errors: string[] = [];
 
+  // ---- Incremental dedup filter ----
+  // Stops pagination when PNCP keeps returning the same items (or 100%
+  // already-seen IDs) so the orchestrator does not page forever without
+  // making real progress.
+  const seenIds = new Set<string>();
+  let lastFingerprint: string | null = null;
+  let consecutiveAllDuplicates = 0;
+  let consecutiveSameFingerprint = 0;
+  const MAX_CONSECUTIVE_ALL_DUP = 2;       // 2 pages of pure duplicates → stop
+  const MAX_CONSECUTIVE_SAME_FP = 1;       // identical page payload → stop immediately
+  const fp = (rows: any[]): string => {
+    const first = rows[0]?.numero_controle_pncp || rows[0]?.id_origem || "";
+    const last = rows[rows.length - 1]?.numero_controle_pncp || rows[rows.length - 1]?.id_origem || "";
+    return `${rows.length}|${first}|${last}`;
+  };
+
   while (hasMore) {
     try {
       let url = `${PNCP_CONSULTA_URL}/contratacoes/publicacao?dataInicial=${dataInicial}&dataFinal=${dataFinal}&codigoModalidadeContratacao=${modalidade}&pagina=${pagina}&tamanhoPagina=${PAGE_SIZE}`;
@@ -223,8 +239,57 @@ async function fetchAllPages(
       if (contratacoes.length === 0) { hasMore = false; continue; }
 
       const rows = contratacoes.map(mapContratacao);
-      for (let i = 0; i < rows.length; i += 200) {
-        const batch = rows.slice(i, i + 200);
+
+      // ---- Dedup check #1: identical page payload as previous ----
+      const currentFp = fp(rows);
+      if (lastFingerprint && currentFp === lastFingerprint) {
+        consecutiveSameFingerprint++;
+        if (consecutiveSameFingerprint >= MAX_CONSECUTIVE_SAME_FP) {
+          console.warn(
+            `PNCP dedup: mod ${modalidade} pág ${pagina} retornou payload idêntico ao anterior (fp=${currentFp}). Encerrando paginação.`
+          );
+          hasMore = false;
+          continue;
+        }
+      } else {
+        consecutiveSameFingerprint = 0;
+        lastFingerprint = currentFp;
+      }
+
+      // ---- Dedup check #2: count NEW vs already-seen IDs in this loop ----
+      let newInPage = 0;
+      const filteredRows = rows.filter((r: any) => {
+        const key = r.numero_controle_pncp || r.id_origem;
+        if (!key) return true;
+        if (seenIds.has(key)) return false;
+        seenIds.add(key);
+        newInPage++;
+        return true;
+      });
+
+      if (rows.length > 0 && newInPage === 0) {
+        consecutiveAllDuplicates++;
+        console.warn(
+          `PNCP dedup: mod ${modalidade} pág ${pagina} - 100% duplicatas (${rows.length} ids). Streak=${consecutiveAllDuplicates}.`
+        );
+        if (consecutiveAllDuplicates >= MAX_CONSECUTIVE_ALL_DUP) {
+          console.warn(
+            `PNCP dedup: mod ${modalidade} - ${MAX_CONSECUTIVE_ALL_DUP} páginas seguidas só com duplicatas. Encerrando paginação.`
+          );
+          hasMore = false;
+          continue;
+        }
+        // skip upsert work entirely for this duplicate page
+        pagesOk++;
+        hasMore = contratacoes.length >= PAGE_SIZE;
+        pagina++;
+        continue;
+      } else {
+        consecutiveAllDuplicates = 0;
+      }
+
+      for (let i = 0; i < filteredRows.length; i += 200) {
+        const batch = filteredRows.slice(i, i + 200);
         if (fetchWinners) {
           const { data: upserted, error } = await supabase
             .from("licitacoes")
