@@ -2,8 +2,13 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   Brain, Loader2, Sparkles, MessageSquare, Trash2, RotateCcw, Send, User,
-  Calendar, Database, ExternalLink,
+  Calendar, Database, ExternalLink, FileDown, FileText,
 } from "lucide-react";
+import { exportConversationCsv, exportConversationPdf } from "@/lib/exportConversation";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -155,6 +160,39 @@ export default function AIMarketAnalysis() {
         <div className="ml-auto flex gap-2">
           {hasConv && !isLoading && (
             <>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-9 gap-1.5">
+                    <FileDown className="h-3.5 w-3.5" /> Exportar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem
+                    onClick={() => {
+                      try {
+                        exportConversationPdf(conversation);
+                        toast.success("PDF gerado com sucesso");
+                      } catch (e: any) {
+                        toast.error("Falha ao gerar PDF: " + (e?.message || "erro desconhecido"));
+                      }
+                    }}
+                  >
+                    <FileText className="h-3.5 w-3.5 mr-2" /> PDF (conversa + tabelas + fontes)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      try {
+                        exportConversationCsv(conversation);
+                        toast.success("CSV gerado com sucesso");
+                      } catch (e: any) {
+                        toast.error("Falha ao gerar CSV: " + (e?.message || "erro desconhecido"));
+                      }
+                    }}
+                  >
+                    <Database className="h-3.5 w-3.5 mr-2" /> CSV (tabelas + fontes)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button variant="ghost" size="sm" onClick={() => clearAll()} className="h-9 gap-1.5 text-muted-foreground hover:text-primary"><RotateCcw className="h-3.5 w-3.5" /> Nova conversa</Button>
               <Button variant="ghost" size="sm" onClick={clearAll} className="h-9 gap-1.5 text-muted-foreground hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /> Limpar</Button>
             </>
