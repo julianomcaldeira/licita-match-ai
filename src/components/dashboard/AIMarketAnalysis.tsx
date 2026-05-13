@@ -23,8 +23,10 @@ const SUGGESTIONS = [
   { label: "Visão geral do mercado", q: "Faça uma visão geral do mercado de licitações no período: total movimentado, número de contratos, principais compradores e vencedores, e tendência mensal." },
   { label: "Quem domina (competitivo)", q: "Quais empresas dominam o mercado no período? Mostre top 10 vencedores com market share, ticket médio, e destaque outliers ou concentração excessiva." },
   { label: "Análise regional", q: "Faça uma análise regional: quais UFs movimentam mais valor, onde há menos concorrência e quais órgãos são os maiores compradores em cada região relevante." },
-  { label: "Tendências temporais", q: "Como está a evolução mensal do mercado? Há crescimento, queda ou sazonalidade? Quais meses concentram mais valor?" },
-  { label: "Oportunidades pouco exploradas", q: "Identifique nichos com pouca concorrência e segmentos em crescimento que representem boas oportunidades comerciais." },
+  { label: "Perfil de empresa (CNPJ)", q: "Faça o perfil consolidado da empresa CNPJ 00.000.000/0001-00 — cadastro Receita Federal, vitórias em licitações (PNCP), contratos formalizados (Portal da Transparência) e eventuais sanções (CEIS/CNEP)." },
+  { label: "Buscar contratos", q: "Liste contratos formalizados nos últimos 12 meses contendo a palavra 'software' no objeto, com órgão, fornecedor e valor — fonte Portal da Transparência." },
+  { label: "Diários oficiais municipais", q: "Busque publicações em diários oficiais municipais (Querido Diário) sobre 'homologação pregão' nos últimos 3 meses." },
+  { label: "Comparar órgãos", q: "Compare o score de bom-pagador e indicadores fiscais entre Ministério da Saúde, Ministério da Educação e INSS." },
   { label: "Risco — vencedores sancionados", q: "Algum dos principais vencedores está na lista de sancionados (CEIS/CNEP)? Liste os casos com fonte oficial." },
 ];
 
@@ -38,13 +40,19 @@ interface ChatMessage {
 }
 
 const TOOL_LABELS: Record<string, string> = {
-  get_market_overview: "Visão geral",
-  get_top_winners: "Top vencedores",
-  get_top_buyers: "Top órgãos compradores",
-  search_licitacoes: "Busca de licitações",
-  get_orgao_score: "Score do órgão",
-  check_vencedores_sancionados: "Vencedores sancionados",
-  get_contratos_recentes_orgao: "Contratos recentes",
+  get_market_overview: "Visão geral (PNCP)",
+  get_top_winners: "Top vencedores (PNCP)",
+  get_top_buyers: "Top órgãos compradores (PNCP)",
+  search_licitacoes: "Busca de licitações (PNCP)",
+  get_orgao_score: "Score do órgão (Transparência+SICONFI)",
+  check_vencedores_sancionados: "Vencedores sancionados (CEIS/CNEP)",
+  get_contratos_recentes_orgao: "Top órgãos por contratos (Transparência)",
+  search_contratos: "Busca de contratos (Transparência)",
+  search_sancionadas: "Busca em sanções (CEIS/CNEP)",
+  search_diarios_oficiais: "Diários Oficiais (Querido Diário)",
+  lookup_cnpj_receita: "Cadastro CNPJ (Receita Federal)",
+  get_empresa_perfil: "Perfil consolidado de empresa",
+  compare_orgaos_score: "Comparativo de órgãos",
 };
 
 function loadConversation(): ChatMessage[] {

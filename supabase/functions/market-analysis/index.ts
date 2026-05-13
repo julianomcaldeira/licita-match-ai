@@ -152,6 +152,110 @@ const TOOLS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "search_contratos",
+      description:
+        "Busca contratos formalizados (texto livre no objeto, CNPJ do fornecedor ou do órgão). Útil para 'todos os contratos da empresa X', 'contratos de TI no Ministério Y'. Fonte: Portal da Transparência (contratos).",
+      parameters: {
+        type: "object",
+        properties: {
+          keyword: { type: "string", description: "Texto buscado no objeto do contrato." },
+          fornecedor_cnpj: { type: "string", description: "CNPJ do fornecedor (apenas dígitos)." },
+          orgao_cnpj: { type: "string", description: "CNPJ do órgão contratante (apenas dígitos)." },
+          orgao_nome: { type: "string", description: "Parte do nome do órgão." },
+          period_months: { type: "integer", default: 12 },
+          limit: { type: "integer", default: 20 },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_sancionadas",
+      description:
+        "Busca direta na lista de empresas/pessoas sancionadas (CEIS, CNEP, CEPIM, Inidôneas-TCU). Filtre por nome, CNPJ ou tipo de sanção. Fonte: Portal da Transparência — Cadastro de Sanções.",
+      parameters: {
+        type: "object",
+        properties: {
+          keyword: { type: "string", description: "Nome (ou parte) da empresa/pessoa." },
+          cnpj_cpf: { type: "string", description: "CNPJ/CPF (apenas dígitos)." },
+          tipo_cadastro: { type: "string", description: "CEIS, CNEP, CEPIM ou INIDONEAS." },
+          limit: { type: "integer", default: 20 },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_diarios_oficiais",
+      description:
+        "Busca trechos em Diários Oficiais municipais (Querido Diário, +5500 municípios). Útil para encontrar publicações de homologações, contratos, dispensas e atos administrativos. Fonte: Querido Diário (Open Knowledge Brasil).",
+      parameters: {
+        type: "object",
+        properties: {
+          keyword: { type: "string", description: "Texto buscado no trecho do diário." },
+          uf: { type: "string" },
+          territory_name: { type: "string", description: "Nome do município." },
+          period_months: { type: "integer", default: 6 },
+          limit: { type: "integer", default: 15 },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "lookup_cnpj_receita",
+      description:
+        "Consulta cadastro oficial de um CNPJ direto na Receita Federal (razão social, situação cadastral, CNAEs, sócios, endereço, capital social). Use quando o usuário citar uma empresa por nome ou CNPJ e precisar de dados cadastrais. Fonte: Receita Federal via BrasilAPI (público).",
+      parameters: {
+        type: "object",
+        properties: {
+          cnpj: { type: "string", description: "CNPJ (com ou sem máscara)." },
+        },
+        required: ["cnpj"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_empresa_perfil",
+      description:
+        "Perfil consolidado de uma empresa fornecedora a partir do CNPJ: total de vitórias e valor em licitações (PNCP), contratos formalizados (Portal da Transparência) e eventuais sanções (CEIS/CNEP). Use quando o usuário quiser entender o histórico de uma empresa específica.",
+      parameters: {
+        type: "object",
+        properties: {
+          cnpj: { type: "string", description: "CNPJ do fornecedor (apenas dígitos)." },
+          period_months: { type: "integer", default: 24 },
+        },
+        required: ["cnpj"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "compare_orgaos_score",
+      description:
+        "Compara o score de bom-pagador (AAA-D) e indicadores fiscais de vários órgãos lado a lado. Use para perguntas como 'compare o histórico de pagamento entre X, Y e Z'. Fontes: Portal da Transparência + SICONFI + dados internos.",
+      parameters: {
+        type: "object",
+        properties: {
+          orgaos: {
+            type: "array",
+            description: "Lista de nomes ou CNPJs (até 5).",
+            items: { type: "string" },
+          },
+        },
+        required: ["orgaos"],
+      },
+    },
+  },
 ];
 
 // ---------- TOOL EXECUTORS ----------
@@ -294,12 +398,146 @@ async function execTool(
         sources.push({ label: "Portal da Transparência — CEIS/CNEP (sanções)", url: "https://portaldatransparencia.gov.br/sancoes" });
         return { summary: `${(r.data || []).length} vencedor(es) sancionado(s)`, sources, content: JSON.stringify(r.data || []) };
       }
-      case "get_contratos_recentes_orgao": {
-        const days = (args.period_months ?? 6) * 30;
-        const limit = Math.min(50, args.limit ?? 10);
-        const r = await supabase.rpc("contratos_top_orgaos", { p_days: days, p_limit: limit });
+      case "search_contratos": {
+        const { from, to } = dateRange(args.period_months ?? 12);
+        const limit = Math.min(50, args.limit ?? 20);
+        let q = supabase
+          .from("contratos")
+          .select("numero_contrato,orgao_nome,cnpj_orgao,fornecedor_nome,fornecedor_cnpj,objeto,valor_inicial,valor_final,data_assinatura,data_vigencia_fim,situacao,modalidade_compra")
+          .gte("data_assinatura", from)
+          .lte("data_assinatura", to)
+          .order("data_assinatura", { ascending: false })
+          .limit(limit);
+        if (args.keyword) q = q.ilike("objeto", `%${args.keyword}%`);
+        if (args.fornecedor_cnpj) q = q.eq("fornecedor_cnpj", args.fornecedor_cnpj.replace(/\D/g, ""));
+        if (args.orgao_cnpj) q = q.eq("cnpj_orgao", args.orgao_cnpj.replace(/\D/g, ""));
+        if (args.orgao_nome) q = q.ilike("orgao_nome", `%${args.orgao_nome}%`);
+        const r = await q;
         sources.push({ label: "Portal da Transparência — contratos", url: "https://portaldatransparencia.gov.br/contratos" });
-        return { summary: `Top órgãos por contratos (${days}d)`, sources, content: JSON.stringify(r.data || []) };
+        return { summary: `${(r.data || []).length} contrato(s)`, sources, content: JSON.stringify(r.data || []) };
+      }
+      case "search_sancionadas": {
+        const limit = Math.min(50, args.limit ?? 20);
+        let q = supabase
+          .from("empresas_sancionadas")
+          .select("nome,cnpj_cpf,tipo_cadastro,tipo_sancao,orgao_sancionador,uf_orgao,data_inicio,data_fim,fundamentacao_legal")
+          .order("data_inicio", { ascending: false, nullsFirst: false })
+          .limit(limit);
+        if (args.keyword) q = q.ilike("nome", `%${args.keyword}%`);
+        if (args.cnpj_cpf) q = q.eq("cnpj_cpf", args.cnpj_cpf.replace(/\D/g, ""));
+        if (args.tipo_cadastro) q = q.eq("tipo_cadastro", args.tipo_cadastro.toUpperCase());
+        const r = await q;
+        sources.push({ label: "Portal da Transparência — Cadastro de Sanções (CEIS/CNEP)", url: "https://portaldatransparencia.gov.br/sancoes" });
+        return { summary: `${(r.data || []).length} sanção(ões)`, sources, content: JSON.stringify(r.data || []) };
+      }
+      case "search_diarios_oficiais": {
+        const { from, to } = dateRange(args.period_months ?? 6);
+        const limit = Math.min(50, args.limit ?? 15);
+        let q = supabase
+          .from("diarios_oficiais")
+          .select("territory_name,state_code,publication_date,url,excerpt,is_extra_edition")
+          .gte("publication_date", from)
+          .lte("publication_date", to)
+          .order("publication_date", { ascending: false })
+          .limit(limit);
+        if (args.keyword) q = q.ilike("excerpt", `%${args.keyword}%`);
+        if (args.uf || uf) q = q.eq("state_code", (args.uf || uf).toUpperCase());
+        if (args.territory_name) q = q.ilike("territory_name", `%${args.territory_name}%`);
+        const r = await q;
+        sources.push({ label: "Querido Diário — Open Knowledge Brasil", url: "https://queridodiario.ok.org.br" });
+        return { summary: `${(r.data || []).length} publicação(ões) em diário oficial`, sources, content: JSON.stringify(r.data || []) };
+      }
+      case "lookup_cnpj_receita": {
+        const cnpj = (args.cnpj || "").replace(/\D/g, "");
+        if (cnpj.length !== 14) {
+          return { summary: "CNPJ inválido", sources: [], content: JSON.stringify({ erro: "CNPJ deve ter 14 dígitos." }) };
+        }
+        try {
+          const resp = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`, { headers: { Accept: "application/json" } });
+          if (!resp.ok) {
+            return { summary: `Receita: HTTP ${resp.status}`, sources: [], content: JSON.stringify({ erro: `Receita Federal retornou ${resp.status}.` }) };
+          }
+          const data = await resp.json();
+          const slim = {
+            cnpj: data.cnpj,
+            razao_social: data.razao_social,
+            nome_fantasia: data.nome_fantasia,
+            situacao_cadastral: data.descricao_situacao_cadastral,
+            data_inicio_atividade: data.data_inicio_atividade,
+            capital_social: data.capital_social,
+            porte: data.porte,
+            natureza_juridica: data.natureza_juridica,
+            cnae_principal: `${data.cnae_fiscal} - ${data.cnae_fiscal_descricao}`,
+            cnaes_secundarios: (data.cnaes_secundarios || []).slice(0, 5).map((c: any) => `${c.codigo} - ${c.descricao}`),
+            endereco: `${data.logradouro || ""}, ${data.numero || ""} - ${data.bairro || ""} - ${data.municipio || ""}/${data.uf || ""}`,
+            telefone: data.ddd_telefone_1,
+            email: data.email,
+            qsa: (data.qsa || []).slice(0, 10).map((s: any) => ({ nome: s.nome_socio, qualificacao: s.qualificacao_socio })),
+          };
+          sources.push({ label: "Receita Federal — Cadastro Nacional da Pessoa Jurídica (via BrasilAPI)", url: `https://brasilapi.com.br/api/cnpj/v1/${cnpj}` });
+          return { summary: `Receita: ${slim.razao_social}`, sources, content: JSON.stringify(slim) };
+        } catch (e: any) {
+          return { summary: "Falha Receita", sources: [], content: JSON.stringify({ erro: e?.message || "falha" }) };
+        }
+      }
+      case "get_empresa_perfil": {
+        const cnpj = (args.cnpj || "").replace(/\D/g, "");
+        if (cnpj.length !== 14) {
+          return { summary: "CNPJ inválido", sources: [], content: JSON.stringify({ erro: "CNPJ deve ter 14 dígitos." }) };
+        }
+        const { from, to } = dateRange(args.period_months ?? 24);
+        const [vit, contr, sanc] = await Promise.all([
+          supabase.from("licitacao_vencedores")
+            .select("razao_social,cnpj,valor_homologado,data_homologacao", { count: "exact" })
+            .eq("cnpj", cnpj)
+            .gte("data_homologacao", from)
+            .lte("data_homologacao", to)
+            .limit(500),
+          supabase.from("contratos")
+            .select("numero_contrato,orgao_nome,objeto,valor_inicial,valor_final,data_assinatura", { count: "exact" })
+            .eq("fornecedor_cnpj", cnpj)
+            .order("data_assinatura", { ascending: false })
+            .limit(20),
+          supabase.from("empresas_sancionadas")
+            .select("nome,tipo_cadastro,tipo_sancao,orgao_sancionador,data_inicio,data_fim")
+            .eq("cnpj_cpf", cnpj)
+            .limit(20),
+        ]);
+        const vitorias = vit.data || [];
+        const totalVit = vitorias.reduce((s: number, r: any) => s + (Number(r.valor_homologado) || 0), 0);
+        const contratos = contr.data || [];
+        const totalContr = contratos.reduce((s: number, r: any) => s + (Number(r.valor_final) || Number(r.valor_inicial) || 0), 0);
+        sources.push({ label: "PNCP — homologações", url: "https://pncp.gov.br" });
+        sources.push({ label: "Portal da Transparência — contratos", url: "https://portaldatransparencia.gov.br/contratos" });
+        if ((sanc.data || []).length) sources.push({ label: "Portal da Transparência — Sanções (CEIS/CNEP)", url: "https://portaldatransparencia.gov.br/sancoes" });
+        return {
+          summary: `Perfil ${cnpj}`,
+          sources,
+          content: JSON.stringify({
+            cnpj,
+            periodo: { from, to },
+            licitacoes: { total_vitorias: vit.count ?? vitorias.length, valor_total_brl: totalVit, razao_social: vitorias[0]?.razao_social || null },
+            contratos_pt: { total: contr.count ?? contratos.length, valor_total_brl: totalContr, recentes: contratos.slice(0, 10) },
+            sancoes: sanc.data || [],
+          }),
+        };
+      }
+      case "compare_orgaos_score": {
+        const inputs: string[] = (args.orgaos || []).slice(0, 5);
+        const results = await Promise.all(inputs.map(async (it: string) => {
+          let cnpj = it.replace(/\D/g, "");
+          if (cnpj.length !== 14) {
+            const f = await supabase.from("orgaos_score").select("cnpj_orgao,nome_orgao")
+              .ilike("nome_orgao", `%${it}%`).order("score_numerico", { ascending: false }).limit(1);
+            cnpj = f.data?.[0]?.cnpj_orgao || "";
+          }
+          if (!cnpj) return { input: it, erro: "não localizado" };
+          const r = await supabase.rpc("get_orgao_score", { p_cnpj: cnpj });
+          return { input: it, score: r.data?.[0] || null };
+        }));
+        sources.push({ label: "Portal da Transparência — execução orçamentária", url: "https://portaldatransparencia.gov.br" });
+        sources.push({ label: "SICONFI — Tesouro Nacional", url: "https://siconfi.tesouro.gov.br" });
+        return { summary: `Comparativo de ${results.length} órgão(s)`, sources, content: JSON.stringify(results) };
       }
       default:
         return { summary: "tool desconhecida", sources: [], content: JSON.stringify({ erro: `Tool ${name} não existe.` }) };
@@ -314,27 +552,36 @@ const SYSTEM_PROMPT = `Você é um analista sênior de inteligência de mercado 
 
 Sua função é responder perguntas do usuário consultando **dados oficiais do governo** via as ferramentas disponíveis. Nunca invente números — sempre chame as ferramentas necessárias antes de responder.
 
+FONTES OFICIAIS DISPONÍVEIS (use a mais adequada para cada claim):
+- **PNCP** (Portal Nacional de Contratações Públicas) — editais, atas, homologações.
+- **Portal da Transparência** — contratos formalizados, execução orçamentária, sanções (CEIS, CNEP, CEPIM, Inidôneas-TCU).
+- **SICONFI** (Tesouro Nacional) — indicadores fiscais (RCL, dívida, restos a pagar).
+- **Receita Federal** (via BrasilAPI) — cadastro CNPJ, situação, CNAE, sócios.
+- **Querido Diário** (Open Knowledge Brasil) — diários oficiais municipais (+5500 municípios).
+- **Score interno i-pesquisei** — agregado AAA-D de bom-pagador.
+
 ESTRATÉGIA:
-1. Identifique o que a pergunta pede (visão geral, busca específica, ranking, score de órgão, risco de sanção, regional, tendência, etc.).
-2. Chame **uma ou mais ferramentas** para obter os dados. Combine ferramentas quando necessário (ex: top vencedores + sancionados; top órgãos + score do órgão).
-3. Para perguntas específicas sobre uma empresa ou órgão, use \`search_licitacoes\` com o filtro \`vencedor\` ou \`orgao\` em vez de listar tudo.
-4. Quando o usuário citar um órgão por nome, busque o score dele com \`get_orgao_score(orgao_nome=...)\`.
-5. Não chame mais de 4 ferramentas por resposta. Pare quando tiver dados suficientes.
+1. Identifique o que a pergunta pede e selecione **as ferramentas adequadas** — combine fontes sempre que enriquecer a resposta (ex.: \`get_top_winners\` + \`search_sancionadas\`; \`get_empresa_perfil\` + \`lookup_cnpj_receita\`).
+2. Para uma empresa específica: \`lookup_cnpj_receita\` (cadastro) + \`get_empresa_perfil\` (vitórias/contratos/sanções).
+3. Para um órgão por nome: \`get_orgao_score(orgao_nome=...)\` e/ou \`compare_orgaos_score\`.
+4. Para licitações pontuais: \`search_licitacoes\`. Para contratos formalizados: \`search_contratos\`. Para publicações municipais: \`search_diarios_oficiais\`.
+5. Não chame mais de 5 ferramentas por resposta. Pare quando os dados forem suficientes.
 
 FORMATO DA RESPOSTA (markdown PT-BR):
 - Comece com 1-2 linhas de resumo executivo direto.
-- Use tabelas markdown para rankings e listas comparativas.
-- Use **negrito** para nomes de empresas/órgãos e valores em R$.
-- Quando citar uma licitação específica, inclua link: \`[Edital no PNCP](https://pncp.gov.br/app/editais/{numero_controle_pncp})\`.
+- Use tabelas markdown para rankings e comparativos.
+- Use **negrito** para nomes e valores em R$.
+- Cite a fonte ao lado de cada dado importante quando vier de fontes diferentes (ex.: "*(PNCP)*", "*(Portal da Transparência)*", "*(Receita Federal)*").
+- Para licitação específica: \`[Edital no PNCP](https://pncp.gov.br/app/editais/{numero_controle_pncp})\`.
 - Termine com seção \`## 🎯 Recomendações\` com **exatamente 3** ações concretas.
-- Termine com seção \`## 📚 Fontes\` listando as fontes oficiais consultadas (PNCP, Portal da Transparência, SICONFI, etc.).
+- Termine com seção \`## 📚 Fontes\` listando todas as fontes oficiais consultadas com URL.
 
 REGRAS:
-- Seja DIRETO e QUANTITATIVO. Sem frases genéricas.
+- Seja DIRETO e QUANTITATIVO.
 - Sempre compare ("X tem Y% do mercado, Z× a 2ª colocada").
-- Destaque outliers, anomalias e riscos (sancionados, baixo score de pagamento).
-- Valores monetários sempre como "R$ 1.234.567" com separador de milhar.
-- Se uma ferramenta retornar erro ou vazio, informe ao usuário e sugira uma pergunta alternativa.`;
+- Destaque outliers, anomalias e riscos (sancionados, score baixo de pagamento, situação cadastral irregular).
+- Valores monetários como "R$ 1.234.567" com separador de milhar.
+- Se uma ferramenta retornar vazio/erro, informe ao usuário e sugira pergunta alternativa.`;
 
 interface ToolMeta { name: string; args: any; summary: string }
 
@@ -357,7 +604,7 @@ async function runAgent(opts: {
   const allSources: { label: string; url?: string }[] = [];
   const seenSources = new Set<string>();
 
-  for (let iter = 0; iter < 5; iter++) {
+  for (let iter = 0; iter < 7; iter++) {
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -365,7 +612,7 @@ async function runAgent(opts: {
         model: "google/gemini-2.5-flash",
         messages,
         tools: TOOLS,
-        tool_choice: iter < 4 ? "auto" : "none",
+        tool_choice: iter < 6 ? "auto" : "none",
       }),
     });
 
