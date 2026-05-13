@@ -831,7 +831,39 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Pergunta vazia." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // Passo 1 — Cache: só consultamos quando NÃO há histórico (follow-up depende do contexto)
+    const cacheKey = await sha256Hex(`${normalizeQuestion(question)}|p=${period_months}|uf=${uf || ""}`);
+    if (history.length === 0) {
+      const { data: cached } = await supabase
+        .from("ai_query_cache")
+        .select("response")
+        .eq("cache_key", cacheKey)
+        .gt("expires_at", new Date().toISOString())
+        .maybeSingle();
+      if (cached?.response) {
+        // hit: incrementa métrica fire-and-forget
+        supabase.from("ai_query_cache")
+          .update({ hits: ((cached as any).hits || 0) + 1 })
+          .eq("cache_key", cacheKey)
+          .then(() => {}, () => {});
+        return new Response(JSON.stringify({ ...cached.response, cached: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    }
+
     const result = await runAgent({ apiKey, supabase, question, history, uf, period_months });
+
+    // Salva no cache apenas se for resposta limpa (validador OK e sem erro de iteração)
+    if (history.length === 0 && result.validation?.ok !== false && !result.answer.startsWith("Não consegui finalizar")) {
+      supabase.from("ai_query_cache").upsert({
+        cache_key: cacheKey,
+        question,
+        filters: { period_months, uf: uf || null },
+        response: result,
+        model_used: result.toolsUsed?.length ? "agent" : "direct",
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      }, { onConflict: "cache_key" }).then(() => {}, (err: any) => console.error("cache upsert failed", err));
+    }
+
     return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e: any) {
     console.error("market-analysis error:", e);
