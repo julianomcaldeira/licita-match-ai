@@ -152,6 +152,110 @@ const TOOLS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "search_contratos",
+      description:
+        "Busca contratos formalizados (texto livre no objeto, CNPJ do fornecedor ou do órgão). Útil para 'todos os contratos da empresa X', 'contratos de TI no Ministério Y'. Fonte: Portal da Transparência (contratos).",
+      parameters: {
+        type: "object",
+        properties: {
+          keyword: { type: "string", description: "Texto buscado no objeto do contrato." },
+          fornecedor_cnpj: { type: "string", description: "CNPJ do fornecedor (apenas dígitos)." },
+          orgao_cnpj: { type: "string", description: "CNPJ do órgão contratante (apenas dígitos)." },
+          orgao_nome: { type: "string", description: "Parte do nome do órgão." },
+          period_months: { type: "integer", default: 12 },
+          limit: { type: "integer", default: 20 },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_sancionadas",
+      description:
+        "Busca direta na lista de empresas/pessoas sancionadas (CEIS, CNEP, CEPIM, Inidôneas-TCU). Filtre por nome, CNPJ ou tipo de sanção. Fonte: Portal da Transparência — Cadastro de Sanções.",
+      parameters: {
+        type: "object",
+        properties: {
+          keyword: { type: "string", description: "Nome (ou parte) da empresa/pessoa." },
+          cnpj_cpf: { type: "string", description: "CNPJ/CPF (apenas dígitos)." },
+          tipo_cadastro: { type: "string", description: "CEIS, CNEP, CEPIM ou INIDONEAS." },
+          limit: { type: "integer", default: 20 },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_diarios_oficiais",
+      description:
+        "Busca trechos em Diários Oficiais municipais (Querido Diário, +5500 municípios). Útil para encontrar publicações de homologações, contratos, dispensas e atos administrativos. Fonte: Querido Diário (Open Knowledge Brasil).",
+      parameters: {
+        type: "object",
+        properties: {
+          keyword: { type: "string", description: "Texto buscado no trecho do diário." },
+          uf: { type: "string" },
+          territory_name: { type: "string", description: "Nome do município." },
+          period_months: { type: "integer", default: 6 },
+          limit: { type: "integer", default: 15 },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "lookup_cnpj_receita",
+      description:
+        "Consulta cadastro oficial de um CNPJ direto na Receita Federal (razão social, situação cadastral, CNAEs, sócios, endereço, capital social). Use quando o usuário citar uma empresa por nome ou CNPJ e precisar de dados cadastrais. Fonte: Receita Federal via BrasilAPI (público).",
+      parameters: {
+        type: "object",
+        properties: {
+          cnpj: { type: "string", description: "CNPJ (com ou sem máscara)." },
+        },
+        required: ["cnpj"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_empresa_perfil",
+      description:
+        "Perfil consolidado de uma empresa fornecedora a partir do CNPJ: total de vitórias e valor em licitações (PNCP), contratos formalizados (Portal da Transparência) e eventuais sanções (CEIS/CNEP). Use quando o usuário quiser entender o histórico de uma empresa específica.",
+      parameters: {
+        type: "object",
+        properties: {
+          cnpj: { type: "string", description: "CNPJ do fornecedor (apenas dígitos)." },
+          period_months: { type: "integer", default: 24 },
+        },
+        required: ["cnpj"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "compare_orgaos_score",
+      description:
+        "Compara o score de bom-pagador (AAA-D) e indicadores fiscais de vários órgãos lado a lado. Use para perguntas como 'compare o histórico de pagamento entre X, Y e Z'. Fontes: Portal da Transparência + SICONFI + dados internos.",
+      parameters: {
+        type: "object",
+        properties: {
+          orgaos: {
+            type: "array",
+            description: "Lista de nomes ou CNPJs (até 5).",
+            items: { type: "string" },
+          },
+        },
+        required: ["orgaos"],
+      },
+    },
+  },
 ];
 
 // ---------- TOOL EXECUTORS ----------
