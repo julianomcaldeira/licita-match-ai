@@ -271,6 +271,112 @@ function dateRange(period_months: number) {
   return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
 }
 
+// ---------- HELPERS DE OTIMIZAÇÃO (cache, roteador, validador, ficha) ----------
+async function sha256Hex(s: string) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+function normalizeQuestion(q: string) {
+  return q.toLowerCase().trim().replace(/\s+/g, " ").replace(/[?!.,;]+$/g, "");
+}
+
+// 7. Roteador: expõe apenas o subconjunto de tools relevante à pergunta.
+function pickToolsForQuestion(question: string, allTools: any[]) {
+  const q = question.toLowerCase();
+  const picked = new Set<string>();
+  const add = (...names: string[]) => names.forEach(n => picked.add(n));
+
+  if (/(empres|forneced|cnpj|razão social|razao social|perfil)/.test(q))
+    add("lookup_cnpj_receita", "get_empresa_perfil", "search_sancionadas");
+  if (/(órgão|orgao|prefeitura|ministério|ministerio|secretaria|score|comprador)/.test(q))
+    add("get_orgao_score", "compare_orgaos_score", "get_top_buyers", "get_contratos_recentes_orgao");
+  if (/(licitaç|edital|pregão|pregao|homolog)/.test(q))
+    add("search_licitacoes");
+  if (/(contrato|formaliz|assinatur)/.test(q))
+    add("search_contratos", "get_contratos_recentes_orgao");
+  if (/(sancion|ceis|cnep|inidône|inidone|risco)/.test(q))
+    add("search_sancionadas", "check_vencedores_sancionados");
+  if (/(diário|diario oficial|querido)/.test(q))
+    add("search_diarios_oficiais");
+  if (/(visão|visao|geral|mercado|panorama|top|ranking|maiores|principais|vencedor)/.test(q))
+    add("get_market_overview", "get_top_winners", "get_top_buyers");
+
+  // fallback: kit básico
+  if (picked.size === 0) add("get_market_overview", "get_top_winners", "get_top_buyers", "search_licitacoes");
+
+  return allTools.filter(t => picked.has(t.function.name));
+}
+
+// 2. Ficha de contexto: 1 RPC barato com KPIs do período/UF para injetar no prompt.
+//    Reduz drasticamente o nº de tool-calls em perguntas amplas.
+async function buildContextBriefing(supabase: any, period_months: number, uf?: string) {
+  try {
+    const { from, to } = dateRange(period_months);
+    const [tot, totals, winners, buyers] = await Promise.all([
+      supabase.rpc("analytics_sales_totals", { p_date_from: from, p_date_to: to }),
+      supabase.rpc("analytics_totals", { p_date_from: from, p_date_to: to }),
+      supabase.rpc("analytics_top_winners", { p_date_from: from, p_date_to: to, p_limit: 5 }),
+      supabase.rpc("analytics_top_buyers", { p_date_from: from, p_date_to: to, p_limit: 5 }),
+    ]);
+    const t = tot.data?.[0] || {};
+    const tt = totals.data?.[0] || {};
+    const fmt = (n: any) => Number(n || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+    const wList = (winners.data || []).slice(0, 5).map((w: any, i: number) =>
+      `  ${i + 1}. ${w.razao_social} (CNPJ ${w.cnpj}) — ${w.wins} vitórias, ${fmt(w.total_valor)}`).join("\n");
+    const bList = (buyers.data || []).slice(0, 5).map((b: any, i: number) =>
+      `  ${i + 1}. ${b.orgao} — ${b.purchases} compras, ${fmt(b.total_valor)}`).join("\n");
+    return `\n\n--- DADOS PRÉ-CARREGADOS (período ${from} → ${to}${uf ? `, UF ${uf}` : ", BR"}) ---
+KPIs gerais:
+  - Total movimentado: ${fmt(t.total_sales)}
+  - Total de contratos: ${(t.total_contracts || 0).toLocaleString("pt-BR")}
+  - Empresas distintas: ${(tt.total_empresas || 0).toLocaleString("pt-BR")}
+  - Órgãos distintos: ${(tt.total_orgaos || 0).toLocaleString("pt-BR")}
+
+Top 5 vencedores:
+${wList || "  (sem dados)"}
+
+Top 5 órgãos compradores:
+${bList || "  (sem dados)"}
+
+Use estes dados como ponto de partida — só chame tools para aprofundar (ex.: detalhe de empresa específica, busca textual, sanções, comparação). Para perguntas de "visão geral" ou "top X", os dados acima já bastam.
+--- FIM DADOS PRÉ-CARREGADOS ---`;
+  } catch (e) {
+    console.error("buildContextBriefing failed:", e);
+    return "";
+  }
+}
+
+// 6. Validador: extrai R$ valores e CNPJs do texto final e checa se aparecem
+//    nos resultados das tools chamadas. Adiciona aviso se houver suspeita de invenção.
+function validateAnswer(answer: string, toolResultsConcat: string): { ok: boolean; suspect: { cnpjs: string[]; values: string[] } } {
+  const haystack = toolResultsConcat.replace(/\D/g, "");
+  const haystackText = toolResultsConcat.toLowerCase();
+
+  // Extrai CNPJs no texto (com ou sem máscara) — só dígitos
+  const cnpjMatches = Array.from(answer.matchAll(/\b(\d{2}[.\s]?\d{3}[.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}|\d{14})\b/g))
+    .map(m => m[0].replace(/\D/g, ""))
+    .filter(c => c.length === 14);
+  const suspectCnpjs = Array.from(new Set(cnpjMatches.filter(c => !haystack.includes(c))));
+
+  // Extrai valores em R$ (apenas a parte inteira, em milhar) — mantém só números >= 10.000 (mais relevantes)
+  const valueMatches = Array.from(answer.matchAll(/R\$\s*([\d.,]+)/gi))
+    .map(m => m[1].replace(/\./g, "").replace(",", ".").split(".")[0])
+    .filter(v => v && Number(v) >= 10000);
+  const suspectValues = Array.from(new Set(valueMatches.filter(v => {
+    // tolera diferença pelos últimos 3 dígitos (arredondamento)
+    return !haystack.includes(v) && !haystack.includes(v.slice(0, -3));
+  })));
+
+  // Ignora valores que aparecem como texto formatado também (ex.: "1.234.567")
+  const suspectValuesFinal = suspectValues.filter(v => !haystackText.includes(Number(v).toLocaleString("pt-BR")));
+
+  return {
+    ok: suspectCnpjs.length === 0 && suspectValuesFinal.length === 0,
+    suspect: { cnpjs: suspectCnpjs, values: suspectValuesFinal },
+  };
+}
+
 async function execTool(
   supabase: any,
   name: string,
