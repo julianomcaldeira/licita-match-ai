@@ -603,8 +603,22 @@ async function runAgent(opts: {
   const allSources: { label: string; url?: string }[] = [];
   const seenSources = new Set<string>();
 
-  // Modelo principal: gpt-5-mini (forte em tool-calling). Fallback: gemini-2.5-pro.
-  const MODELS = ["openai/gpt-5-mini", "google/gemini-2.5-pro"];
+  // Roteamento híbrido: perguntas simples → flash-lite (barato);
+  // perguntas com cruzamento/comparação/perfil de empresa/órgão → gpt-5-mini (preciso).
+  const ql = question.toLowerCase();
+  const COMPLEX_HINTS = [
+    "compar", "cruz", "perfil", "sancion", "ceis", "cnep", "cnpj",
+    "score", "risco", "domin", "concentr", "outlier", "anomal",
+    " vs ", " versus ", "lado a lado", "histórico", "historico",
+    "análise", "analise", "diagnóst", "diagnost", "investig",
+  ];
+  const isComplex =
+    COMPLEX_HINTS.some(k => ql.includes(k)) ||
+    question.length > 220 ||
+    history.length >= 2;
+  const MODELS = isComplex
+    ? ["openai/gpt-5-mini", "google/gemini-2.5-pro"]
+    : ["google/gemini-2.5-flash-lite", "google/gemini-2.5-flash", "openai/gpt-5-mini"];
   let modelIdx = 0;
 
   for (let iter = 0; iter < 7; iter++) {
