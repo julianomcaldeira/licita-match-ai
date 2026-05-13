@@ -603,12 +603,16 @@ async function runAgent(opts: {
   const allSources: { label: string; url?: string }[] = [];
   const seenSources = new Set<string>();
 
+  // Modelo principal: gpt-5-mini (forte em tool-calling). Fallback: gemini-2.5-pro.
+  const MODELS = ["openai/gpt-5-mini", "google/gemini-2.5-pro"];
+  let modelIdx = 0;
+
   for (let iter = 0; iter < 7; iter++) {
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: MODELS[modelIdx],
         messages,
         tools: TOOLS,
         tool_choice: iter < 6 ? "auto" : "none",
@@ -617,7 +621,12 @@ async function runAgent(opts: {
 
     if (!resp.ok) {
       const t = await resp.text();
-      console.error("AI gateway error", resp.status, t);
+      console.error("AI gateway error", resp.status, MODELS[modelIdx], t);
+      // Tenta o próximo modelo em caso de erro 5xx ou 400 (tool schema)
+      if ((resp.status >= 500 || resp.status === 400) && modelIdx < MODELS.length - 1) {
+        modelIdx++;
+        continue;
+      }
       if (resp.status === 429) throw new Error("Rate limit. Tente novamente em alguns minutos.");
       if (resp.status === 402) throw new Error("Créditos de IA esgotados. Adicione créditos ao workspace.");
       throw new Error("Falha no serviço de IA.");
