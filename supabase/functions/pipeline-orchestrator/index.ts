@@ -41,6 +41,7 @@ const MODALIDADES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
 // Hard cap to prevent infinite pagination loops when the PNCP API keeps returning hasMore=true
 // indefinitely. The real PNCP limit is ~200 pages (10k records) per window/modalidade.
 const PNCP_MAX_PAGES_PER_MODALIDADE = 250;
+const WINNERS_BATCH_LIMIT = 1000;
 const WATCHDOG_STALL_MS = 3 * 60_000;
 const WATCHDOG_BASE_BACKOFF_MS = 30_000;
 const WATCHDOG_MAX_BACKOFF_MS = 10 * 60_000;
@@ -253,11 +254,9 @@ serve(async (req) => {
         }
       }
     } else if (phase === "winners") {
-      const cursor: string | null = state.winnersCursor || null;
       const result = await invokeFn("ingest-pncp", {
         mode: "winners",
-        limit: 100,
-        afterCreatedAt: cursor,
+        limit: WINNERS_BATCH_LIMIT,
       });
 
       if (result.ok && result.json && result.json.success !== false) {
@@ -267,8 +266,6 @@ serve(async (req) => {
         totalRecords += winners;
         phaseProgressCurrent = Number(state.processed || 0) + processed;
         state.processed = phaseProgressCurrent;
-        // Always remember how far we have walked, even if processed==0 (avoids loops)
-        if (result.json.nextCursor) state.winnersCursor = result.json.nextCursor;
         phaseProgressTotal = phaseProgressCurrent + (result.json.hasMore ? 100 : 0);
         if (!result.json.hasMore) advancePhase = true;
       } else {
