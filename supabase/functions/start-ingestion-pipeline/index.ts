@@ -69,9 +69,9 @@ serve(async (req) => {
     .from("ingestion_jobs")
     .insert({
       status: "pending",
-      current_phase: "pncp",
+      current_phase: "winners",
       phases_total: 5,
-      phase_label: "Aguardando início...",
+      phase_label: "Aguardando atualização de vencedores...",
       created_by: userId,
     })
     .select("*")
