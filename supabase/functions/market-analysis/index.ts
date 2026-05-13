@@ -697,10 +697,23 @@ async function runAgent(opts: {
   history: { role: "user" | "assistant"; content: string }[];
   uf?: string;
   period_months?: number;
-}): Promise<{ answer: string; toolsUsed: ToolMeta[]; sources: { label: string; url?: string }[] }> {
+}): Promise<{ answer: string; toolsUsed: ToolMeta[]; sources: { label: string; url?: string }[]; validation?: { ok: boolean; suspect: { cnpjs: string[]; values: string[] } } }> {
   const { apiKey, supabase, question, history, uf, period_months } = opts;
+
+  // Passo 2 — Ficha de contexto pré-carregada (1 RPC barato)
+  const briefing = await buildContextBriefing(supabase, period_months || 6, uf);
+
+  // Passo 7 — Roteador: filtra ferramentas relevantes
+  const tools = pickToolsForQuestion(question, TOOLS);
+
   const messages: any[] = [
-    { role: "system", content: SYSTEM_PROMPT + `\n\nFiltros do usuário: período=${period_months || 6} meses${uf ? `, UF=${uf}` : ""}.` },
+    {
+      role: "system",
+      content:
+        SYSTEM_PROMPT +
+        `\n\nFiltros do usuário: período=${period_months || 6} meses${uf ? `, UF=${uf}` : ""}.` +
+        briefing,
+    },
   ];
   for (const m of history.slice(-6)) messages.push({ role: m.role, content: m.content });
   messages.push({ role: "user", content: question });
@@ -708,9 +721,9 @@ async function runAgent(opts: {
   const toolsUsed: ToolMeta[] = [];
   const allSources: { label: string; url?: string }[] = [];
   const seenSources = new Set<string>();
+  const toolResultsConcat: string[] = [];
 
-  // Roteamento híbrido: perguntas simples → flash-lite (barato);
-  // perguntas com cruzamento/comparação/perfil de empresa/órgão → gpt-5-mini (preciso).
+  // Roteamento híbrido de modelo
   const ql = question.toLowerCase();
   const COMPLEX_HINTS = [
     "compar", "cruz", "perfil", "sancion", "ceis", "cnep", "cnpj",
@@ -734,7 +747,7 @@ async function runAgent(opts: {
       body: JSON.stringify({
         model: MODELS[modelIdx],
         messages,
-        tools: TOOLS,
+        tools,
         tool_choice: iter < 6 ? "auto" : "none",
       }),
     });
@@ -742,7 +755,6 @@ async function runAgent(opts: {
     if (!resp.ok) {
       const t = await resp.text();
       console.error("AI gateway error", resp.status, MODELS[modelIdx], t);
-      // Tenta o próximo modelo em caso de erro 5xx ou 400 (tool schema)
       if ((resp.status >= 500 || resp.status === 400) && modelIdx < MODELS.length - 1) {
         modelIdx++;
         continue;
@@ -758,18 +770,29 @@ async function runAgent(opts: {
 
     const toolCalls = msg.tool_calls || [];
     if (!toolCalls.length) {
-      return { answer: msg.content || "(resposta vazia)", toolsUsed, sources: allSources };
+      let answer = msg.content || "(resposta vazia)";
+
+      // Passo 6 — Validador anti-alucinação
+      const validation = validateAnswer(answer, toolResultsConcat.join("\n") + "\n" + briefing);
+      if (!validation.ok) {
+        console.warn("market-analysis suspeita de invenção:", validation.suspect);
+        const parts: string[] = [];
+        if (validation.suspect.cnpjs.length) parts.push(`CNPJ(s) sem origem: ${validation.suspect.cnpjs.join(", ")}`);
+        if (validation.suspect.values.length) parts.push(`Valor(es) sem origem: ${validation.suspect.values.map(v => `R$ ${Number(v).toLocaleString("pt-BR")}`).join(", ")}`);
+        answer += `\n\n> ⚠️ **Aviso de validação:** alguns dados acima não foram localizados nas fontes consultadas (${parts.join("; ")}). Considere refinar a pergunta ou solicitar nova consulta.`;
+      }
+
+      return { answer, toolsUsed, sources: allSources, validation };
     }
 
-    // Push assistant tool-call message as-is
     messages.push(msg);
 
-    // Execute tools in parallel
     const results = await Promise.all(toolCalls.map(async (tc: any) => {
       let parsedArgs: any = {};
       try { parsedArgs = JSON.parse(tc.function.arguments || "{}"); } catch { /* ignore */ }
       const out = await execTool(supabase, tc.function.name, parsedArgs, uf);
       toolsUsed.push({ name: tc.function.name, args: parsedArgs, summary: out.summary });
+      toolResultsConcat.push(out.content);
       for (const s of out.sources) {
         const k = s.label;
         if (!seenSources.has(k)) { seenSources.add(k); allSources.push(s); }
@@ -782,7 +805,6 @@ async function runAgent(opts: {
     }
   }
 
-  // Forced final answer if loop exceeded
   return { answer: "Não consegui finalizar a análise — muitas iterações. Tente uma pergunta mais específica.", toolsUsed, sources: allSources };
 }
 
