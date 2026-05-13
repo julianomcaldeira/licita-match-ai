@@ -632,6 +632,30 @@ export type Database = {
         }
         Relationships: []
       }
+      mv_refresh_state: {
+        Row: {
+          last_duration_ms: number | null
+          last_refresh_at: string
+          last_seen_max: string | null
+          mv_name: string
+          refresh_count: number
+        }
+        Insert: {
+          last_duration_ms?: number | null
+          last_refresh_at?: string
+          last_seen_max?: string | null
+          mv_name: string
+          refresh_count?: number
+        }
+        Update: {
+          last_duration_ms?: number | null
+          last_refresh_at?: string
+          last_seen_max?: string | null
+          mv_name?: string
+          refresh_count?: number
+        }
+        Relationships: []
+      }
       oportunidades: {
         Row: {
           created_at: string
@@ -1211,6 +1235,7 @@ export type Database = {
       pncp_dadosabertos_backfill_fast_tick: { Args: never; Returns: Json }
       pncp_dadosabertos_backfill_tick: { Args: never; Returns: Json }
       refresh_all_mvs: { Args: never; Returns: undefined }
+      refresh_summary_mvs_if_dirty: { Args: never; Returns: Json }
       run_ingestion_audit: { Args: never; Returns: string }
       schedule_auto_ingestion: { Args: { p_force?: boolean }; Returns: Json }
       search_licitacoes: {
