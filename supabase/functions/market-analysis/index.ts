@@ -604,7 +604,7 @@ async function runAgent(opts: {
   const allSources: { label: string; url?: string }[] = [];
   const seenSources = new Set<string>();
 
-  for (let iter = 0; iter < 5; iter++) {
+  for (let iter = 0; iter < 7; iter++) {
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -612,7 +612,7 @@ async function runAgent(opts: {
         model: "google/gemini-2.5-flash",
         messages,
         tools: TOOLS,
-        tool_choice: iter < 4 ? "auto" : "none",
+        tool_choice: iter < 6 ? "auto" : "none",
       }),
     });
 
