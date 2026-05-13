@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_query_cache: {
+        Row: {
+          cache_key: string
+          created_at: string
+          expires_at: string
+          filters: Json
+          hits: number
+          id: string
+          model_used: string | null
+          question: string
+          response: Json
+        }
+        Insert: {
+          cache_key: string
+          created_at?: string
+          expires_at?: string
+          filters?: Json
+          hits?: number
+          id?: string
+          model_used?: string | null
+          question: string
+          response: Json
+        }
+        Update: {
+          cache_key?: string
+          created_at?: string
+          expires_at?: string
+          filters?: Json
+          hits?: number
+          id?: string
+          model_used?: string | null
+          question?: string
+          response?: Json
+        }
+        Relationships: []
+      }
       api_keys: {
         Row: {
           api_key: string
@@ -1035,6 +1071,7 @@ export type Database = {
           raw_json: Json
         }[]
       }
+      cleanup_ai_query_cache: { Args: never; Returns: number }
       contratos_por_dia: {
         Args: { p_days?: number }
         Returns: {
