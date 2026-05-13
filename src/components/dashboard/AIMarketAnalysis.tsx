@@ -2,8 +2,13 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   Brain, Loader2, Sparkles, MessageSquare, Trash2, RotateCcw, Send, User,
-  Calendar, Database, ExternalLink,
+  Calendar, Database, ExternalLink, FileDown, FileText,
 } from "lucide-react";
+import { exportConversationCsv, exportConversationPdf } from "@/lib/exportConversation";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
