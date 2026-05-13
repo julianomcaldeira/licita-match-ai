@@ -271,6 +271,112 @@ function dateRange(period_months: number) {
   return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
 }
 
+// ---------- HELPERS DE OTIMIZAÇÃO (cache, roteador, validador, ficha) ----------
+async function sha256Hex(s: string) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+function normalizeQuestion(q: string) {
+  return q.toLowerCase().trim().replace(/\s+/g, " ").replace(/[?!.,;]+$/g, "");
+}
+
+// 7. Roteador: expõe apenas o subconjunto de tools relevante à pergunta.
+function pickToolsForQuestion(question: string, allTools: any[]) {
+  const q = question.toLowerCase();
+  const picked = new Set<string>();
+  const add = (...names: string[]) => names.forEach(n => picked.add(n));
+
+  if (/(empres|forneced|cnpj|razão social|razao social|perfil)/.test(q))
+    add("lookup_cnpj_receita", "get_empresa_perfil", "search_sancionadas");
+  if (/(órgão|orgao|prefeitura|ministério|ministerio|secretaria|score|comprador)/.test(q))
+    add("get_orgao_score", "compare_orgaos_score", "get_top_buyers", "get_contratos_recentes_orgao");
+  if (/(licitaç|edital|pregão|pregao|homolog)/.test(q))
+    add("search_licitacoes");
+  if (/(contrato|formaliz|assinatur)/.test(q))
+    add("search_contratos", "get_contratos_recentes_orgao");
+  if (/(sancion|ceis|cnep|inidône|inidone|risco)/.test(q))
+    add("search_sancionadas", "check_vencedores_sancionados");
+  if (/(diário|diario oficial|querido)/.test(q))
+    add("search_diarios_oficiais");
+  if (/(visão|visao|geral|mercado|panorama|top|ranking|maiores|principais|vencedor)/.test(q))
+    add("get_market_overview", "get_top_winners", "get_top_buyers");
+
+  // fallback: kit básico
+  if (picked.size === 0) add("get_market_overview", "get_top_winners", "get_top_buyers", "search_licitacoes");
+
+  return allTools.filter(t => picked.has(t.function.name));
+}
+
+// 2. Ficha de contexto: 1 RPC barato com KPIs do período/UF para injetar no prompt.
+//    Reduz drasticamente o nº de tool-calls em perguntas amplas.
+async function buildContextBriefing(supabase: any, period_months: number, uf?: string) {
+  try {
+    const { from, to } = dateRange(period_months);
+    const [tot, totals, winners, buyers] = await Promise.all([
+      supabase.rpc("analytics_sales_totals", { p_date_from: from, p_date_to: to }),
+      supabase.rpc("analytics_totals", { p_date_from: from, p_date_to: to }),
+      supabase.rpc("analytics_top_winners", { p_date_from: from, p_date_to: to, p_limit: 5 }),
+      supabase.rpc("analytics_top_buyers", { p_date_from: from, p_date_to: to, p_limit: 5 }),
+    ]);
+    const t = tot.data?.[0] || {};
+    const tt = totals.data?.[0] || {};
+    const fmt = (n: any) => Number(n || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+    const wList = (winners.data || []).slice(0, 5).map((w: any, i: number) =>
+      `  ${i + 1}. ${w.razao_social} (CNPJ ${w.cnpj}) — ${w.wins} vitórias, ${fmt(w.total_valor)}`).join("\n");
+    const bList = (buyers.data || []).slice(0, 5).map((b: any, i: number) =>
+      `  ${i + 1}. ${b.orgao} — ${b.purchases} compras, ${fmt(b.total_valor)}`).join("\n");
+    return `\n\n--- DADOS PRÉ-CARREGADOS (período ${from} → ${to}${uf ? `, UF ${uf}` : ", BR"}) ---
+KPIs gerais:
+  - Total movimentado: ${fmt(t.total_sales)}
+  - Total de contratos: ${(t.total_contracts || 0).toLocaleString("pt-BR")}
+  - Empresas distintas: ${(tt.total_empresas || 0).toLocaleString("pt-BR")}
+  - Órgãos distintos: ${(tt.total_orgaos || 0).toLocaleString("pt-BR")}
+
+Top 5 vencedores:
+${wList || "  (sem dados)"}
+
+Top 5 órgãos compradores:
+${bList || "  (sem dados)"}
+
+Use estes dados como ponto de partida — só chame tools para aprofundar (ex.: detalhe de empresa específica, busca textual, sanções, comparação). Para perguntas de "visão geral" ou "top X", os dados acima já bastam.
+--- FIM DADOS PRÉ-CARREGADOS ---`;
+  } catch (e) {
+    console.error("buildContextBriefing failed:", e);
+    return "";
+  }
+}
+
+// 6. Validador: extrai R$ valores e CNPJs do texto final e checa se aparecem
+//    nos resultados das tools chamadas. Adiciona aviso se houver suspeita de invenção.
+function validateAnswer(answer: string, toolResultsConcat: string): { ok: boolean; suspect: { cnpjs: string[]; values: string[] } } {
+  const haystack = toolResultsConcat.replace(/\D/g, "");
+  const haystackText = toolResultsConcat.toLowerCase();
+
+  // Extrai CNPJs no texto (com ou sem máscara) — só dígitos
+  const cnpjMatches = Array.from(answer.matchAll(/\b(\d{2}[.\s]?\d{3}[.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}|\d{14})\b/g))
+    .map(m => m[0].replace(/\D/g, ""))
+    .filter(c => c.length === 14);
+  const suspectCnpjs = Array.from(new Set(cnpjMatches.filter(c => !haystack.includes(c))));
+
+  // Extrai valores em R$ (apenas a parte inteira, em milhar) — mantém só números >= 10.000 (mais relevantes)
+  const valueMatches = Array.from(answer.matchAll(/R\$\s*([\d.,]+)/gi))
+    .map(m => m[1].replace(/\./g, "").replace(",", ".").split(".")[0])
+    .filter(v => v && Number(v) >= 10000);
+  const suspectValues = Array.from(new Set(valueMatches.filter(v => {
+    // tolera diferença pelos últimos 3 dígitos (arredondamento)
+    return !haystack.includes(v) && !haystack.includes(v.slice(0, -3));
+  })));
+
+  // Ignora valores que aparecem como texto formatado também (ex.: "1.234.567")
+  const suspectValuesFinal = suspectValues.filter(v => !haystackText.includes(Number(v).toLocaleString("pt-BR")));
+
+  return {
+    ok: suspectCnpjs.length === 0 && suspectValuesFinal.length === 0,
+    suspect: { cnpjs: suspectCnpjs, values: suspectValuesFinal },
+  };
+}
+
 async function execTool(
   supabase: any,
   name: string,
@@ -591,10 +697,23 @@ async function runAgent(opts: {
   history: { role: "user" | "assistant"; content: string }[];
   uf?: string;
   period_months?: number;
-}): Promise<{ answer: string; toolsUsed: ToolMeta[]; sources: { label: string; url?: string }[] }> {
+}): Promise<{ answer: string; toolsUsed: ToolMeta[]; sources: { label: string; url?: string }[]; validation?: { ok: boolean; suspect: { cnpjs: string[]; values: string[] } } }> {
   const { apiKey, supabase, question, history, uf, period_months } = opts;
+
+  // Passo 2 — Ficha de contexto pré-carregada (1 RPC barato)
+  const briefing = await buildContextBriefing(supabase, period_months || 6, uf);
+
+  // Passo 7 — Roteador: filtra ferramentas relevantes
+  const tools = pickToolsForQuestion(question, TOOLS);
+
   const messages: any[] = [
-    { role: "system", content: SYSTEM_PROMPT + `\n\nFiltros do usuário: período=${period_months || 6} meses${uf ? `, UF=${uf}` : ""}.` },
+    {
+      role: "system",
+      content:
+        SYSTEM_PROMPT +
+        `\n\nFiltros do usuário: período=${period_months || 6} meses${uf ? `, UF=${uf}` : ""}.` +
+        briefing,
+    },
   ];
   for (const m of history.slice(-6)) messages.push({ role: m.role, content: m.content });
   messages.push({ role: "user", content: question });
@@ -602,9 +721,9 @@ async function runAgent(opts: {
   const toolsUsed: ToolMeta[] = [];
   const allSources: { label: string; url?: string }[] = [];
   const seenSources = new Set<string>();
+  const toolResultsConcat: string[] = [];
 
-  // Roteamento híbrido: perguntas simples → flash-lite (barato);
-  // perguntas com cruzamento/comparação/perfil de empresa/órgão → gpt-5-mini (preciso).
+  // Roteamento híbrido de modelo
   const ql = question.toLowerCase();
   const COMPLEX_HINTS = [
     "compar", "cruz", "perfil", "sancion", "ceis", "cnep", "cnpj",
@@ -628,7 +747,7 @@ async function runAgent(opts: {
       body: JSON.stringify({
         model: MODELS[modelIdx],
         messages,
-        tools: TOOLS,
+        tools,
         tool_choice: iter < 6 ? "auto" : "none",
       }),
     });
@@ -636,7 +755,6 @@ async function runAgent(opts: {
     if (!resp.ok) {
       const t = await resp.text();
       console.error("AI gateway error", resp.status, MODELS[modelIdx], t);
-      // Tenta o próximo modelo em caso de erro 5xx ou 400 (tool schema)
       if ((resp.status >= 500 || resp.status === 400) && modelIdx < MODELS.length - 1) {
         modelIdx++;
         continue;
@@ -652,18 +770,29 @@ async function runAgent(opts: {
 
     const toolCalls = msg.tool_calls || [];
     if (!toolCalls.length) {
-      return { answer: msg.content || "(resposta vazia)", toolsUsed, sources: allSources };
+      let answer = msg.content || "(resposta vazia)";
+
+      // Passo 6 — Validador anti-alucinação
+      const validation = validateAnswer(answer, toolResultsConcat.join("\n") + "\n" + briefing);
+      if (!validation.ok) {
+        console.warn("market-analysis suspeita de invenção:", validation.suspect);
+        const parts: string[] = [];
+        if (validation.suspect.cnpjs.length) parts.push(`CNPJ(s) sem origem: ${validation.suspect.cnpjs.join(", ")}`);
+        if (validation.suspect.values.length) parts.push(`Valor(es) sem origem: ${validation.suspect.values.map(v => `R$ ${Number(v).toLocaleString("pt-BR")}`).join(", ")}`);
+        answer += `\n\n> ⚠️ **Aviso de validação:** alguns dados acima não foram localizados nas fontes consultadas (${parts.join("; ")}). Considere refinar a pergunta ou solicitar nova consulta.`;
+      }
+
+      return { answer, toolsUsed, sources: allSources, validation };
     }
 
-    // Push assistant tool-call message as-is
     messages.push(msg);
 
-    // Execute tools in parallel
     const results = await Promise.all(toolCalls.map(async (tc: any) => {
       let parsedArgs: any = {};
       try { parsedArgs = JSON.parse(tc.function.arguments || "{}"); } catch { /* ignore */ }
       const out = await execTool(supabase, tc.function.name, parsedArgs, uf);
       toolsUsed.push({ name: tc.function.name, args: parsedArgs, summary: out.summary });
+      toolResultsConcat.push(out.content);
       for (const s of out.sources) {
         const k = s.label;
         if (!seenSources.has(k)) { seenSources.add(k); allSources.push(s); }
@@ -676,7 +805,6 @@ async function runAgent(opts: {
     }
   }
 
-  // Forced final answer if loop exceeded
   return { answer: "Não consegui finalizar a análise — muitas iterações. Tente uma pergunta mais específica.", toolsUsed, sources: allSources };
 }
 
@@ -703,7 +831,39 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Pergunta vazia." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // Passo 1 — Cache: só consultamos quando NÃO há histórico (follow-up depende do contexto)
+    const cacheKey = await sha256Hex(`${normalizeQuestion(question)}|p=${period_months}|uf=${uf || ""}`);
+    if (history.length === 0) {
+      const { data: cached } = await supabase
+        .from("ai_query_cache")
+        .select("response")
+        .eq("cache_key", cacheKey)
+        .gt("expires_at", new Date().toISOString())
+        .maybeSingle();
+      if (cached?.response) {
+        // hit: incrementa métrica fire-and-forget
+        supabase.from("ai_query_cache")
+          .update({ hits: ((cached as any).hits || 0) + 1 })
+          .eq("cache_key", cacheKey)
+          .then(() => {}, () => {});
+        return new Response(JSON.stringify({ ...cached.response, cached: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    }
+
     const result = await runAgent({ apiKey, supabase, question, history, uf, period_months });
+
+    // Salva no cache apenas se for resposta limpa (validador OK e sem erro de iteração)
+    if (history.length === 0 && result.validation?.ok !== false && !result.answer.startsWith("Não consegui finalizar")) {
+      supabase.from("ai_query_cache").upsert({
+        cache_key: cacheKey,
+        question,
+        filters: { period_months, uf: uf || null },
+        response: result,
+        model_used: result.toolsUsed?.length ? "agent" : "direct",
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      }, { onConflict: "cache_key" }).then(() => {}, (err: any) => console.error("cache upsert failed", err));
+    }
+
     return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e: any) {
     console.error("market-analysis error:", e);
