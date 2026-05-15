@@ -614,7 +614,7 @@ async function handleWinners(supabase: any, body: any) {
   let winnersFound = 0;
   let processed = 0;
 
-  const PARALLEL = 15;
+  const PARALLEL = 25;
   for (let i = 0; i < licitacoes.length; i += PARALLEL) {
     const batch = licitacoes.slice(i, i + PARALLEL);
     const results = await Promise.allSettled(
