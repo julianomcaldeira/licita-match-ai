@@ -279,9 +279,11 @@ serve(async (req) => {
       const dataFinal = state.cDataFinal || todayYYYYMMDD().replace(/(\d{4})(\d{2})(\d{2})/, "$3/$2/$1");
       const pagina = state.cPagina || 1;
       const result = await invokeFn("ingest-contratos", {
+        mode: "bulk-contratos",
         dataInicial,
         dataFinal,
         pagina,
+        maxPages: 50,
       });
 
       if (result.ok && result.json) {
