@@ -53,6 +53,7 @@ function formatCnpjCpf(raw: string): { display: string; isForeign: boolean } {
 
 export default function SancionadasPage() {
   const [search, setSearch] = useState("");
+  const [searchField, setSearchField] = useState<"nome" | "cnpj">("nome");
   const [page, setPage] = useState(0);
   const [cnpjCheck, setCnpjCheck] = useState("");
   const [checkResult, setCheckResult] = useState<null | { found: boolean; records: any[] }>(null);
