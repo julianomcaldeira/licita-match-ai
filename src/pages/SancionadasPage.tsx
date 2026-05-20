@@ -1,11 +1,18 @@
 import { useState, useMemo } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { ShieldAlert, Search, AlertTriangle, CheckCircle2, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { ShieldAlert, Search, AlertTriangle, CheckCircle2, X, ChevronLeft, ChevronRight, Building2, Hash } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { motion } from "framer-motion";
 
 const PAGE_SIZE = 50;
