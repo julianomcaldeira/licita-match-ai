@@ -197,24 +197,43 @@ export default function SancionadasPage() {
               {activeCount} vigentes nesta página)
             </span>
           </h2>
-          <div className="relative w-full sm:w-72">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nome ou CNPJ..."
-              value={search}
-              onChange={(e) => onSearchChange(e.target.value)}
-              className="pl-9 h-10"
-              maxLength={100}
-            />
-            {search && (
-              <button
-                onClick={() => onSearchChange("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2"
-                aria-label="Limpar busca"
-              >
-                <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-              </button>
-            )}
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Select value={searchField} onValueChange={(v: "nome" | "cnpj") => { setSearchField(v); setPage(0); }}>
+              <SelectTrigger className="h-10 w-[160px] shrink-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="nome">
+                  <span className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4" /> Nome da empresa
+                  </span>
+                </SelectItem>
+                <SelectItem value="cnpj">
+                  <span className="flex items-center gap-2">
+                    <Hash className="h-4 w-4" /> CNPJ/CPF
+                  </span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="relative flex-1 sm:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder={searchField === "nome" ? "Buscar por nome da empresa..." : "Buscar por CNPJ/CPF..."}
+                value={search}
+                onChange={(e) => onSearchChange(e.target.value)}
+                className="pl-9 h-10"
+                maxLength={100}
+              />
+              {search && (
+                <button
+                  onClick={() => onSearchChange("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2"
+                  aria-label="Limpar busca"
+                >
+                  <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
