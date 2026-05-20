@@ -59,7 +59,7 @@ export default function SancionadasPage() {
   const [checkResult, setCheckResult] = useState<null | { found: boolean; records: any[] }>(null);
 
   const { data, isLoading, isFetching } = useQuery({
-    queryKey: ["sancionadas-list", search, page],
+    queryKey: ["sancionadas-list", search, searchField, page],
     queryFn: async () => {
       let q = supabase
         .from("empresas_sancionadas")
@@ -69,8 +69,7 @@ export default function SancionadasPage() {
 
       if (search.trim()) {
         const term = search.trim();
-        const isNumeric = /^\d/.test(term.replace(/[.\-\/]/g, ""));
-        if (isNumeric) {
+        if (searchField === "cnpj") {
           q = q.ilike("cnpj_cpf", `%${term.replace(/\D/g, "")}%`);
         } else {
           q = q.ilike("nome", `%${term}%`);
