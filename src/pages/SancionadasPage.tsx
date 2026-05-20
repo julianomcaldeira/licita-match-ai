@@ -1,11 +1,18 @@
 import { useState, useMemo } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { ShieldAlert, Search, AlertTriangle, CheckCircle2, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { ShieldAlert, Search, AlertTriangle, CheckCircle2, X, ChevronLeft, ChevronRight, Building2, Hash } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { motion } from "framer-motion";
 
 const PAGE_SIZE = 50;
@@ -46,12 +53,13 @@ function formatCnpjCpf(raw: string): { display: string; isForeign: boolean } {
 
 export default function SancionadasPage() {
   const [search, setSearch] = useState("");
+  const [searchField, setSearchField] = useState<"nome" | "cnpj">("nome");
   const [page, setPage] = useState(0);
   const [cnpjCheck, setCnpjCheck] = useState("");
   const [checkResult, setCheckResult] = useState<null | { found: boolean; records: any[] }>(null);
 
   const { data, isLoading, isFetching } = useQuery({
-    queryKey: ["sancionadas-list", search, page],
+    queryKey: ["sancionadas-list", search, searchField, page],
     queryFn: async () => {
       let q = supabase
         .from("empresas_sancionadas")
@@ -61,8 +69,7 @@ export default function SancionadasPage() {
 
       if (search.trim()) {
         const term = search.trim();
-        const isNumeric = /^\d/.test(term.replace(/[.\-\/]/g, ""));
-        if (isNumeric) {
+        if (searchField === "cnpj") {
           q = q.ilike("cnpj_cpf", `%${term.replace(/\D/g, "")}%`);
         } else {
           q = q.ilike("nome", `%${term}%`);
@@ -190,24 +197,43 @@ export default function SancionadasPage() {
               {activeCount} vigentes nesta página)
             </span>
           </h2>
-          <div className="relative w-full sm:w-72">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nome ou CNPJ..."
-              value={search}
-              onChange={(e) => onSearchChange(e.target.value)}
-              className="pl-9 h-10"
-              maxLength={100}
-            />
-            {search && (
-              <button
-                onClick={() => onSearchChange("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2"
-                aria-label="Limpar busca"
-              >
-                <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-              </button>
-            )}
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Select value={searchField} onValueChange={(v: "nome" | "cnpj") => { setSearchField(v); setPage(0); }}>
+              <SelectTrigger className="h-10 w-[160px] shrink-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="nome">
+                  <span className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4" /> Nome da empresa
+                  </span>
+                </SelectItem>
+                <SelectItem value="cnpj">
+                  <span className="flex items-center gap-2">
+                    <Hash className="h-4 w-4" /> CNPJ/CPF
+                  </span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="relative flex-1 sm:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder={searchField === "nome" ? "Buscar por nome da empresa..." : "Buscar por CNPJ/CPF..."}
+                value={search}
+                onChange={(e) => onSearchChange(e.target.value)}
+                className="pl-9 h-10"
+                maxLength={100}
+              />
+              {search && (
+                <button
+                  onClick={() => onSearchChange("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2"
+                  aria-label="Limpar busca"
+                >
+                  <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
