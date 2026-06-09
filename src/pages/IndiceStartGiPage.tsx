@@ -240,7 +240,11 @@ export default function IndiceStartGiPage() {
         <Card>
           <CardHeader><CardTitle>Preview do card</CardTitle></CardHeader>
           <CardContent>
-            <div ref={previewWrapRef} className="w-full overflow-hidden rounded-lg border border-border bg-slate-950">
+            <div
+              ref={previewWrapRef}
+              className="w-full overflow-hidden rounded-lg border border-border bg-slate-950"
+              style={{ height: selected ? 1080 * previewScale : undefined }}
+            >
               {selected ? (
                 <div
                   style={{
@@ -258,13 +262,6 @@ export default function IndiceStartGiPage() {
                 </div>
               )}
             </div>
-            <div
-              ref={previewWrapRef === null ? undefined : undefined}
-              style={{
-                width: previewWrapRef.current?.clientWidth || "100%",
-                height: selected ? 1080 * previewScale : 0,
-              }}
-            />
           </CardContent>
         </Card>
 
