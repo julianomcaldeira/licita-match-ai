@@ -14,12 +14,21 @@ import {
   ShieldAlert,
   ShieldCheck,
   Key,
+  TrendingUp,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 import logoImg from "@/assets/logo-ipesquisei.png";
 
-const navigation = [
+type NavItem = {
+  name: string;
+  href: string;
+  icon: typeof LayoutDashboard;
+  roles?: string[]; // se definido, restringe a esses roles
+};
+
+const navigation: NavItem[] = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Licitações", href: "/licitacoes", icon: Search },
   { name: "Empresas", href: "/empresas", icon: Building2 },
