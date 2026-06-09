@@ -420,11 +420,22 @@ export type Database = {
           dados_parciais: boolean | null
           destaque_segmento: string | null
           destaque_variacao: number | null
+          fornecedores_unicos: number | null
           gerado_em: string
           gerado_por: string | null
           id: string
           indice_startgi: number | null
+          maior_contrato_objeto: string | null
+          maior_contrato_valor: number | null
           mes_referencia: string
+          orgaos_unicos: number | null
+          ticket_medio: number | null
+          top_fornecedor_nome: string | null
+          top_fornecedor_valor: number | null
+          top_modalidade: string | null
+          top_modalidade_share: number | null
+          top_orgao_nome: string | null
+          top_orgao_valor: number | null
           valor_total_brl: number | null
           variacao_mom: number | null
           variacao_yoy: number | null
@@ -437,11 +448,22 @@ export type Database = {
           dados_parciais?: boolean | null
           destaque_segmento?: string | null
           destaque_variacao?: number | null
+          fornecedores_unicos?: number | null
           gerado_em?: string
           gerado_por?: string | null
           id?: string
           indice_startgi?: number | null
+          maior_contrato_objeto?: string | null
+          maior_contrato_valor?: number | null
           mes_referencia: string
+          orgaos_unicos?: number | null
+          ticket_medio?: number | null
+          top_fornecedor_nome?: string | null
+          top_fornecedor_valor?: number | null
+          top_modalidade?: string | null
+          top_modalidade_share?: number | null
+          top_orgao_nome?: string | null
+          top_orgao_valor?: number | null
           valor_total_brl?: number | null
           variacao_mom?: number | null
           variacao_yoy?: number | null
@@ -454,11 +476,22 @@ export type Database = {
           dados_parciais?: boolean | null
           destaque_segmento?: string | null
           destaque_variacao?: number | null
+          fornecedores_unicos?: number | null
           gerado_em?: string
           gerado_por?: string | null
           id?: string
           indice_startgi?: number | null
+          maior_contrato_objeto?: string | null
+          maior_contrato_valor?: number | null
           mes_referencia?: string
+          orgaos_unicos?: number | null
+          ticket_medio?: number | null
+          top_fornecedor_nome?: string | null
+          top_fornecedor_valor?: number | null
+          top_modalidade?: string | null
+          top_modalidade_share?: number | null
+          top_orgao_nome?: string | null
+          top_orgao_valor?: number | null
           valor_total_brl?: number | null
           variacao_mom?: number | null
           variacao_yoy?: number | null
@@ -475,8 +508,19 @@ export type Database = {
           dados_parciais: boolean
           destaque_segmento: string | null
           destaque_variacao: number | null
+          fornecedores_unicos: number | null
           indice_startgi: number | null
+          maior_contrato_objeto: string | null
+          maior_contrato_valor: number | null
           mes_referencia: string
+          orgaos_unicos: number | null
+          ticket_medio: number | null
+          top_fornecedor_nome: string | null
+          top_fornecedor_valor: number | null
+          top_modalidade: string | null
+          top_modalidade_share: number | null
+          top_orgao_nome: string | null
+          top_orgao_valor: number | null
           ultima_atualizacao: string
           updated_at: string
           valor_total_brl: number
@@ -492,8 +536,19 @@ export type Database = {
           dados_parciais?: boolean
           destaque_segmento?: string | null
           destaque_variacao?: number | null
+          fornecedores_unicos?: number | null
           indice_startgi?: number | null
+          maior_contrato_objeto?: string | null
+          maior_contrato_valor?: number | null
           mes_referencia: string
+          orgaos_unicos?: number | null
+          ticket_medio?: number | null
+          top_fornecedor_nome?: string | null
+          top_fornecedor_valor?: number | null
+          top_modalidade?: string | null
+          top_modalidade_share?: number | null
+          top_orgao_nome?: string | null
+          top_orgao_valor?: number | null
           ultima_atualizacao?: string
           updated_at?: string
           valor_total_brl?: number
@@ -509,8 +564,19 @@ export type Database = {
           dados_parciais?: boolean
           destaque_segmento?: string | null
           destaque_variacao?: number | null
+          fornecedores_unicos?: number | null
           indice_startgi?: number | null
+          maior_contrato_objeto?: string | null
+          maior_contrato_valor?: number | null
           mes_referencia?: string
+          orgaos_unicos?: number | null
+          ticket_medio?: number | null
+          top_fornecedor_nome?: string | null
+          top_fornecedor_valor?: number | null
+          top_modalidade?: string | null
+          top_modalidade_share?: number | null
+          top_orgao_nome?: string | null
+          top_orgao_valor?: number | null
           ultima_atualizacao?: string
           updated_at?: string
           valor_total_brl?: number
@@ -1190,8 +1256,19 @@ export type Database = {
           dados_parciais: boolean
           destaque_segmento: string | null
           destaque_variacao: number | null
+          fornecedores_unicos: number | null
           indice_startgi: number | null
+          maior_contrato_objeto: string | null
+          maior_contrato_valor: number | null
           mes_referencia: string
+          orgaos_unicos: number | null
+          ticket_medio: number | null
+          top_fornecedor_nome: string | null
+          top_fornecedor_valor: number | null
+          top_modalidade: string | null
+          top_modalidade_share: number | null
+          top_orgao_nome: string | null
+          top_orgao_valor: number | null
           ultima_atualizacao: string
           updated_at: string
           valor_total_brl: number
@@ -1348,8 +1425,19 @@ export type Database = {
           dados_parciais: boolean
           destaque_segmento: string | null
           destaque_variacao: number | null
+          fornecedores_unicos: number | null
           indice_startgi: number | null
+          maior_contrato_objeto: string | null
+          maior_contrato_valor: number | null
           mes_referencia: string
+          orgaos_unicos: number | null
+          ticket_medio: number | null
+          top_fornecedor_nome: string | null
+          top_fornecedor_valor: number | null
+          top_modalidade: string | null
+          top_modalidade_share: number | null
+          top_orgao_nome: string | null
+          top_orgao_valor: number | null
           ultima_atualizacao: string
           updated_at: string
           valor_total_brl: number
@@ -1373,11 +1461,22 @@ export type Database = {
           dados_parciais: boolean | null
           destaque_segmento: string | null
           destaque_variacao: number | null
+          fornecedores_unicos: number | null
           gerado_em: string
           gerado_por: string | null
           id: string
           indice_startgi: number | null
+          maior_contrato_objeto: string | null
+          maior_contrato_valor: number | null
           mes_referencia: string
+          orgaos_unicos: number | null
+          ticket_medio: number | null
+          top_fornecedor_nome: string | null
+          top_fornecedor_valor: number | null
+          top_modalidade: string | null
+          top_modalidade_share: number | null
+          top_orgao_nome: string | null
+          top_orgao_valor: number | null
           valor_total_brl: number | null
           variacao_mom: number | null
           variacao_yoy: number | null
