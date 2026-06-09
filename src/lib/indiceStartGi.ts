@@ -12,6 +12,17 @@ export type IndiceData = {
   destaque_variacao: number | null;
   dados_parciais: boolean;
   ultima_atualizacao: string;
+  top_orgao_nome?: string | null;
+  top_orgao_valor?: number | null;
+  top_fornecedor_nome?: string | null;
+  top_fornecedor_valor?: number | null;
+  top_modalidade?: string | null;
+  top_modalidade_share?: number | null;
+  maior_contrato_valor?: number | null;
+  maior_contrato_objeto?: string | null;
+  ticket_medio?: number | null;
+  orgaos_unicos?: number | null;
+  fornecedores_unicos?: number | null;
 };
 
 const MESES_PT = [
