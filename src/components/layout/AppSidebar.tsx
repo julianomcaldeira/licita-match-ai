@@ -110,7 +110,7 @@ export default function AppSidebar({ mobileOpen = false, onMobileClose }: AppSid
 
         {/* Nav */}
         <nav className="mt-4 flex-1 space-y-1 overflow-y-auto px-3">
-          {navigation.map((item) => {
+          {visibleNav.map((item) => {
             const isActive = location.pathname === item.href;
             return (
               <NavLink
