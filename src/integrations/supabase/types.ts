@@ -412,6 +412,60 @@ export type Database = {
         }
         Relationships: []
       }
+      indice_startgi_historico: {
+        Row: {
+          breakdown_esfera: Json | null
+          breakdown_modalidade: Json | null
+          breakdown_segmento: Json | null
+          dados_parciais: boolean | null
+          destaque_segmento: string | null
+          destaque_variacao: number | null
+          gerado_em: string
+          gerado_por: string | null
+          id: string
+          indice_startgi: number | null
+          mes_referencia: string
+          valor_total_brl: number | null
+          variacao_mom: number | null
+          variacao_yoy: number | null
+          volume_contratos: number | null
+        }
+        Insert: {
+          breakdown_esfera?: Json | null
+          breakdown_modalidade?: Json | null
+          breakdown_segmento?: Json | null
+          dados_parciais?: boolean | null
+          destaque_segmento?: string | null
+          destaque_variacao?: number | null
+          gerado_em?: string
+          gerado_por?: string | null
+          id?: string
+          indice_startgi?: number | null
+          mes_referencia: string
+          valor_total_brl?: number | null
+          variacao_mom?: number | null
+          variacao_yoy?: number | null
+          volume_contratos?: number | null
+        }
+        Update: {
+          breakdown_esfera?: Json | null
+          breakdown_modalidade?: Json | null
+          breakdown_segmento?: Json | null
+          dados_parciais?: boolean | null
+          destaque_segmento?: string | null
+          destaque_variacao?: number | null
+          gerado_em?: string
+          gerado_por?: string | null
+          id?: string
+          indice_startgi?: number | null
+          mes_referencia?: string
+          valor_total_brl?: number | null
+          variacao_mom?: number | null
+          variacao_yoy?: number | null
+          volume_contratos?: number | null
+        }
+        Relationships: []
+      }
       indice_startgi_mensal: {
         Row: {
           breakdown_esfera: Json
@@ -1306,6 +1360,32 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "indice_startgi_mensal"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      list_indice_startgi_historico: {
+        Args: { p_limit?: number }
+        Returns: {
+          breakdown_esfera: Json | null
+          breakdown_modalidade: Json | null
+          breakdown_segmento: Json | null
+          dados_parciais: boolean | null
+          destaque_segmento: string | null
+          destaque_variacao: number | null
+          gerado_em: string
+          gerado_por: string | null
+          id: string
+          indice_startgi: number | null
+          mes_referencia: string
+          valor_total_brl: number | null
+          variacao_mom: number | null
+          variacao_yoy: number | null
+          volume_contratos: number | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "indice_startgi_historico"
           isOneToOne: false
           isSetofReturn: true
         }
