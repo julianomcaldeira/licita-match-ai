@@ -162,15 +162,13 @@ export default function IndiceStartGiCard({ data, variant = "feed" }: Props) {
         padding: `${PAD - 8}px ${PAD}px ${PAD}px`,
         position: "relative",
       }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 1 }}>
-          <div style={{
-            display: "flex", alignItems: "center", gap: 16,
-          }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 1, gap: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <img
               src={logoAsset.url}
               alt="StartGi"
               crossOrigin="anonymous"
-              style={{ height: isStory ? 44 : 38, width: "auto", objectFit: "contain", display: "block" }}
+              style={{ height: isStory ? 110 : 88, width: "auto", objectFit: "contain", display: "block" }}
             />
           </div>
           <div style={{ textAlign: "right" }}>
@@ -191,6 +189,7 @@ export default function IndiceStartGiCard({ data, variant = "feed" }: Props) {
             </div>
           </div>
         </div>
+
 
         {data.dados_parciais && (
           <div style={{
