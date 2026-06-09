@@ -157,8 +157,8 @@ export default function IndiceStartGiCard({ data, variant = "feed" }: Props) {
       <div style={{
         flex: 1,
         display: "grid",
-        gridTemplateRows: "auto auto 1fr auto",
-        gap: isStory ? 24 : 18,
+        gridTemplateRows: "auto auto minmax(0, 1fr) auto",
+        gap: isStory ? 24 : 14,
         padding: `${PAD - 8}px ${PAD}px ${PAD}px`,
         position: "relative",
       }}>
@@ -208,8 +208,8 @@ export default function IndiceStartGiCard({ data, variant = "feed" }: Props) {
         <div style={{
           zIndex: 1,
           display: "grid",
-          gridTemplateColumns: "1.18fr 0.82fr",
-          gap: 16,
+          gridTemplateColumns: "1.14fr 0.86fr",
+          gap: 14,
           alignItems: "stretch",
         }}>
           <div style={{
@@ -231,14 +231,14 @@ export default function IndiceStartGiCard({ data, variant = "feed" }: Props) {
             <div style={{
               fontFamily: "'Space Grotesk', sans-serif",
               fontWeight: 800,
-              fontSize: isStory ? 100 : 84,
+              fontSize: isStory ? 100 : 72,
               lineHeight: 0.95,
               color: GREEN,
               whiteSpace: "nowrap",
             }}>
               {formatBRL(data.valor_total_brl)}
             </div>
-            <div style={{ marginTop: 12, fontSize: 18, color: INK, fontWeight: 600, lineHeight: 1.35 }}>
+            <div style={{ marginTop: 10, fontSize: 16, color: INK, fontWeight: 600, lineHeight: 1.3 }}>
               {data.volume_contratos.toLocaleString("pt-BR")} contratos no mês · ticket médio de {formatBRL(data.ticket_medio ?? 0)}
             </div>
             <div style={{ marginTop: 10, fontSize: 13, color: INK_SOFT, lineHeight: 1.5 }}>
@@ -259,7 +259,7 @@ export default function IndiceStartGiCard({ data, variant = "feed" }: Props) {
               <div style={{
                 marginTop: 8,
                 fontFamily: "'Space Grotesk', sans-serif",
-                fontSize: isStory ? 78 : 64,
+                fontSize: isStory ? 78 : 56,
                 lineHeight: 0.95,
                 fontWeight: 800,
                 color: INK,
@@ -283,7 +283,7 @@ export default function IndiceStartGiCard({ data, variant = "feed" }: Props) {
           zIndex: 1,
           display: "grid",
           gridTemplateColumns: "1.02fr 0.98fr",
-          gap: 16,
+          gap: 14,
           alignItems: "stretch",
         }}>
           <div style={{ display: "grid", gap: 12, alignContent: "start" }}>
@@ -297,17 +297,17 @@ export default function IndiceStartGiCard({ data, variant = "feed" }: Props) {
               <div style={{ fontSize: 11, fontWeight: 800, color: GREEN_DARK, textTransform: "uppercase", letterSpacing: 3, marginBottom: 10 }}>
                 Análise assertiva do mês
               </div>
-              <div style={{ display: "grid", gap: 8 }}>
+              <div style={{ display: "grid", gap: 6 }}>
                 {analise.map((linha, index) => (
                   <div key={index} style={{ display: "grid", gridTemplateColumns: "10px 1fr", gap: 10, alignItems: "start" }}>
                     <span style={{ width: 8, height: 8, borderRadius: 999, background: GREEN, marginTop: 7 }} />
-                    <span style={{ fontSize: 15, lineHeight: 1.48, color: INK, fontWeight: 500 }}>{linha}</span>
+                    <span style={{ fontSize: 14, lineHeight: 1.42, color: INK, fontWeight: 500 }}>{linha}</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
               {[
                 {
                   l: "Órgãos compradores",
@@ -325,9 +325,9 @@ export default function IndiceStartGiCard({ data, variant = "feed" }: Props) {
                   s: data.top_modalidade_share != null ? `${formatNum(data.top_modalidade_share)}% do valor` : undefined,
                 },
               ].map((k) => (
-                <div key={k.l} style={{ padding: "14px 16px", borderRadius: 16, background: BG, border: `1px solid ${LINE}` }}>
+                <div key={k.l} style={{ padding: "12px 14px", borderRadius: 16, background: BG, border: `1px solid ${LINE}` }}>
                   <div style={{ fontSize: 10, color: MUTED, textTransform: "uppercase", letterSpacing: 2, fontWeight: 800 }}>{k.l}</div>
-                  <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 22, marginTop: 6, color: INK, lineHeight: 1.1 }}>
+                  <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 20, marginTop: 6, color: INK, lineHeight: 1.1 }}>
                     {k.v}
                   </div>
                   {k.s && <div style={{ fontSize: 11, color: INK_SOFT, marginTop: 4, fontWeight: 500, lineHeight: 1.35 }}>{k.s}</div>}
@@ -335,7 +335,7 @@ export default function IndiceStartGiCard({ data, variant = "feed" }: Props) {
               ))}
             </div>
 
-            <div style={{ padding: "18px 20px", borderRadius: 18, background: BG, border: `1px solid ${LINE}` }}>
+            <div style={{ padding: "16px 18px", borderRadius: 18, background: BG, border: `1px solid ${LINE}` }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline", marginBottom: 12 }}>
                 <div style={{ fontSize: 11, color: GREEN_DARK, textTransform: "uppercase", letterSpacing: 3, fontWeight: 800 }}>
                   Distribuição por esfera de governo
@@ -350,7 +350,7 @@ export default function IndiceStartGiCard({ data, variant = "feed" }: Props) {
                 <div style={{ width: `${mun}%`, background: "#86efac" }} />
                 <div style={{ width: `${out}%`, background: "#cbd5e1" }} />
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10, marginTop: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8, marginTop: 10 }}>
                 {esferaItems.map((item) => (
                   <div key={item.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 13, color: INK_SOFT, fontWeight: 600 }}>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
@@ -364,7 +364,7 @@ export default function IndiceStartGiCard({ data, variant = "feed" }: Props) {
             </div>
           </div>
 
-          <div style={{ display: "grid", gap: 10, alignContent: "start" }}>
+          <div style={{ display: "grid", gap: 8, alignContent: "start" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
               <div style={{ fontSize: 12, fontWeight: 800, color: GREEN_DARK, textTransform: "uppercase", letterSpacing: 3 }}>
                 Segmentos do mês
@@ -382,11 +382,11 @@ export default function IndiceStartGiCard({ data, variant = "feed" }: Props) {
                   <div
                     key={s.nome}
                     style={{
-                      padding: "14px 18px",
+                      padding: "12px 16px",
                       borderTop: i === 0 ? "none" : `1px solid ${LINE}`,
                       display: "grid",
                       gridTemplateColumns: "1.2fr 0.95fr auto",
-                      gap: 14,
+                      gap: 12,
                       alignItems: "center",
                       background: isOutros ? "#fcfcfd" : BG,
                     }}
@@ -398,7 +398,7 @@ export default function IndiceStartGiCard({ data, variant = "feed" }: Props) {
                       </div>
                     </div>
                     <div style={{ textAlign: "right" }}>
-                      <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 19, fontWeight: 700, color: INK, lineHeight: 1 }}>
+                      <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 17, fontWeight: 700, color: INK, lineHeight: 1 }}>
                         {formatBRL(s.valor_atual)}
                       </div>
                       <div style={{ fontSize: 11, color: MUTED, fontWeight: 700, marginTop: 4 }}>{formatNum(s.share_pct)}% do total</div>

@@ -183,11 +183,13 @@ export function buildPostText(d: IndiceData): string {
     return `• ${s.nome}: ${formatBRL(s.valor_atual)} — ${formatNum(s.share_pct)}% do total${v}`;
   }).join("\n");
 
+  const multiploBase = d.indice_startgi != null ? d.indice_startgi / 100 : null;
+
   return `📊 Índice StartGi de Compras Governamentais — ${mesLabel(d.mes_referencia)}
 
 ${buildAnaliseMes(d)}
 
-📈 Índice StartGi: ${formatNum(d.indice_startgi)} pts (${formatPct(d.variacao_mom)} vs mês anterior · ${formatPct(d.variacao_yoy)} vs ano anterior)
+📈 Índice StartGi: ${formatNum(d.indice_startgi)} pts${multiploBase != null ? `, equivalente a ${formatNum(multiploBase)}x a base jan/24 = 100` : ""} (${formatPct(d.variacao_mom)} vs mês anterior · ${formatPct(d.variacao_yoy)} vs ano anterior)
 
 🏷️ Segmentos do mês:
 ${segLinhas || "• Sem dados de segmento."}
