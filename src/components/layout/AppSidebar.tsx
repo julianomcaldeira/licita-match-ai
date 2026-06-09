@@ -14,17 +14,27 @@ import {
   ShieldAlert,
   ShieldCheck,
   Key,
+  TrendingUp,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 import logoImg from "@/assets/logo-ipesquisei.png";
 
-const navigation = [
+type NavItem = {
+  name: string;
+  href: string;
+  icon: typeof LayoutDashboard;
+  roles?: string[]; // se definido, restringe a esses roles
+};
+
+const navigation: NavItem[] = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Licitações", href: "/licitacoes", icon: Search },
   { name: "Empresas", href: "/empresas", icon: Building2 },
   { name: "Sancionadas", href: "/sancionadas", icon: ShieldAlert },
   { name: "Score Órgãos", href: "/score-orgaos", icon: ShieldCheck },
+  { name: "Índice StartGi", href: "/indice-startgi", icon: TrendingUp, roles: ["admin_central", "admin_empresa"] },
   { name: "Usuários", href: "/usuarios", icon: Users },
   { name: "Relatórios", href: "/relatorios", icon: FileText },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
@@ -41,6 +51,8 @@ interface AppSidebarProps {
 export default function AppSidebar({ mobileOpen = false, onMobileClose }: AppSidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
+  const { role } = useAuth();
+  const visibleNav = navigation.filter((i) => !i.roles || (role && i.roles.includes(role)));
 
   // Close mobile drawer on route change
   useEffect(() => {
@@ -98,7 +110,7 @@ export default function AppSidebar({ mobileOpen = false, onMobileClose }: AppSid
 
         {/* Nav */}
         <nav className="mt-4 flex-1 space-y-1 overflow-y-auto px-3">
-          {navigation.map((item) => {
+          {visibleNav.map((item) => {
             const isActive = location.pathname === item.href;
             return (
               <NavLink

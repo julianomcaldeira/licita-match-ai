@@ -18,6 +18,7 @@ import RelatoriosPage from "@/pages/RelatoriosPage";
 import SancionadasPage from "@/pages/SancionadasPage";
 import OrgaosScorePage from "@/pages/OrgaosScorePage";
 import ApiKeysPage from "@/pages/ApiKeysPage";
+import IndiceStartGiPage from "@/pages/IndiceStartGiPage";
 import NotFound from "@/pages/NotFound";
 import { Users, FileText, Settings } from "lucide-react";
 
@@ -48,6 +49,7 @@ const App = () => (
               <Route path="/relatorios" element={<RelatoriosPage />} />
               <Route path="/sancionadas" element={<SancionadasPage />} />
               <Route path="/score-orgaos" element={<OrgaosScorePage />} />
+              <Route path="/indice-startgi" element={<IndiceStartGiPage />} />
               <Route path="/api" element={<ApiKeysPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/monitor-ingestao" element={<IngestaoMonitorPage />} />
