@@ -412,6 +412,60 @@ export type Database = {
         }
         Relationships: []
       }
+      indice_startgi_mensal: {
+        Row: {
+          breakdown_esfera: Json
+          breakdown_modalidade: Json
+          breakdown_segmento: Json
+          created_at: string
+          dados_parciais: boolean
+          destaque_segmento: string | null
+          destaque_variacao: number | null
+          indice_startgi: number | null
+          mes_referencia: string
+          ultima_atualizacao: string
+          updated_at: string
+          valor_total_brl: number
+          variacao_mom: number | null
+          variacao_yoy: number | null
+          volume_contratos: number
+        }
+        Insert: {
+          breakdown_esfera?: Json
+          breakdown_modalidade?: Json
+          breakdown_segmento?: Json
+          created_at?: string
+          dados_parciais?: boolean
+          destaque_segmento?: string | null
+          destaque_variacao?: number | null
+          indice_startgi?: number | null
+          mes_referencia: string
+          ultima_atualizacao?: string
+          updated_at?: string
+          valor_total_brl?: number
+          variacao_mom?: number | null
+          variacao_yoy?: number | null
+          volume_contratos?: number
+        }
+        Update: {
+          breakdown_esfera?: Json
+          breakdown_modalidade?: Json
+          breakdown_segmento?: Json
+          created_at?: string
+          dados_parciais?: boolean
+          destaque_segmento?: string | null
+          destaque_variacao?: number | null
+          indice_startgi?: number | null
+          mes_referencia?: string
+          ultima_atualizacao?: string
+          updated_at?: string
+          valor_total_brl?: number
+          variacao_mom?: number | null
+          variacao_yoy?: number | null
+          volume_contratos?: number
+        }
+        Relationships: []
+      }
       ingestao_logs: {
         Row: {
           created_at: string
@@ -1072,6 +1126,32 @@ export type Database = {
         }[]
       }
       cleanup_ai_query_cache: { Args: never; Returns: number }
+      compute_indice_startgi: {
+        Args: { p_force?: boolean; p_mes: string }
+        Returns: {
+          breakdown_esfera: Json
+          breakdown_modalidade: Json
+          breakdown_segmento: Json
+          created_at: string
+          dados_parciais: boolean
+          destaque_segmento: string | null
+          destaque_variacao: number | null
+          indice_startgi: number | null
+          mes_referencia: string
+          ultima_atualizacao: string
+          updated_at: string
+          valor_total_brl: number
+          variacao_mom: number | null
+          variacao_yoy: number | null
+          volume_contratos: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "indice_startgi_mensal"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       contratos_por_dia: {
         Args: { p_days?: number }
         Returns: {
@@ -1204,6 +1284,32 @@ export type Database = {
               uf: string
             }[]
           }
+      list_indice_startgi: {
+        Args: { p_limit?: number }
+        Returns: {
+          breakdown_esfera: Json
+          breakdown_modalidade: Json
+          breakdown_segmento: Json
+          created_at: string
+          dados_parciais: boolean
+          destaque_segmento: string | null
+          destaque_variacao: number | null
+          indice_startgi: number | null
+          mes_referencia: string
+          ultima_atualizacao: string
+          updated_at: string
+          valor_total_brl: number
+          variacao_mom: number | null
+          variacao_yoy: number | null
+          volume_contratos: number
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "indice_startgi_mensal"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       list_orgaos:
         | {
             Args: {
