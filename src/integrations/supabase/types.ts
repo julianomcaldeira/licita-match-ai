@@ -429,6 +429,7 @@ export type Database = {
           maior_contrato_valor: number | null
           mes_referencia: string
           orgaos_unicos: number | null
+          segmentos_detalhe: Json | null
           ticket_medio: number | null
           top_fornecedor_nome: string | null
           top_fornecedor_valor: number | null
@@ -437,6 +438,7 @@ export type Database = {
           top_orgao_nome: string | null
           top_orgao_valor: number | null
           valor_total_brl: number | null
+          valor_total_brl_anterior: number | null
           variacao_mom: number | null
           variacao_yoy: number | null
           volume_contratos: number | null
@@ -457,6 +459,7 @@ export type Database = {
           maior_contrato_valor?: number | null
           mes_referencia: string
           orgaos_unicos?: number | null
+          segmentos_detalhe?: Json | null
           ticket_medio?: number | null
           top_fornecedor_nome?: string | null
           top_fornecedor_valor?: number | null
@@ -465,6 +468,7 @@ export type Database = {
           top_orgao_nome?: string | null
           top_orgao_valor?: number | null
           valor_total_brl?: number | null
+          valor_total_brl_anterior?: number | null
           variacao_mom?: number | null
           variacao_yoy?: number | null
           volume_contratos?: number | null
@@ -485,6 +489,7 @@ export type Database = {
           maior_contrato_valor?: number | null
           mes_referencia?: string
           orgaos_unicos?: number | null
+          segmentos_detalhe?: Json | null
           ticket_medio?: number | null
           top_fornecedor_nome?: string | null
           top_fornecedor_valor?: number | null
@@ -493,6 +498,7 @@ export type Database = {
           top_orgao_nome?: string | null
           top_orgao_valor?: number | null
           valor_total_brl?: number | null
+          valor_total_brl_anterior?: number | null
           variacao_mom?: number | null
           variacao_yoy?: number | null
           volume_contratos?: number | null
@@ -514,6 +520,7 @@ export type Database = {
           maior_contrato_valor: number | null
           mes_referencia: string
           orgaos_unicos: number | null
+          segmentos_detalhe: Json
           ticket_medio: number | null
           top_fornecedor_nome: string | null
           top_fornecedor_valor: number | null
@@ -524,6 +531,7 @@ export type Database = {
           ultima_atualizacao: string
           updated_at: string
           valor_total_brl: number
+          valor_total_brl_anterior: number | null
           variacao_mom: number | null
           variacao_yoy: number | null
           volume_contratos: number
@@ -542,6 +550,7 @@ export type Database = {
           maior_contrato_valor?: number | null
           mes_referencia: string
           orgaos_unicos?: number | null
+          segmentos_detalhe?: Json
           ticket_medio?: number | null
           top_fornecedor_nome?: string | null
           top_fornecedor_valor?: number | null
@@ -552,6 +561,7 @@ export type Database = {
           ultima_atualizacao?: string
           updated_at?: string
           valor_total_brl?: number
+          valor_total_brl_anterior?: number | null
           variacao_mom?: number | null
           variacao_yoy?: number | null
           volume_contratos?: number
@@ -570,6 +580,7 @@ export type Database = {
           maior_contrato_valor?: number | null
           mes_referencia?: string
           orgaos_unicos?: number | null
+          segmentos_detalhe?: Json
           ticket_medio?: number | null
           top_fornecedor_nome?: string | null
           top_fornecedor_valor?: number | null
@@ -580,6 +591,7 @@ export type Database = {
           ultima_atualizacao?: string
           updated_at?: string
           valor_total_brl?: number
+          valor_total_brl_anterior?: number | null
           variacao_mom?: number | null
           variacao_yoy?: number | null
           volume_contratos?: number
@@ -1262,6 +1274,7 @@ export type Database = {
           maior_contrato_valor: number | null
           mes_referencia: string
           orgaos_unicos: number | null
+          segmentos_detalhe: Json
           ticket_medio: number | null
           top_fornecedor_nome: string | null
           top_fornecedor_valor: number | null
@@ -1272,6 +1285,7 @@ export type Database = {
           ultima_atualizacao: string
           updated_at: string
           valor_total_brl: number
+          valor_total_brl_anterior: number | null
           variacao_mom: number | null
           variacao_yoy: number | null
           volume_contratos: number
@@ -1431,6 +1445,7 @@ export type Database = {
           maior_contrato_valor: number | null
           mes_referencia: string
           orgaos_unicos: number | null
+          segmentos_detalhe: Json
           ticket_medio: number | null
           top_fornecedor_nome: string | null
           top_fornecedor_valor: number | null
@@ -1441,6 +1456,7 @@ export type Database = {
           ultima_atualizacao: string
           updated_at: string
           valor_total_brl: number
+          valor_total_brl_anterior: number | null
           variacao_mom: number | null
           variacao_yoy: number | null
           volume_contratos: number
@@ -1470,6 +1486,7 @@ export type Database = {
           maior_contrato_valor: number | null
           mes_referencia: string
           orgaos_unicos: number | null
+          segmentos_detalhe: Json | null
           ticket_medio: number | null
           top_fornecedor_nome: string | null
           top_fornecedor_valor: number | null
@@ -1478,6 +1495,7 @@ export type Database = {
           top_orgao_nome: string | null
           top_orgao_valor: number | null
           valor_total_brl: number | null
+          valor_total_brl_anterior: number | null
           variacao_mom: number | null
           variacao_yoy: number | null
           volume_contratos: number | null
