@@ -1,13 +1,23 @@
+export type SegmentoDetalhe = {
+  nome: string;
+  valor_atual: number;
+  valor_anterior: number;
+  var_pct: number | null;
+  share_pct: number;
+};
+
 export type IndiceData = {
   mes_referencia: string; // YYYY-MM
   indice_startgi: number | null;
   valor_total_brl: number;
+  valor_total_brl_anterior?: number | null;
   volume_contratos: number;
   variacao_mom: number | null;
   variacao_yoy: number | null;
   breakdown_modalidade: Record<string, number>;
   breakdown_esfera: Record<string, number>;
   breakdown_segmento: Record<string, number>;
+  segmentos_detalhe?: SegmentoDetalhe[];
   destaque_segmento: string | null;
   destaque_variacao: number | null;
   dados_parciais: boolean;
@@ -24,6 +34,51 @@ export type IndiceData = {
   orgaos_unicos?: number | null;
   fornecedores_unicos?: number | null;
 };
+
+/** Análise textual assertiva do mês selecionado, gerada apenas com dados reais do PNCP. */
+export function buildAnaliseMes(d: IndiceData): string {
+  const mes = mesLabel(d.mes_referencia).split(" ")[0];
+  const partes: string[] = [];
+
+  const valor = Number(d.valor_total_brl || 0);
+  const valorAnt = Number(d.valor_total_brl_anterior || 0);
+  const deltaPct =
+    valorAnt > 0 ? ((valor - valorAnt) / valorAnt) * 100 : null;
+
+  if (deltaPct != null) {
+    const verbo = deltaPct >= 0 ? "expandiu" : "recuou";
+    partes.push(
+      `Em ${mes} o mercado público ${verbo} ${formatPct(Math.abs(deltaPct))} em valor contratado vs. mês anterior, totalizando ${formatBRL(valor)} em ${d.volume_contratos.toLocaleString("pt-BR")} contratos.`
+    );
+  } else {
+    partes.push(
+      `Em ${mes} o mercado público movimentou ${formatBRL(valor)} em ${d.volume_contratos.toLocaleString("pt-BR")} contratos.`
+    );
+  }
+
+  const segs = (d.segmentos_detalhe ?? []).filter((s) => s.nome !== "Outros");
+  if (segs.length) {
+    const lider = [...segs].sort((a, b) => b.valor_atual - a.valor_atual)[0];
+    partes.push(
+      `${lider.nome} liderou com ${formatBRL(lider.valor_atual)} (${formatNum(lider.share_pct)}% do total)${
+        lider.var_pct != null ? `, ${lider.var_pct >= 0 ? "alta" : "queda"} de ${formatPct(Math.abs(lider.var_pct))} sobre o mês anterior` : ""
+      }.`
+    );
+    const comVar = segs.filter((s) => s.var_pct != null);
+    if (comVar.length) {
+      const maiorAlta = [...comVar].sort((a, b) => (b.var_pct! - a.var_pct!))[0];
+      const maiorQueda = [...comVar].sort((a, b) => (a.var_pct! - b.var_pct!))[0];
+      if (maiorAlta && maiorAlta.var_pct! > 0 && maiorAlta.nome !== lider.nome) {
+        partes.push(`Maior aceleração: ${maiorAlta.nome} (${formatPct(maiorAlta.var_pct)}).`);
+      }
+      if (maiorQueda && maiorQueda.var_pct! < 0) {
+        partes.push(`Maior retração: ${maiorQueda.nome} (${formatPct(maiorQueda.var_pct)}).`);
+      }
+    }
+  }
+  return partes.join(" ");
+}
+
 
 const MESES_PT = [
   "Janeiro","Fevereiro","Março","Abril","Maio","Junho",
