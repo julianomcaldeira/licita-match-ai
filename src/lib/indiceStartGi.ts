@@ -35,48 +35,57 @@ export type IndiceData = {
   fornecedores_unicos?: number | null;
 };
 
-/** Análise textual assertiva do mês selecionado, gerada apenas com dados reais do PNCP. */
-export function buildAnaliseMes(d: IndiceData): string {
-  const mes = mesLabel(d.mes_referencia).split(" ")[0];
-  const partes: string[] = [];
+function mesAnteriorCurto(yyyymm: string): string {
+  const [y, m] = yyyymm.split("-").map(Number);
+  const d = new Date(y, m - 2, 1);
+  return `${MESES_ABREV[d.getMonth()].toLowerCase()}/${String(d.getFullYear()).slice(2)}`;
+}
 
+export function buildAnaliseHighlights(d: IndiceData): string[] {
   const valor = Number(d.valor_total_brl || 0);
   const valorAnt = Number(d.valor_total_brl_anterior || 0);
-  const deltaPct =
-    valorAnt > 0 ? ((valor - valorAnt) / valorAnt) * 100 : null;
+  const deltaPct = valorAnt > 0 ? ((valor - valorAnt) / valorAnt) * 100 : null;
+  const segs = (d.segmentos_detalhe ?? [])
+    .filter((s) => s.valor_atual > 0)
+    .sort((a, b) => b.valor_atual - a.valor_atual);
+  const outros = segs.find((s) => s.nome === "Outros");
+  const nomeados = segs.filter((s) => s.nome !== "Outros");
+  const lider = nomeados[0];
+  const vice = nomeados[1];
+
+  const linhas: string[] = [];
+  linhas.push(
+    `${mesLabel(d.mes_referencia)} fechou em ${formatBRL(valor)} e ${d.volume_contratos.toLocaleString("pt-BR")} contratos, com ticket médio de ${formatBRL(d.ticket_medio ?? 0)}.`
+  );
 
   if (deltaPct != null) {
-    const verbo = deltaPct >= 0 ? "expandiu" : "recuou";
-    partes.push(
-      `Em ${mes} o mercado público ${verbo} ${formatPct(Math.abs(deltaPct))} em valor contratado vs. mês anterior, totalizando ${formatBRL(valor)} em ${d.volume_contratos.toLocaleString("pt-BR")} contratos.`
-    );
-  } else {
-    partes.push(
-      `Em ${mes} o mercado público movimentou ${formatBRL(valor)} em ${d.volume_contratos.toLocaleString("pt-BR")} contratos.`
+    linhas.push(
+      `Vs ${mesAnteriorCurto(d.mes_referencia)}, o volume ${deltaPct >= 0 ? "avançou" : "recuou"} ${formatPct(Math.abs(deltaPct))}.`
     );
   }
 
-  const segs = (d.segmentos_detalhe ?? []).filter((s) => s.nome !== "Outros");
-  if (segs.length) {
-    const lider = [...segs].sort((a, b) => b.valor_atual - a.valor_atual)[0];
-    partes.push(
-      `${lider.nome} liderou com ${formatBRL(lider.valor_atual)} (${formatNum(lider.share_pct)}% do total)${
-        lider.var_pct != null ? `, ${lider.var_pct >= 0 ? "alta" : "queda"} de ${formatPct(Math.abs(lider.var_pct))} sobre o mês anterior` : ""
-      }.`
-    );
-    const comVar = segs.filter((s) => s.var_pct != null);
-    if (comVar.length) {
-      const maiorAlta = [...comVar].sort((a, b) => (b.var_pct! - a.var_pct!))[0];
-      const maiorQueda = [...comVar].sort((a, b) => (a.var_pct! - b.var_pct!))[0];
-      if (maiorAlta && maiorAlta.var_pct! > 0 && maiorAlta.nome !== lider.nome) {
-        partes.push(`Maior aceleração: ${maiorAlta.nome} (${formatPct(maiorAlta.var_pct)}).`);
-      }
-      if (maiorQueda && maiorQueda.var_pct! < 0) {
-        partes.push(`Maior retração: ${maiorQueda.nome} (${formatPct(maiorQueda.var_pct)}).`);
-      }
+  if (lider && vice) {
+    if ((outros?.share_pct ?? 0) >= 45) {
+      linhas.push(
+        `A rubrica Outros concentrou ${formatNum(outros?.share_pct)}% do volume; entre os segmentos nomeados, ${lider.nome} liderou com ${formatBRL(lider.valor_atual)} e ${vice.nome} veio na sequência com ${formatBRL(vice.valor_atual)}.`
+      );
+    } else {
+      linhas.push(
+        `${lider.nome} liderou o recorte setorial com ${formatBRL(lider.valor_atual)} (${formatNum(lider.share_pct)}% do total), seguido por ${vice.nome} com ${formatBRL(vice.valor_atual)}.`
+      );
     }
+  } else if (lider) {
+    linhas.push(`${lider.nome} foi o principal segmento do mês, com ${formatBRL(lider.valor_atual)}.`);
+  } else if (outros) {
+    linhas.push(`A classificação setorial disponível concentrou ${formatBRL(outros.valor_atual)} em Outros (${formatNum(outros.share_pct)}% do total).`);
   }
-  return partes.join(" ");
+
+  return linhas.slice(0, 3);
+}
+
+/** Análise textual assertiva do mês selecionado, gerada apenas com dados reais do PNCP. */
+export function buildAnaliseMes(d: IndiceData): string {
+  return buildAnaliseHighlights(d).join(" ");
 }
 
 
