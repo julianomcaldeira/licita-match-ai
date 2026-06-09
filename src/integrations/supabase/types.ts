@@ -149,6 +149,7 @@ export type Database = {
           cnpj_orgao: string
           created_at: string
           data_assinatura: string | null
+          data_efetiva: string | null
           data_publicacao: string | null
           data_vigencia_fim: string | null
           data_vigencia_inicio: string | null
@@ -174,6 +175,7 @@ export type Database = {
           cnpj_orgao: string
           created_at?: string
           data_assinatura?: string | null
+          data_efetiva?: string | null
           data_publicacao?: string | null
           data_vigencia_fim?: string | null
           data_vigencia_inicio?: string | null
@@ -199,6 +201,7 @@ export type Database = {
           cnpj_orgao?: string
           created_at?: string
           data_assinatura?: string | null
+          data_efetiva?: string | null
           data_publicacao?: string | null
           data_vigencia_fim?: string | null
           data_vigencia_inicio?: string | null
