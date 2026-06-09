@@ -51,6 +51,8 @@ interface AppSidebarProps {
 export default function AppSidebar({ mobileOpen = false, onMobileClose }: AppSidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
+  const { role } = useAuth();
+  const visibleNav = navigation.filter((i) => !i.roles || (role && i.roles.includes(role)));
 
   // Close mobile drawer on route change
   useEffect(() => {
