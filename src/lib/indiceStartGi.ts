@@ -165,21 +165,27 @@ export function buildPostText(d: IndiceData): string {
   const fed = Math.round(esfera.federal || 0);
   const est = Math.round(esfera.estadual || 0);
   const mun = Math.round(esfera.municipal || 0);
-  const destaque = d.destaque_segmento
-    ? `${d.destaque_segmento} com ${formatPct(d.destaque_variacao ?? 0)} de crescimento`
-    : "—";
+  const segs = (d.segmentos_detalhe ?? [])
+    .filter((s) => s.valor_atual > 0)
+    .sort((a, b) => b.valor_atual - a.valor_atual)
+    .slice(0, 5);
+  const segLinhas = segs.map((s) => {
+    const v = s.var_pct != null ? ` (${formatPct(s.var_pct)} vs mês anterior)` : "";
+    return `• ${s.nome}: ${formatBRL(s.valor_atual)} — ${formatNum(s.share_pct)}% do total${v}`;
+  }).join("\n");
+
   return `📊 Índice StartGi de Compras Governamentais — ${mesLabel(d.mes_referencia)}
 
-O governo brasileiro contratou ${formatBRL(d.valor_total_brl)} em ${mesLabel(d.mes_referencia).split(" ")[0]}, movimentando ${d.volume_contratos.toLocaleString("pt-BR")} contratos.
+${buildAnaliseMes(d)}
 
-📈 Índice StartGi: ${formatNum(d.indice_startgi)} pontos (${formatPct(d.variacao_mom)} vs mês anterior)
-📅 Variação anual: ${formatPct(d.variacao_yoy)} vs mesmo mês do ano anterior
+📈 Índice StartGi: ${formatNum(d.indice_startgi)} pts (${formatPct(d.variacao_mom)} vs mês anterior · ${formatPct(d.variacao_yoy)} vs ano anterior)
 
-🏆 Destaque: ${destaque}
+🏷️ Segmentos do mês:
+${segLinhas || "• Sem dados de segmento."}
 
-🏛️ Distribuição: ${fed}% Federal | ${est}% Estadual | ${mun}% Municipal
+🏛️ Esferas: ${fed}% Federal · ${est}% Estadual · ${mun}% Municipal
 
-Dados consolidados pelo iPesquisei com base no Portal Nacional de Contratações Públicas (PNCP).
+Dados consolidados pelo iPesquisei com base no PNCP.
 
 #ÍndiceStartGi #ComprasGovernamentais #LicitaçõesBrasil #GovTech #StartGi`;
 }
