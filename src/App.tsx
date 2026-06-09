@@ -18,6 +18,7 @@ import RelatoriosPage from "@/pages/RelatoriosPage";
 import SancionadasPage from "@/pages/SancionadasPage";
 import OrgaosScorePage from "@/pages/OrgaosScorePage";
 import ApiKeysPage from "@/pages/ApiKeysPage";
+import IndiceStartGiPage from "@/pages/IndiceStartGiPage";
 import NotFound from "@/pages/NotFound";
 import { Users, FileText, Settings } from "lucide-react";
 
