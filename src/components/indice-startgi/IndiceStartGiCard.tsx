@@ -420,8 +420,9 @@ export default function IndiceStartGiCard({ data, variant = "feed" }: Props) {
           display: "flex", justifyContent: "space-between", alignItems: "center",
           fontSize: 13, color: INK_SOFT, fontWeight: 600,
         }}>
-          <span>Fonte: PNCP · processado por <span style={{ color: GREEN_DARK, fontWeight: 800 }}>StartGi</span></span>
+          <span>Análise produzida pela <span style={{ color: GREEN_DARK, fontWeight: 800 }}>StartGi</span> · Fontes oficiais do governo brasileiro</span>
           <span style={{ color: GREEN_DARK, fontWeight: 800, letterSpacing: 0.5 }}>#ÍndiceStartGi</span>
+
         </div>
       </div>
     </div>
