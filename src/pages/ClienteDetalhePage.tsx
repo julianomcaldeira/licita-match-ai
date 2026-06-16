@@ -162,6 +162,7 @@ export default function ClienteDetalhePage() {
       <Tabs value={tab} onValueChange={(v) => { setTab(v as any); setPage(0); }}>
         <TabsList>
           <TabsTrigger value="vitorias" className="gap-2"><Trophy className="h-4 w-4" /> Licitações</TabsTrigger>
+          <TabsTrigger value="mercado" className="gap-2"><Target className="h-4 w-4" /> Mercado</TabsTrigger>
           <TabsTrigger value="contratos" className="gap-2"><FileText className="h-4 w-4" /> Contratos</TabsTrigger>
         </TabsList>
 
@@ -175,18 +176,26 @@ export default function ClienteDetalhePage() {
               className="h-10 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
-          {isLicit ? (
+          {tab === "vitorias" && (
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={onlyVencidas} onChange={(e) => { setOnlyVencidas(e.target.checked); setPage(0); }} />
               Apenas vencidas pelo cliente
             </label>
-          ) : (
+          )}
+          {tab === "contratos" && (
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={onlyProprios} onChange={(e) => { setOnlyProprios(e.target.checked); setPage(0); }} />
               Apenas contratos do cliente
             </label>
           )}
+          {tab === "mercado" && (
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={onlyHomologadas} onChange={(e) => { setOnlyHomologadas(e.target.checked); setPage(0); }} />
+              Apenas homologadas (com vencedor)
+            </label>
+          )}
         </div>
+
 
         <TabsContent value="vitorias" className="mt-4">
           {isLoading ? (
