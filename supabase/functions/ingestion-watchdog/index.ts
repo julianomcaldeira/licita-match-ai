@@ -16,7 +16,7 @@ const PHASE_LABELS = {
   winners: "Buscando vencedores das homologadas",
   contratos: "Ingerindo contratos do Portal da Transparência",
   sancionados: "Atualizando empresas sancionadas (CEIS/CNEP)",
-  auto_analysis: "Executando auto-análise IA",
+  
 } as const;
 
 type Phase = keyof typeof PHASE_LABELS;
