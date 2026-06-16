@@ -10,6 +10,7 @@ import AuthPage from "@/pages/AuthPage";
 import Dashboard from "@/pages/Dashboard";
 import LicitacoesPage from "@/pages/LicitacoesPage";
 import EmpresasPage from "@/pages/EmpresasPage";
+import ClienteDetalhePage from "@/pages/ClienteDetalhePage";
 import IngestaoMonitorPage from "@/pages/IngestaoMonitorPage";
 import AnalyticsPage from "@/pages/AnalyticsPage";
 import PlaceholderPage from "@/components/PlaceholderPage";
@@ -45,6 +46,7 @@ const App = () => (
               <Route path="/" element={<Dashboard />} />
               <Route path="/licitacoes" element={<LicitacoesPage />} />
               <Route path="/empresas" element={<EmpresasPage />} />
+              <Route path="/empresas/:id" element={<ClienteDetalhePage />} />
               <Route path="/usuarios" element={<UsuariosPage />} />
               <Route path="/relatorios" element={<RelatoriosPage />} />
               <Route path="/sancionadas" element={<SancionadasPage />} />
