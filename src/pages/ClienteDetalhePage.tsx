@@ -294,6 +294,65 @@ export default function ClienteDetalhePage() {
           )}
         </TabsContent>
 
+        <TabsContent value="mercado" className="mt-4">
+          {isLoading ? (
+            <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+          ) : !rows?.length ? (
+            <div className="rounded-xl border border-border bg-card p-12 text-center text-sm text-muted-foreground">
+              Nenhuma oportunidade de mercado encontrada.
+              <p className="mt-2 text-xs">Esta aba mostra licitações aderentes às palavras-chave do cliente que foram vencidas por concorrentes.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-border bg-card">
+              <table className="w-full text-sm">
+                <thead className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2">Objeto</th>
+                    <th className="px-3 py-2">Órgão</th>
+                    <th className="px-3 py-2">UF</th>
+                    <th className="px-3 py-2 text-right">Valor estimado</th>
+                    <th className="px-3 py-2 text-right">Valor homologado</th>
+                    <th className="px-3 py-2">Vencedor</th>
+                    <th className="px-3 py-2">Publicação</th>
+                    <th className="px-3 py-2">Situação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r: any) => (
+                    <tr
+                      key={r.id}
+                      onClick={() => setDetailId(r.id)}
+                      className="border-b border-border hover:bg-muted/40 cursor-pointer transition"
+                      title="Ver detalhes"
+                    >
+                      <td className="px-3 py-2 max-w-md"><div className="line-clamp-2">{r.objeto}</div></td>
+                      <td className="px-3 py-2 max-w-xs"><div className="line-clamp-1 text-muted-foreground">{r.orgao}</div></td>
+                      <td className="px-3 py-2">{r.uf ?? "—"}</td>
+                      <td className="px-3 py-2 text-right">{fmtMoney(r.valor_estimado)}</td>
+                      <td className="px-3 py-2 text-right font-semibold text-emerald-600">{fmtMoney(r.valor_homologado)}</td>
+                      <td className="px-3 py-2 max-w-xs">
+                        {r.vencedor_nome ? (
+                          <div>
+                            <div className="line-clamp-1 text-xs font-medium">{r.vencedor_nome}</div>
+                            <div className="text-[10px] text-muted-foreground font-mono">{r.vencedor_cnpj ?? "—"}</div>
+                            {r.total_vencedores > 1 && (
+                              <div className="text-[10px] text-muted-foreground">+{r.total_vencedores - 1} outro(s)</div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">{fmtDate(r.data_publicacao)}</td>
+                      <td className="px-3 py-2"><span className="inline-block rounded-full bg-muted px-2 py-0.5 text-[10px]">{r.situacao ?? "—"}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </TabsContent>
+
         {total > PAGE_SIZE && (
           <div className="mt-4 flex items-center justify-between text-sm">
             <span className="text-muted-foreground">{total.toLocaleString("pt-BR")} resultado(s) — página {page + 1} de {totalPages}</span>
