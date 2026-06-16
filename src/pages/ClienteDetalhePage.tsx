@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ArrowLeft, Trophy, FileText, Loader2, Search, Building2 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import LicitacaoDetailDialog from "@/components/LicitacaoDetailDialog";
 
 const PAGE_SIZE = 50;
 
@@ -36,6 +37,7 @@ export default function ClienteDetalhePage() {
   const [onlyVencidas, setOnlyVencidas] = useState(true);
   const [onlyProprios, setOnlyProprios] = useState(true);
   const [page, setPage] = useState(0);
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   const { data: empresa } = useQuery({
     queryKey: ["empresa", empresaId],
@@ -185,7 +187,12 @@ export default function ClienteDetalhePage() {
                 </thead>
                 <tbody>
                   {rows.map((r: any) => (
-                    <tr key={r.id} className="border-b border-border hover:bg-muted/30">
+                    <tr
+                      key={r.id}
+                      onClick={() => setDetailId(r.id)}
+                      className="border-b border-border hover:bg-muted/40 cursor-pointer transition"
+                      title="Ver detalhes"
+                    >
                       <td className="px-3 py-2 max-w-md"><div className="line-clamp-2">{r.objeto}</div></td>
                       <td className="px-3 py-2 max-w-xs"><div className="line-clamp-1 text-muted-foreground">{r.orgao}</div></td>
                       <td className="px-3 py-2">{r.uf ?? "—"}</td>
@@ -250,6 +257,12 @@ export default function ClienteDetalhePage() {
           </div>
         )}
       </Tabs>
+
+      <LicitacaoDetailDialog
+        licitacaoId={detailId}
+        open={!!detailId}
+        onOpenChange={(o) => { if (!o) setDetailId(null); }}
+      />
     </div>
   );
 }
