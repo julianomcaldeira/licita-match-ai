@@ -187,7 +187,12 @@ export default function ClienteDetalhePage() {
                 </thead>
                 <tbody>
                   {rows.map((r: any) => (
-                    <tr key={r.id} className="border-b border-border hover:bg-muted/30">
+                    <tr
+                      key={r.id}
+                      onClick={() => setDetailId(r.id)}
+                      className="border-b border-border hover:bg-muted/40 cursor-pointer transition"
+                      title="Ver detalhes"
+                    >
                       <td className="px-3 py-2 max-w-md"><div className="line-clamp-2">{r.objeto}</div></td>
                       <td className="px-3 py-2 max-w-xs"><div className="line-clamp-1 text-muted-foreground">{r.orgao}</div></td>
                       <td className="px-3 py-2">{r.uf ?? "—"}</td>
