@@ -37,6 +37,7 @@ export default function ClienteDetalhePage() {
   const [onlyVencidas, setOnlyVencidas] = useState(true);
   const [onlyProprios, setOnlyProprios] = useState(true);
   const [page, setPage] = useState(0);
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   const { data: empresa } = useQuery({
     queryKey: ["empresa", empresaId],
