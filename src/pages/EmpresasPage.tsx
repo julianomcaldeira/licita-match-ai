@@ -297,9 +297,3 @@ export default function EmpresasPage() {
     </div>
   );
 }
-          ))}
-        </motion.div>
-      )}
-    </div>
-  );
-}
