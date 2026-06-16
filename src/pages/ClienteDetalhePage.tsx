@@ -95,9 +95,31 @@ export default function ClienteDetalhePage() {
     enabled: !!empresaId && tab === "contratos",
   });
 
-  const isLicit = tab === "vitorias";
-  const rows = isLicit ? licitacoesQuery.data : contratosQuery.data;
-  const isLoading = isLicit ? licitacoesQuery.isLoading : contratosQuery.isLoading;
+  const [onlyHomologadas, setOnlyHomologadas] = useState(false);
+  const mercadoQuery = useQuery({
+    queryKey: ["cliente_mercado", empresaId, search, onlyHomologadas, page],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("list_cliente_mercado", {
+        p_empresa_id: empresaId!,
+        p_search: search || null,
+        p_only_homologadas: onlyHomologadas,
+        p_limit: PAGE_SIZE,
+        p_offset: page * PAGE_SIZE,
+      });
+      if (error) throw error;
+      return data as any[];
+    },
+    enabled: !!empresaId && tab === "mercado",
+  });
+
+  const rows =
+    tab === "vitorias" ? licitacoesQuery.data :
+    tab === "contratos" ? contratosQuery.data :
+    mercadoQuery.data;
+  const isLoading =
+    tab === "vitorias" ? licitacoesQuery.isLoading :
+    tab === "contratos" ? contratosQuery.isLoading :
+    mercadoQuery.isLoading;
   const total = rows?.[0]?.total_count ? Number(rows[0].total_count) : 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
