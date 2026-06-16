@@ -22,8 +22,15 @@ async function sha256Hex(input: string): Promise<string> {
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-// Validate API key and return supabase service client
-async function authenticate(req: Request) {
+type AuthOk = {
+  supabase: ReturnType<typeof createClient>;
+  apiKeyId: string;
+  clientName: string;
+  empresaClienteId: string | null;
+  empresaNome: string | null;
+};
+
+async function authenticate(req: Request): Promise<{ error: Response } | AuthOk> {
   const apiKey =
     req.headers.get("x-api-key") ||
     req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
@@ -38,24 +45,21 @@ async function authenticate(req: Request) {
   );
 
   const apiKeyHash = await sha256Hex(apiKey);
+  const { data, error: e } = await supabase.rpc("api_key_resolve_cliente", { p_hash: apiKeyHash });
+  if (e || !data || data.length === 0) return { error: err("Invalid API key.", 401) };
 
-  const { data: keyRecord, error: keyErr } = await supabase
-    .from("api_keys")
-    .select("id, client_name, is_active")
-    .eq("api_key_hash", apiKeyHash)
-    .maybeSingle();
+  const rec = data[0] as { api_key_id: string; client_name: string; is_active: boolean; empresa_cliente_id: string | null; empresa_nome: string | null };
+  if (!rec.is_active) return { error: err("API key is deactivated.", 403) };
 
-  if (keyErr || !keyRecord) {
-    return { error: err("Invalid API key.", 401) };
-  }
-  if (!keyRecord.is_active) {
-    return { error: err("API key is deactivated.", 403) };
-  }
+  supabase.from("api_keys").update({ last_used_at: new Date().toISOString() }).eq("id", rec.api_key_id).then();
 
-  // Update last_used_at (fire-and-forget)
-  supabase.from("api_keys").update({ last_used_at: new Date().toISOString() }).eq("id", keyRecord.id).then();
-
-  return { supabase, client: keyRecord };
+  return {
+    supabase,
+    apiKeyId: rec.api_key_id,
+    clientName: rec.client_name,
+    empresaClienteId: rec.empresa_cliente_id,
+    empresaNome: rec.empresa_nome,
+  };
 }
 
 function parseParams(url: URL) {
@@ -66,72 +70,146 @@ function parseParams(url: URL) {
   return { limit, offset, search, uf };
 }
 
+function scopeMeta(auth: AuthOk) {
+  return auth.empresaClienteId
+    ? { cliente_id: auth.empresaClienteId, cliente_nome: auth.empresaNome }
+    : null;
+}
+
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
-  if (req.method !== "GET") {
-    return err("Only GET requests are supported.", 405);
-  }
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method !== "GET") return err("Only GET requests are supported.", 405);
 
   const url = new URL(req.url);
   const path = url.pathname.replace(/^\/public-api\/?/, "").replace(/\/$/, "");
 
-  // Root: API docs
   if (!path || path === "") {
     return json({
       name: "i-pesquisei Public API",
-      version: "1.0",
+      version: "1.1",
       endpoints: {
-        "/licitacoes": "Search biddings with filters (search, uf, modalidade, date_from, date_to, com_vencedor, limit, offset)",
-        "/licitacoes/:id": "Get bidding details with items and winners",
-        "/orgaos": "List public agencies (search, uf, order_by, limit, offset)",
-        "/empresas-vencedoras": "List winning companies (search, uf, order_by, limit, offset)",
-        "/sancionadas": "Search sanctioned companies - CEIS/CNEP (search, uf, tipo_cadastro, vigente, limit, offset)",
-        "/contratos": "Search contracts (search, uf, fornecedor_cnpj, limit, offset)",
-        "/check-sancionada/:cnpj": "Quick check if a CNPJ is sanctioned",
+        "/me": "Dados do cliente vinculado à api_key",
+        "/me/resumo": "KPIs consolidados do recorte do cliente",
+        "/me/vitorias": "Licitações vencidas e contratos firmados (somente por CNPJ)",
+        "/licitacoes": "Licitações (recorte do cliente quando a chave for vinculada)",
+        "/licitacoes/:id": "Detalhe de licitação",
+        "/contratos": "Contratos (recorte do cliente quando a chave for vinculada)",
+        "/orgaos": "Órgãos públicos (global)",
+        "/empresas-vencedoras": "Empresas vencedoras (global)",
+        "/sancionadas": "Empresas sancionadas (global)",
+        "/check-sancionada/:cnpj": "Checagem rápida de CNPJ sancionado",
       },
-      auth: "Send API key via x-api-key header or Authorization: Bearer <key>",
-      limits: "Max 500 records per request",
+      auth: "x-api-key header ou Authorization: Bearer <key>",
+      scope_note: "Chaves vinculadas a um cliente entregam apenas o recorte daquele cliente em /licitacoes, /contratos e /me/*",
     });
   }
 
   const auth = await authenticate(req);
-  if (auth.error) return auth.error;
-  const { supabase } = auth;
+  if ("error" in auth) return auth.error;
+  const { supabase, empresaClienteId } = auth;
+  const scope = scopeMeta(auth);
 
   try {
-    // ---- LICITAÇÕES ----
+    // ---------- /me ----------
+    if (path === "me") {
+      if (!empresaClienteId) return json({ data: null, meta: { scope: null, note: "API key global (sem cliente vinculado)" } });
+      const { data: emp } = await supabase
+        .from("empresas_clientes")
+        .select("id, nome, cnpj, segmentos, palavras_chave, descricao_atividade")
+        .eq("id", empresaClienteId)
+        .maybeSingle();
+      const { data: cnpjs } = await supabase
+        .from("cliente_cnpjs")
+        .select("cnpj, rotulo")
+        .eq("empresa_id", empresaClienteId);
+      return json({ data: { ...emp, cnpjs: cnpjs || [] }, meta: { scope } });
+    }
+
+    if (path === "me/resumo") {
+      if (!empresaClienteId) return err("Esta API key não está vinculada a um cliente.", 400);
+      const { data, error: e } = await supabase.rpc("cliente_resumo", { p_empresa_id: empresaClienteId });
+      if (e) throw e;
+      return json({ data, meta: { scope } });
+    }
+
+    if (path === "me/vitorias") {
+      if (!empresaClienteId) return err("Esta API key não está vinculada a um cliente.", 400);
+      const { limit, offset } = parseParams(url);
+      const { data, error: e } = await supabase
+        .from("cliente_vinculos")
+        .select("tipo, referencia_id, licitacao_id, cnpj_match, data_evento, valor", { count: "exact" })
+        .eq("empresa_id", empresaClienteId)
+        .order("data_evento", { ascending: false, nullsFirst: false })
+        .range(offset, offset + limit - 1);
+      if (e) throw e;
+      return json({ data, meta: { scope, limit, offset } });
+    }
+
+    // ---------- LICITAÇÕES ----------
     if (path === "licitacoes") {
       const { limit, offset, search, uf } = parseParams(url);
       const modalidade = url.searchParams.get("modalidade") || null;
       const dateFrom = url.searchParams.get("date_from") || null;
       const dateTo = url.searchParams.get("date_to") || null;
-      const comVencedor = url.searchParams.get("com_vencedor") === "true";
+      const onlyVencidas = url.searchParams.get("only_vencidas") === "true";
 
+      if (empresaClienteId) {
+        const { data, error: e } = await supabase.rpc("list_cliente_licitacoes", {
+          p_empresa_id: empresaClienteId,
+          p_search: search, p_uf: uf, p_modalidade: modalidade,
+          p_date_from: dateFrom, p_date_to: dateTo,
+          p_only_vencidas: onlyVencidas,
+          p_limit: limit, p_offset: offset,
+        });
+        if (e) throw e;
+        return json({ data, meta: { scope, limit, offset, total: data?.[0]?.total_count ?? 0 } });
+      }
+
+      const comVencedor = url.searchParams.get("com_vencedor") === "true";
       const { data, error: e } = await supabase.rpc("search_licitacoes", {
-        p_search: search,
-        p_uf: uf,
-        p_modalidade: modalidade,
-        p_date_from: dateFrom,
-        p_date_to: dateTo,
+        p_search: search, p_uf: uf, p_modalidade: modalidade,
+        p_date_from: dateFrom, p_date_to: dateTo,
         p_com_vencedor: comVencedor,
-        p_limit: limit,
-        p_offset: offset,
+        p_limit: limit, p_offset: offset,
       });
       if (e) throw e;
-      return json({ data, meta: { limit, offset, total: data?.[0]?.total_count ?? 0 } });
+      return json({ data, meta: { scope, limit, offset, total: data?.[0]?.total_count ?? 0 } });
     }
 
-    // ---- LICITAÇÃO DETALHE ----
+    // ---------- LICITAÇÃO DETALHE ----------
     const licMatch = path.match(/^licitacoes\/([0-9a-f-]{36})$/);
     if (licMatch) {
       const id = licMatch[1];
+      if (empresaClienteId) {
+        // Garante que está no recorte do cliente: vitória OU keyword
+        const { data: vit } = await supabase
+          .from("cliente_vinculos")
+          .select("id")
+          .eq("empresa_id", empresaClienteId)
+          .eq("tipo", "licitacao_vencedor")
+          .eq("licitacao_id", id)
+          .maybeSingle();
+        if (!vit) {
+          const { data: rows } = await supabase.rpc("list_cliente_licitacoes", {
+            p_empresa_id: empresaClienteId, p_limit: 1, p_offset: 0,
+          });
+          const inScope = (rows || []).some((r: any) => r.id === id);
+          if (!inScope) {
+            const { data: kw } = await supabase
+              .from("licitacoes")
+              .select("id")
+              .eq("id", id)
+              .maybeSingle();
+            // fallback simple: deny if not found in vínculos
+            if (!kw) return err("Licitação not found.", 404);
+            // For scoped keys, hide licitações fora do recorte
+            return err("Licitação fora do recorte deste cliente.", 404);
+          }
+        }
+      }
+
       const { data: lic, error: e1 } = await supabase
-        .from("licitacoes")
-        .select("*")
-        .eq("id", id)
-        .maybeSingle();
+        .from("licitacoes").select("*").eq("id", id).maybeSingle();
       if (e1) throw e1;
       if (!lic) return err("Licitação not found.", 404);
 
@@ -141,54 +219,70 @@ Deno.serve(async (req) => {
         .eq("licitacao_id", id)
         .order("numero_item");
 
-      // Strip raw_json for cleaner response
       const { raw_json, ...licClean } = lic;
-      return json({ data: { ...licClean, itens: itens || [] } });
+      return json({ data: { ...licClean, itens: itens || [] }, meta: { scope } });
     }
 
-    // ---- ÓRGÃOS ----
+    // ---------- CONTRATOS ----------
+    if (path === "contratos") {
+      const { limit, offset, search, uf } = parseParams(url);
+      const fornecedorCnpj = url.searchParams.get("fornecedor_cnpj") || null;
+      const dateFrom = url.searchParams.get("date_from") || null;
+      const dateTo = url.searchParams.get("date_to") || null;
+      const onlyProprios = url.searchParams.get("only_proprios") === "true";
+
+      if (empresaClienteId) {
+        const { data, error: e } = await supabase.rpc("list_cliente_contratos", {
+          p_empresa_id: empresaClienteId,
+          p_search: search, p_uf: uf,
+          p_date_from: dateFrom, p_date_to: dateTo,
+          p_only_proprios: onlyProprios,
+          p_limit: limit, p_offset: offset,
+        });
+        if (e) throw e;
+        return json({ data, meta: { scope, limit, offset, total: data?.[0]?.total_count ?? 0 } });
+      }
+
+      let q = supabase.from("contratos")
+        .select("id, cnpj_orgao, orgao_nome, numero_contrato, objeto, fornecedor_nome, fornecedor_cnpj, valor_inicial, valor_final, data_assinatura, data_vigencia_inicio, data_vigencia_fim, situacao, modalidade_compra", { count: "exact" })
+        .order("data_assinatura", { ascending: false })
+        .range(offset, offset + limit - 1);
+      if (search) q = q.ilike("objeto", `%${search}%`);
+      if (fornecedorCnpj) q = q.ilike("fornecedor_cnpj", `%${fornecedorCnpj}%`);
+      const { data, count, error: e } = await q;
+      if (e) throw e;
+      return json({ data, meta: { scope, limit, offset, total: count ?? 0 } });
+    }
+
+    // ---------- ÓRGÃOS (global) ----------
     if (path === "orgaos") {
       const { limit, offset, search, uf } = parseParams(url);
       const orderBy = url.searchParams.get("order_by") || "total_licitacoes";
-
       const { data, error: e } = await supabase.rpc("list_orgaos", {
-        p_search: search,
-        p_uf: uf,
-        p_order_by: orderBy,
-        p_limit: limit,
-        p_offset: offset,
+        p_search: search, p_uf: uf, p_order_by: orderBy, p_limit: limit, p_offset: offset,
       });
       if (e) throw e;
-      return json({ data, meta: { limit, offset, total: data?.[0]?.total_count ?? 0 } });
+      return json({ data, meta: { scope, limit, offset, total: data?.[0]?.total_count ?? 0 } });
     }
 
-    // ---- EMPRESAS VENCEDORAS ----
     if (path === "empresas-vencedoras") {
       const { limit, offset, search, uf } = parseParams(url);
       const orderBy = url.searchParams.get("order_by") || "total_vitorias";
-
       const { data, error: e } = await supabase.rpc("list_empresas_vencedoras", {
-        p_search: search,
-        p_uf: uf,
-        p_order_by: orderBy,
-        p_limit: limit,
-        p_offset: offset,
+        p_search: search, p_uf: uf, p_order_by: orderBy, p_limit: limit, p_offset: offset,
       });
       if (e) throw e;
-      return json({ data, meta: { limit, offset, total: data?.[0]?.total_count ?? 0 } });
+      return json({ data, meta: { scope, limit, offset, total: data?.[0]?.total_count ?? 0 } });
     }
 
-    // ---- SANCIONADAS ----
     if (path === "sancionadas") {
       const { limit, offset, search, uf } = parseParams(url);
       const tipoCadastro = url.searchParams.get("tipo_cadastro") || null;
       const vigente = url.searchParams.get("vigente");
-
       let q = supabase.from("empresas_sancionadas")
         .select("id, nome, cnpj_cpf, tipo_cadastro, tipo_sancao, orgao_sancionador, uf_orgao, data_inicio, data_fim, fonte", { count: "exact" })
         .order("created_at", { ascending: false })
         .range(offset, offset + limit - 1);
-
       if (search) {
         const isNumeric = /^\d/.test(search.replace(/\D/g, ""));
         q = isNumeric ? q.ilike("cnpj_cpf", `%${search}%`) : q.ilike("nome", `%${search}%`);
@@ -196,13 +290,11 @@ Deno.serve(async (req) => {
       if (uf) q = q.eq("uf_orgao", uf);
       if (tipoCadastro) q = q.eq("tipo_cadastro", tipoCadastro);
       if (vigente === "true") q = q.or("data_fim.is.null,data_fim.gte." + new Date().toISOString().split("T")[0]);
-
       const { data, count, error: e } = await q;
       if (e) throw e;
-      return json({ data, meta: { limit, offset, total: count ?? 0 } });
+      return json({ data, meta: { scope, limit, offset, total: count ?? 0 } });
     }
 
-    // ---- CHECK SANCIONADA ----
     const checkMatch = path.match(/^check-sancionada\/(\d{11,14})$/);
     if (checkMatch) {
       const cnpj = checkMatch[1];
@@ -210,28 +302,9 @@ Deno.serve(async (req) => {
         .from("empresas_sancionadas")
         .select("nome, tipo_cadastro, tipo_sancao, data_inicio, data_fim, orgao_sancionador")
         .ilike("cnpj_cpf", `%${cnpj}%`);
-
       const records = data || [];
-      const vigentes = records.filter(r => !r.data_fim || new Date(r.data_fim) >= new Date());
+      const vigentes = records.filter((r: any) => !r.data_fim || new Date(r.data_fim) >= new Date());
       return json({ cnpj, sancionada: vigentes.length > 0, total_registros: records.length, vigentes: vigentes.length, registros: records });
-    }
-
-    // ---- CONTRATOS ----
-    if (path === "contratos") {
-      const { limit, offset, search, uf } = parseParams(url);
-      const fornecedorCnpj = url.searchParams.get("fornecedor_cnpj") || null;
-
-      let q = supabase.from("contratos")
-        .select("id, cnpj_orgao, orgao_nome, numero_contrato, objeto, fornecedor_nome, fornecedor_cnpj, valor_inicial, valor_final, data_assinatura, data_vigencia_inicio, data_vigencia_fim, situacao, modalidade_compra", { count: "exact" })
-        .order("data_assinatura", { ascending: false })
-        .range(offset, offset + limit - 1);
-
-      if (search) q = q.ilike("objeto", `%${search}%`);
-      if (fornecedorCnpj) q = q.ilike("fornecedor_cnpj", `%${fornecedorCnpj}%`);
-
-      const { data, count, error: e } = await q;
-      if (e) throw e;
-      return json({ data, meta: { limit, offset, total: count ?? 0 } });
     }
 
     return err(`Unknown endpoint: /${path}. Check /public-api for available endpoints.`, 404);

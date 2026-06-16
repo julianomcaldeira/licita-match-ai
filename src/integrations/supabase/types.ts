@@ -56,6 +56,7 @@ export type Database = {
           api_key_prefix: string
           client_name: string
           created_at: string
+          empresa_cliente_id: string | null
           id: string
           is_active: boolean
           last_used_at: string | null
@@ -66,6 +67,7 @@ export type Database = {
           api_key_prefix: string
           client_name: string
           created_at?: string
+          empresa_cliente_id?: string | null
           id?: string
           is_active?: boolean
           last_used_at?: string | null
@@ -76,12 +78,21 @@ export type Database = {
           api_key_prefix?: string
           client_name?: string
           created_at?: string
+          empresa_cliente_id?: string | null
           id?: string
           is_active?: boolean
           last_used_at?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "api_keys_empresa_cliente_id_fkey"
+            columns: ["empresa_cliente_id"]
+            isOneToOne: false
+            referencedRelation: "empresas_clientes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       auditoria_ingestao: {
         Row: {
@@ -145,6 +156,82 @@ export type Database = {
           total_vencedores?: number
         }
         Relationships: []
+      }
+      cliente_cnpjs: {
+        Row: {
+          cnpj: string
+          created_at: string
+          empresa_id: string
+          id: string
+          rotulo: string | null
+        }
+        Insert: {
+          cnpj: string
+          created_at?: string
+          empresa_id: string
+          id?: string
+          rotulo?: string | null
+        }
+        Update: {
+          cnpj?: string
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          rotulo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cliente_cnpjs_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas_clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cliente_vinculos: {
+        Row: {
+          cnpj_match: string
+          created_at: string
+          data_evento: string | null
+          empresa_id: string
+          id: string
+          licitacao_id: string | null
+          referencia_id: string
+          tipo: string
+          valor: number | null
+        }
+        Insert: {
+          cnpj_match: string
+          created_at?: string
+          data_evento?: string | null
+          empresa_id: string
+          id?: string
+          licitacao_id?: string | null
+          referencia_id: string
+          tipo: string
+          valor?: number | null
+        }
+        Update: {
+          cnpj_match?: string
+          created_at?: string
+          data_evento?: string | null
+          empresa_id?: string
+          id?: string
+          licitacao_id?: string | null
+          referencia_id?: string
+          tipo?: string
+          valor?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cliente_vinculos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas_clientes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       contratos: {
         Row: {
@@ -1240,6 +1327,16 @@ export type Database = {
           total_orgaos: number
         }[]
       }
+      api_key_resolve_cliente: {
+        Args: { p_hash: string }
+        Returns: {
+          api_key_id: string
+          client_name: string
+          empresa_cliente_id: string
+          empresa_nome: string
+          is_active: boolean
+        }[]
+      }
       check_vencedores_sancionados: {
         Args: { p_limit?: number }
         Returns: {
@@ -1264,6 +1361,7 @@ export type Database = {
         }[]
       }
       cleanup_ai_query_cache: { Args: never; Returns: number }
+      cliente_resumo: { Args: { p_empresa_id: string }; Returns: Json }
       compute_indice_startgi: {
         Args: { p_force?: boolean; p_mes: string }
         Returns: {
@@ -1400,6 +1498,64 @@ export type Database = {
         }[]
       }
       link_contratos_licitacoes: { Args: never; Returns: number }
+      list_cliente_contratos: {
+        Args: {
+          p_date_from?: string
+          p_date_to?: string
+          p_empresa_id: string
+          p_limit?: number
+          p_offset?: number
+          p_only_proprios?: boolean
+          p_search?: string
+          p_uf?: string
+        }
+        Returns: {
+          cnpj_orgao: string
+          data_assinatura: string
+          data_vigencia_fim: string
+          data_vigencia_inicio: string
+          fornecedor_cnpj: string
+          fornecedor_nome: string
+          id: string
+          match_source: string
+          modalidade_compra: string
+          numero_contrato: string
+          objeto: string
+          orgao_nome: string
+          situacao: string
+          total_count: number
+          valor_final: number
+          valor_inicial: number
+        }[]
+      }
+      list_cliente_licitacoes: {
+        Args: {
+          p_date_from?: string
+          p_date_to?: string
+          p_empresa_id: string
+          p_limit?: number
+          p_modalidade?: string
+          p_offset?: number
+          p_only_vencidas?: boolean
+          p_search?: string
+          p_uf?: string
+        }
+        Returns: {
+          data_publicacao: string
+          id: string
+          match_source: string
+          modalidade: string
+          municipio: string
+          objeto: string
+          orgao: string
+          situacao: string
+          total_count: number
+          uf: string
+          valor_estimado: number
+          valor_homologado: number
+          valor_vencido: number
+        }[]
+      }
       list_empresas_vencedoras:
         | {
             Args: {
@@ -1581,6 +1737,10 @@ export type Database = {
       pncp_dadosabertos_backfill_fast_tick: { Args: never; Returns: Json }
       pncp_dadosabertos_backfill_tick: { Args: never; Returns: Json }
       refresh_all_mvs: { Args: never; Returns: undefined }
+      refresh_cliente_vinculos: {
+        Args: { p_empresa_id?: string }
+        Returns: Json
+      }
       refresh_summary_mvs_if_dirty: { Args: never; Returns: Json }
       run_ingestion_audit: { Args: never; Returns: string }
       schedule_auto_ingestion: { Args: { p_force?: boolean }; Returns: Json }
