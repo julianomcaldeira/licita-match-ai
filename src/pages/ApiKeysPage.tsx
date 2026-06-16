@@ -2,24 +2,29 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Key, Plus, Copy, Trash2, ToggleLeft, ToggleRight, BookOpen, AlertTriangle } from "lucide-react";
+import { Key, Plus, Copy, Trash2, ToggleLeft, ToggleRight, BookOpen, AlertTriangle, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const API_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/public-api`;
+const GLOBAL_SCOPE = "__global__";
 
 const DOCS_ENDPOINTS = [
-  { method: "GET", path: "/licitacoes", desc: "Busca licitações com filtros", params: "search, uf, modalidade, date_from, date_to, com_vencedor, limit, offset" },
-  { method: "GET", path: "/licitacoes/:id", desc: "Detalhes da licitação com itens e vencedores", params: "UUID da licitação" },
-  { method: "GET", path: "/orgaos", desc: "Lista órgãos públicos", params: "search, uf, order_by (total_licitacoes|total_valor), limit, offset" },
-  { method: "GET", path: "/empresas-vencedoras", desc: "Lista empresas vencedoras", params: "search, uf, order_by (total_vitorias|total_valor), limit, offset" },
-  { method: "GET", path: "/sancionadas", desc: "Empresas sancionadas (CEIS/CNEP)", params: "search, uf, tipo_cadastro (CEIS|CNEP), vigente (true|false), limit, offset" },
+  { method: "GET", path: "/me", desc: "Dados do cliente vinculado à chave (nome, CNPJs, segmentos, palavras-chave)", params: "—" },
+  { method: "GET", path: "/me/resumo", desc: "KPIs consolidados do recorte do cliente", params: "—" },
+  { method: "GET", path: "/me/vitorias", desc: "Licitações vencidas e contratos firmados (somente por CNPJ)", params: "limit, offset" },
+  { method: "GET", path: "/licitacoes", desc: "Licitações — recorte do cliente se a chave for vinculada", params: "search, uf, modalidade, date_from, date_to, only_vencidas, com_vencedor, limit, offset" },
+  { method: "GET", path: "/licitacoes/:id", desc: "Detalhe de licitação (404 se fora do recorte do cliente)", params: "UUID" },
+  { method: "GET", path: "/contratos", desc: "Contratos — recorte do cliente se a chave for vinculada", params: "search, uf, fornecedor_cnpj, date_from, date_to, only_proprios, limit, offset" },
+  { method: "GET", path: "/orgaos", desc: "Lista órgãos públicos (global)", params: "search, uf, order_by, limit, offset" },
+  { method: "GET", path: "/empresas-vencedoras", desc: "Empresas vencedoras (global)", params: "search, uf, order_by, limit, offset" },
+  { method: "GET", path: "/sancionadas", desc: "Empresas sancionadas CEIS/CNEP (global)", params: "search, uf, tipo_cadastro, vigente, limit, offset" },
   { method: "GET", path: "/check-sancionada/:cnpj", desc: "Verificação rápida de CNPJ sancionado", params: "CNPJ (apenas números)" },
-  { method: "GET", path: "/contratos", desc: "Consulta contratos públicos", params: "search, fornecedor_cnpj, limit, offset" },
 ];
 
 async function sha256Hex(input: string): Promise<string> {
@@ -38,13 +43,30 @@ export default function ApiKeysPage() {
   const { role } = useAuth();
   const queryClient = useQueryClient();
   const [newClientName, setNewClientName] = useState("");
+  const [newEmpresaId, setNewEmpresaId] = useState<string>(GLOBAL_SCOPE);
   const [revealedKey, setRevealedKey] = useState<{ client_name: string; api_key: string } | null>(null);
   const isAdmin = role === "admin_central";
 
   const { data: keys, isLoading } = useQuery({
     queryKey: ["api-keys"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("api_keys").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabase
+        .from("api_keys")
+        .select("*, empresas_clientes:empresa_cliente_id(id, nome)")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: isAdmin,
+  });
+
+  const { data: empresas } = useQuery({
+    queryKey: ["empresas-clientes-select"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("empresas_clientes")
+        .select("id, nome")
+        .order("nome");
       if (error) throw error;
       return data;
     },
@@ -52,13 +74,13 @@ export default function ApiKeysPage() {
   });
 
   const createKey = useMutation({
-    mutationFn: async (clientName: string) => {
+    mutationFn: async ({ clientName, empresaId }: { clientName: string; empresaId: string | null }) => {
       const apiKey = generateApiKey();
       const api_key_hash = await sha256Hex(apiKey);
       const api_key_prefix = apiKey.slice(0, 8);
       const { data, error } = await supabase
         .from("api_keys")
-        .insert({ client_name: clientName, api_key_hash, api_key_prefix })
+        .insert({ client_name: clientName, api_key_hash, api_key_prefix, empresa_cliente_id: empresaId })
         .select()
         .single();
       if (error) throw error;
@@ -67,6 +89,7 @@ export default function ApiKeysPage() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["api-keys"] });
       setNewClientName("");
+      setNewEmpresaId(GLOBAL_SCOPE);
       setRevealedKey({ client_name: data.client_name, api_key: data.api_key });
       toast({ title: "API Key criada", description: `Copie a chave agora — ela não será exibida novamente.` });
     },
@@ -152,21 +175,40 @@ export default function ApiKeysPage() {
           )}
 
           {/* Create new key */}
-          <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-            <h2 className="font-display text-sm font-semibold text-foreground mb-3">Nova Chave de API</h2>
-            <div className="flex gap-2 max-w-lg">
+          <div className="rounded-xl border border-border bg-card p-5 shadow-sm space-y-3">
+            <h2 className="font-display text-sm font-semibold text-foreground">Nova Chave de API</h2>
+            <div className="grid gap-3 md:grid-cols-[1fr_260px_auto]">
               <Input
                 placeholder="Nome do cliente / sistema..."
                 value={newClientName}
                 onChange={e => setNewClientName(e.target.value)}
                 maxLength={100}
-                onKeyDown={e => e.key === "Enter" && newClientName.trim() && createKey.mutate(newClientName.trim())}
               />
-              <Button onClick={() => createKey.mutate(newClientName.trim())} disabled={!newClientName.trim() || createKey.isPending}>
+              <Select value={newEmpresaId} onValueChange={setNewEmpresaId}>
+                <SelectTrigger><SelectValue placeholder="Escopo da chave..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={GLOBAL_SCOPE}>Global (admin)</SelectItem>
+                  {empresas?.map(e => (
+                    <SelectItem key={e.id} value={e.id}>Cliente: {e.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                onClick={() => createKey.mutate({
+                  clientName: newClientName.trim(),
+                  empresaId: newEmpresaId === GLOBAL_SCOPE ? null : newEmpresaId,
+                })}
+                disabled={!newClientName.trim() || createKey.isPending}
+              >
                 <Plus className="h-4 w-4 mr-1" /> Criar
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground">
+              Chaves vinculadas a um cliente entregam apenas o recorte daquele cliente em <code>/licitacoes</code>, <code>/contratos</code> e <code>/me/*</code>.
+              Chaves globais mantêm o comportamento atual e veem todos os dados.
+            </p>
           </div>
+
 
           {/* Keys table */}
           <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
@@ -177,7 +219,8 @@ export default function ApiKeysPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Cliente</TableHead>
+                    <TableHead>Cliente / Sistema</TableHead>
+                    <TableHead>Escopo</TableHead>
                     <TableHead>Identificador</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Último uso</TableHead>
@@ -187,12 +230,22 @@ export default function ApiKeysPage() {
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
                   ) : !keys?.length ? (
-                    <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhuma chave criada</TableCell></TableRow>
-                  ) : keys.map(k => (
+                    <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Nenhuma chave criada</TableCell></TableRow>
+                  ) : keys.map((k: any) => (
                     <TableRow key={k.id}>
                       <TableCell className="font-medium">{k.client_name}</TableCell>
+                      <TableCell>
+                        {k.empresas_clientes ? (
+                          <Badge variant="outline" className="text-[10px] gap-1">
+                            <Building2 className="h-3 w-3" />
+                            {k.empresas_clientes.nome}
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-[10px]">Global</Badge>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
                           {k.api_key_prefix}…
@@ -203,6 +256,7 @@ export default function ApiKeysPage() {
                           {k.is_active ? "Ativa" : "Inativa"}
                         </Badge>
                       </TableCell>
+
                       <TableCell className="text-xs text-muted-foreground">
                         {k.last_used_at
                           ? new Date(k.last_used_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })

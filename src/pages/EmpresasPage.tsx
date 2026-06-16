@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Building2, Zap, Plus, Loader2, X, Pencil } from "lucide-react";
+import { Building2, Zap, Plus, Loader2, X, Pencil, RefreshCw, Trophy, FileText } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -42,6 +42,38 @@ export default function EmpresasPage() {
       if (error) throw error;
       return data;
     },
+  });
+
+  const { data: vinculosByEmpresa } = useQuery({
+    queryKey: ["empresas-vinculos-count"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("cliente_vinculos")
+        .select("empresa_id, tipo");
+      if (error) throw error;
+      const map: Record<string, { vitorias: number; contratos: number }> = {};
+      (data || []).forEach((r: any) => {
+        if (!map[r.empresa_id]) map[r.empresa_id] = { vitorias: 0, contratos: 0 };
+        if (r.tipo === "licitacao_vencedor") map[r.empresa_id].vitorias++;
+        else if (r.tipo === "contrato") map[r.empresa_id].contratos++;
+      });
+      return map;
+    },
+  });
+
+  const refreshMutation = useMutation({
+    mutationFn: async (empresaId: string) => {
+      const { data, error } = await supabase.rpc("refresh_cliente_vinculos", { p_empresa_id: empresaId });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data: any) => {
+      const v = data?.vitorias_inseridas ?? 0;
+      const c = data?.contratos_inseridos ?? 0;
+      toast.success(`Vínculos atualizados: +${v} vitórias, +${c} contratos`);
+      queryClient.invalidateQueries({ queryKey: ["empresas-vinculos-count"] });
+    },
+    onError: (e: any) => toast.error(e.message),
   });
 
   const resetForm = () => {
@@ -227,6 +259,36 @@ export default function EmpresasPage() {
                 <div className="mt-3 flex items-center gap-1 text-sm text-muted-foreground">
                   <Zap className="h-3.5 w-3.5" /> {emp.segmentos.join(", ")}
                 </div>
+              )}
+              {/* Recorte materializado */}
+              <div className="mt-4 grid grid-cols-2 gap-2 rounded-lg border border-border bg-muted/30 p-3">
+                <div className="flex items-center gap-2">
+                  <Trophy className="h-4 w-4 text-amber-500" />
+                  <div className="text-xs">
+                    <div className="font-semibold text-foreground">{vinculosByEmpresa?.[emp.id]?.vitorias ?? 0}</div>
+                    <div className="text-muted-foreground">vitórias</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-primary" />
+                  <div className="text-xs">
+                    <div className="font-semibold text-foreground">{vinculosByEmpresa?.[emp.id]?.contratos ?? 0}</div>
+                    <div className="text-muted-foreground">contratos</div>
+                  </div>
+                </div>
+              </div>
+              {isAdmin && (
+                <button
+                  onClick={() => refreshMutation.mutate(emp.id)}
+                  disabled={refreshMutation.isPending}
+                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium text-foreground hover:bg-muted transition disabled:opacity-50"
+                  title="Recalcular vínculos a partir do CNPJ"
+                >
+                  {refreshMutation.isPending && refreshMutation.variables === emp.id
+                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    : <RefreshCw className="h-3.5 w-3.5" />}
+                  Reprocessar vínculos
+                </button>
               )}
             </motion.div>
           ))}

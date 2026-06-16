@@ -1,68 +1,82 @@
+## Objetivo
 
-# Índice StartGi — Plano de implementação
+Dar a cada cliente cadastrado em `empresas_clientes` um recorte próprio do dado público — combinando o que ele **já ganhou** (por CNPJ) e o que **combina com o perfil dele** (palavras-chave + segmentos) — e expor isso na API pública de forma que o i-Ganhei só precise usar a `api_key` certa.
 
-## 1. Backend (Lovable Cloud)
+## Arquitetura (híbrido)
 
-**Nova tabela `indice_startgi_mensal`** (migração):
-- `mes_referencia` text PK (formato `YYYY-MM`)
-- `indice_startgi` numeric(8,1)
-- `valor_total_brl` numeric(18,2)
-- `volume_contratos` int
-- `variacao_mom`, `variacao_yoy` numeric(6,2)
-- `breakdown_modalidade`, `breakdown_esfera`, `breakdown_segmento` jsonb
-- `destaque_segmento` text, `destaque_variacao` numeric(6,2)
-- `dados_parciais` boolean
-- `ultima_atualizacao` timestamptz
-- GRANTs (`authenticated` SELECT; `service_role` ALL) + RLS (leitura: authenticated; escrita: somente `admin_central`/`admin_empresa` via `has_role`).
+```text
+empresas_clientes  ──┐
+                     ├── cliente_cnpjs (1..N CNPJs por cliente)
+                     │
+                     ├── cliente_vinculos                      ← MATERIALIZADO (CNPJ)
+                     │     (empresa_id, tipo, ref_id, fonte)     job diário + on-insert
+                     │     • licitacao_vencedor → item_id / licitacao_id
+                     │     • contrato           → contrato_id
+                     │
+                     └── (sem tabela)                          ← DINÂMICO (keywords)
+                           RPC filtra licitacoes/contratos
+                           usando palavras_chave + segmentos
+                           da empresa, com índice GIN trigram
+```
 
-**RPC `compute_indice_startgi(p_mes text, p_force boolean default false)`** (SECURITY DEFINER):
-- Calcula a partir de `contratos` (campo `data_assinatura`/`created_at` filtrado por mês), somando `valor_inicial` como proxy de `valorGlobalContrato`.
-- Base Jan/2024 = soma do mês inserida na própria tabela (idempotente).
-- Calcula MoM e YoY consultando linhas anteriores.
-- Breakdown:
-  - **Modalidade**: agrupa via join `licitacoes.modalidade` quando `contratos.licitacao_id` existe; resto vai em "outros".
-  - **Esfera**: heurística pelo `cnpj_orgao` cacheado em `orgao_siafi_cache` quando possível; fallback por palavras-chave no `orgao_nome` (Município/Prefeitura → municipal; Governo do Estado/Secretaria de Estado → estadual; União/Ministério/Federal → federal).
-  - **Segmento**: top-1 por `objeto` agrupado em buckets simples ("TI e Telecom", "Saúde", "Obras", "Educação", "Serviços Gerais", "Outros") por keywords.
-- Marca `dados_parciais = true` se `now() < (primeiro dia do mês seguinte ao mes_referencia) + interval '10 days'`.
-- Não recalcula se idade > 60 dias e linha existe, exceto `p_force`.
-- UPSERT na tabela e retorna jsonb da linha.
+- **Materializado por CNPJ**: rápido, estável, perfeito para "o que esse cliente ganhou / contratou". Não muda se as keywords mudarem.
+- **Dinâmico por keywords**: sempre reflete a última versão das `palavras_chave` e `segmentos` do cliente, sem reprocessar histórico.
+- **Combinação**: a RPC final faz `UNION` dos dois e marca a origem (`match_source: 'cnpj' | 'keyword' | 'both'`).
 
-**RPC `list_indice_startgi(p_limit int)`** retorna últimos N meses ordenados desc.
+## Mudanças no banco
 
-## 2. Frontend
+**Novas tabelas (`public`, RLS, GRANTs):**
 
-**Roteamento e menu**
-- Nova rota `/indice-startgi` em `App.tsx` (lazy import).
-- Item "Índice StartGi" com ícone `TrendingUp` em `AppSidebar.tsx`, visível só se `role in ('admin_central','admin_empresa')` (filtro inline com `useAuth`).
+1. `cliente_cnpjs` — `empresa_id`, `cnpj` (normalizado, único por empresa). Permite múltiplos CNPJs por cliente (matriz/filiais).
+2. `cliente_vinculos` — `empresa_id`, `tipo` (`licitacao_vencedor` | `contrato`), `referencia_id` (uuid), `cnpj_match`, `data_evento`, `valor`. Único por (empresa, tipo, referencia_id, cnpj_match). Índices: (empresa_id, data_evento desc), (referencia_id).
+3. `api_keys.empresa_cliente_id` — coluna nullable. Quando preenchida, a chave fica "presa" àquele cliente; quando nula, é uma chave global (admin).
 
-**Página `src/pages/IndiceStartGiPage.tsx`** com seções:
-1. **Controles**: `Select` mês/ano (default último mês fechado), botão "Gerar Índice" → invoca RPC `compute_indice_startgi`, status "Atualizado em…".
-2. **Preview + Exportação**: componente `<IndiceStartGiCard variant="feed|story" data={...}/>` renderizado em wrapper 1080px com `transform: scale(containerWidth/1080)`. Botões "Exportar Feed PNG", "Exportar Story PNG", "Copiar texto do post".
-3. **Cards resumo anual**: maior índice do ano, crescimento acumulado YTD, total contratado YTD (a partir da lista).
-4. **Gráfico Recharts** `LineChart` + `Area` com gradiente, `ReferenceLine y=100`, `Dot` destacado no mês selecionado, tooltip custom.
-5. **Tabela histórica** com paginação (12/pág), variações coloridas, linha destacada, "Exportar CSV".
+**Novas funções:**
 
-**Componente do card `src/components/indice-startgi/IndiceStartGiCard.tsx`**
-- Largura fixa 1080px (altura 1080 ou 1920 por variant), background escuro (`bg-slate-900` + gradiente), tipografia Space Grotesk/Inter já existentes.
-- Layout conforme ASCII art (número índice peso 800, variações coloridas, barra de esfera tricolor, badge dados parciais, rodapé com URL/hashtag).
-- Logo: usa `logo-ipesquisei.png` em filtro claro + texto "StartGi" (não há logo StartGi separado; assumo o existente).
+- `refresh_cliente_vinculos(p_empresa_id uuid default null)` — SECURITY DEFINER. Faz `INSERT … ON CONFLICT DO NOTHING` cruzando `cliente_cnpjs` com `licitacao_vencedores` e `contratos`. Quando `p_empresa_id` é nulo, processa todas.
+- `list_cliente_licitacoes(p_empresa_id uuid, p_filters …, p_limit, p_offset)` — UNION entre `cliente_vinculos` (tipo vencedor) e licitações que batem em keywords (`objeto ILIKE ANY (palavras_chave) OR objeto ILIKE ANY (segmentos)`), com `match_source` calculado.
+- `list_cliente_contratos(p_empresa_id, …)` — análogo para contratos.
+- `cliente_resumo(p_empresa_id)` — KPIs do recorte (total ganho, ticket médio, top órgãos, top modalidades, contratos vigentes).
 
-**Exportação**
-- `bun add html2canvas`.
-- Render off-screen (posição fixed top-[-99999px]) e captura com `scale: 1`.
-- Download via `<a download>` com nomenclatura solicitada.
+**Cron diário**: às 03:30 chama `refresh_cliente_vinculos(null)` após o pipeline PNCP/Portal terminar.
 
-**Helpers `src/lib/indiceStartGi.ts`**
-- `formatBRL(v)` com regras tri/bi/mi/mil.
-- `buildPostText(data)`.
-- `getLastClosedMonth()`.
+## Mudanças na API pública
 
-## 3. Pontos abertos / pressupostos
+Edge function `public-api`:
 
-- **Não existe logo StartGi separada** no projeto; usarei o logo i-pesquisei sobre fundo escuro com texto "StartGi" ao lado. Confirmar se deve subir asset específico.
-- **Esfera/Segmento são heurísticas** (não há colunas dedicadas em `contratos`); precisão dependerá da qualidade dos nomes de órgão e objeto.
-- **Valor mensal usa `contratos.valor_inicial`** (proxy mais próximo de `valorGlobalContrato`) filtrado por `data_assinatura` quando presente, senão `created_at`.
-- **Janeiro/2024** será calculado na primeira execução e fixado como denominador — se ainda não houver dados suficientes daquele mês, o índice ficará inflado; aceitável?
-- **Roles "Administrador e Editor"**: o sistema tem `admin_central`, `admin_empresa`, `usuario_empresa`. Mapeei Administrador→admin_central e Editor→admin_empresa. Confirmar.
+1. Resolver `empresa_cliente_id` a partir da `api_key` autenticada.
+2. Se a chave estiver vinculada a um cliente, **todos** os endpoints já existentes passam a chamar o recorte:
+   - `/licitacoes` → `list_cliente_licitacoes(empresa_id, …)`
+   - `/contratos` → `list_cliente_contratos(empresa_id, …)`
+   - `/licitacoes/:id` → 404 se a licitação não está no recorte do cliente
+   - Resposta ganha `meta.scope: { cliente_id, cliente_nome, match_sources: ["cnpj","keyword"] }`
+3. Se a chave for global (admin), comportamento atual permanece.
+4. Novos endpoints específicos do recorte para o i-Ganhei:
+   - `GET /me` — dados do cliente da api_key (nome, CNPJs, segmentos, palavras-chave)
+   - `GET /me/resumo` — KPIs consolidados
+   - `GET /me/vitorias` — só o que veio por CNPJ (licitações vencidas + contratos firmados), ordenado por data
 
-Posso seguir com esses pressupostos ou prefere ajustar algum antes de implementar?
+## Mudanças na UI
+
+`/api-keys`:
+
+- Ao criar uma chave, escolher "**Vincular a cliente**" (select com `empresas_clientes`) ou "Global (admin)".
+- Coluna "Cliente" na tabela de chaves.
+- Botão "Reprocessar vínculos" por cliente em `/empresas` (chama `refresh_cliente_vinculos(empresa_id)`).
+
+`/empresas` (card do cliente):
+
+- Mostra contadores: licitações ganhas, contratos vigentes, oportunidades por keyword.
+- Campo "CNPJs" (lista editável, alimenta `cliente_cnpjs`).
+
+## Backfill inicial
+
+Roda `refresh_cliente_vinculos(null)` uma vez na migration para popular as 2 empresas já cadastradas. O resultado fica disponível imediatamente nos endpoints.
+
+## Notas técnicas
+
+- CNPJ sempre normalizado (`regexp_replace(cnpj, '\D', '', 'g')`) tanto na escrita quanto na consulta — o match precisa ser exato após normalização.
+- Match por keyword usa os índices GIN trigram existentes em `licitacoes.objeto` e `contratos.objeto`.
+- RLS de `cliente_vinculos` e `cliente_cnpjs`: leitura por `admin_central` ou por usuários da própria empresa (`has_role_for_company`); escrita só `service_role`.
+- `api_keys.empresa_cliente_id` com FK `ON DELETE SET NULL` para não derrubar chaves se um cliente for removido.
+- Sem mudança no schema de `licitacoes` / `contratos` — esses dados continuam globais; o recorte vive em `cliente_vinculos` + lookup por keyword.
