@@ -257,6 +257,12 @@ export default function ClienteDetalhePage() {
           </div>
         )}
       </Tabs>
+
+      <LicitacaoDetailDialog
+        licitacaoId={detailId}
+        open={!!detailId}
+        onOpenChange={(o) => { if (!o) setDetailId(null); }}
+      />
     </div>
   );
 }
