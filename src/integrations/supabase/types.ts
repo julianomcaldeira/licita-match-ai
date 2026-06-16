@@ -1280,6 +1280,7 @@ export type Database = {
       }
     }
     Functions: {
+      _kw_or_clause: { Args: { p_kw: string[] }; Returns: string }
       analytics_daily_by_status: {
         Args: { p_date_from?: string; p_date_to?: string }
         Returns: {
@@ -1426,6 +1427,7 @@ export type Database = {
           valor_total: number
         }[]
       }
+      f_unaccent: { Args: { "": string }; Returns: string }
       get_dashboard_validation_summary: {
         Args: never
         Returns: {
@@ -1774,6 +1776,7 @@ export type Database = {
       }
       refresh_summary_mvs_if_dirty: { Args: never; Returns: Json }
       run_ingestion_audit: { Args: never; Returns: string }
+      sanitize_keywords: { Args: { p_kw: string[] }; Returns: string[] }
       schedule_auto_ingestion: { Args: { p_force?: boolean }; Returns: Json }
       search_licitacoes: {
         Args: {
@@ -1812,6 +1815,7 @@ export type Database = {
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      unaccent: { Args: { "": string }; Returns: string }
       validate_dashboard_metrics: { Args: never; Returns: string }
     }
     Enums: {
