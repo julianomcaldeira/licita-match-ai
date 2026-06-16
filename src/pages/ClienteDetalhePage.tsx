@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft, Trophy, FileText, Loader2, Search, Building2 } from "lucide-react";
+import { ArrowLeft, Trophy, FileText, Loader2, Search, Building2, Target } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import LicitacaoDetailDialog from "@/components/LicitacaoDetailDialog";
 
