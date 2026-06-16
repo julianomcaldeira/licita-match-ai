@@ -1280,6 +1280,7 @@ export type Database = {
       }
     }
     Functions: {
+      _kw_or_clause: { Args: { p_kw: string[] }; Returns: string }
       analytics_daily_by_status: {
         Args: { p_date_from?: string; p_date_to?: string }
         Returns: {
