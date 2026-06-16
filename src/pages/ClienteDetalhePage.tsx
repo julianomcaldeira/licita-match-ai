@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft, Trophy, FileText, Loader2, Search, Building2 } from "lucide-react";
+import { ArrowLeft, Trophy, FileText, Loader2, Search, Building2, Target } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import LicitacaoDetailDialog from "@/components/LicitacaoDetailDialog";
 
@@ -32,7 +32,7 @@ function MatchBadge({ source }: { source?: string }) {
 
 export default function ClienteDetalhePage() {
   const { id: empresaId } = useParams<{ id: string }>();
-  const [tab, setTab] = useState<"vitorias" | "contratos">("vitorias");
+  const [tab, setTab] = useState<"vitorias" | "contratos" | "mercado">("vitorias");
   const [search, setSearch] = useState("");
   const [onlyVencidas, setOnlyVencidas] = useState(true);
   const [onlyProprios, setOnlyProprios] = useState(true);
@@ -95,9 +95,31 @@ export default function ClienteDetalhePage() {
     enabled: !!empresaId && tab === "contratos",
   });
 
-  const isLicit = tab === "vitorias";
-  const rows = isLicit ? licitacoesQuery.data : contratosQuery.data;
-  const isLoading = isLicit ? licitacoesQuery.isLoading : contratosQuery.isLoading;
+  const [onlyHomologadas, setOnlyHomologadas] = useState(false);
+  const mercadoQuery = useQuery({
+    queryKey: ["cliente_mercado", empresaId, search, onlyHomologadas, page],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("list_cliente_mercado", {
+        p_empresa_id: empresaId!,
+        p_search: search || null,
+        p_only_homologadas: onlyHomologadas,
+        p_limit: PAGE_SIZE,
+        p_offset: page * PAGE_SIZE,
+      });
+      if (error) throw error;
+      return data as any[];
+    },
+    enabled: !!empresaId && tab === "mercado",
+  });
+
+  const rows =
+    tab === "vitorias" ? licitacoesQuery.data :
+    tab === "contratos" ? contratosQuery.data :
+    mercadoQuery.data;
+  const isLoading =
+    tab === "vitorias" ? licitacoesQuery.isLoading :
+    tab === "contratos" ? contratosQuery.isLoading :
+    mercadoQuery.isLoading;
   const total = rows?.[0]?.total_count ? Number(rows[0].total_count) : 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -117,7 +139,7 @@ export default function ClienteDetalhePage() {
       </div>
 
       {resumo && (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
           <div className="rounded-xl border border-border bg-card p-4">
             <div className="text-xs text-muted-foreground">Vitórias</div>
             <div className="mt-1 font-display text-2xl font-bold">{resumo.vitorias ?? 0}</div>
@@ -127,19 +149,36 @@ export default function ClienteDetalhePage() {
             <div className="mt-1 font-display text-xl font-bold">{fmtMoney(resumo.valor_total_vencido)}</div>
           </div>
           <div className="rounded-xl border border-border bg-card p-4">
-            <div className="text-xs text-muted-foreground">Contratos</div>
-            <div className="mt-1 font-display text-2xl font-bold">{resumo.contratos ?? 0}</div>
-          </div>
-          <div className="rounded-xl border border-border bg-card p-4">
             <div className="text-xs text-muted-foreground">Ticket médio</div>
             <div className="mt-1 font-display text-xl font-bold">{fmtMoney(resumo.ticket_medio)}</div>
           </div>
+          <div className="rounded-xl border border-border bg-card p-4">
+            <div className="text-xs text-muted-foreground">Contratos</div>
+            <div className="mt-1 font-display text-2xl font-bold">{resumo.contratos ?? 0}</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => { setTab("mercado"); setPage(0); }}
+            className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-left transition hover:bg-primary/10"
+          >
+            <div className="flex items-center gap-1 text-xs text-primary"><Target className="h-3 w-3" /> Mercado (concorrência)</div>
+            <div className="mt-1 font-display text-2xl font-bold text-primary">{(resumo.mercado_total ?? 0).toLocaleString("pt-BR")}</div>
+          </button>
+          <button
+            type="button"
+            onClick={() => { setTab("mercado"); setPage(0); }}
+            className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-left transition hover:bg-primary/10"
+          >
+            <div className="text-xs text-primary">Valor homologado mercado</div>
+            <div className="mt-1 font-display text-xl font-bold text-primary">{fmtMoney(resumo.mercado_valor_homologado)}</div>
+          </button>
         </div>
       )}
 
       <Tabs value={tab} onValueChange={(v) => { setTab(v as any); setPage(0); }}>
         <TabsList>
           <TabsTrigger value="vitorias" className="gap-2"><Trophy className="h-4 w-4" /> Licitações</TabsTrigger>
+          <TabsTrigger value="mercado" className="gap-2"><Target className="h-4 w-4" /> Mercado</TabsTrigger>
           <TabsTrigger value="contratos" className="gap-2"><FileText className="h-4 w-4" /> Contratos</TabsTrigger>
         </TabsList>
 
@@ -153,18 +192,26 @@ export default function ClienteDetalhePage() {
               className="h-10 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
-          {isLicit ? (
+          {tab === "vitorias" && (
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={onlyVencidas} onChange={(e) => { setOnlyVencidas(e.target.checked); setPage(0); }} />
               Apenas vencidas pelo cliente
             </label>
-          ) : (
+          )}
+          {tab === "contratos" && (
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={onlyProprios} onChange={(e) => { setOnlyProprios(e.target.checked); setPage(0); }} />
               Apenas contratos do cliente
             </label>
           )}
+          {tab === "mercado" && (
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={onlyHomologadas} onChange={(e) => { setOnlyHomologadas(e.target.checked); setPage(0); }} />
+              Apenas homologadas (com vencedor)
+            </label>
+          )}
         </div>
+
 
         <TabsContent value="vitorias" className="mt-4">
           {isLoading ? (
@@ -239,6 +286,65 @@ export default function ClienteDetalhePage() {
                       <td className="px-3 py-2">{fmtDate(r.data_assinatura)}</td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">{fmtDate(r.data_vigencia_inicio)} → {fmtDate(r.data_vigencia_fim)}</td>
                       <td className="px-3 py-2"><MatchBadge source={r.match_source} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="mercado" className="mt-4">
+          {isLoading ? (
+            <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+          ) : !rows?.length ? (
+            <div className="rounded-xl border border-border bg-card p-12 text-center text-sm text-muted-foreground">
+              Nenhuma oportunidade de mercado encontrada.
+              <p className="mt-2 text-xs">Esta aba mostra licitações aderentes às palavras-chave do cliente que foram vencidas por concorrentes.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-border bg-card">
+              <table className="w-full text-sm">
+                <thead className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2">Objeto</th>
+                    <th className="px-3 py-2">Órgão</th>
+                    <th className="px-3 py-2">UF</th>
+                    <th className="px-3 py-2 text-right">Valor estimado</th>
+                    <th className="px-3 py-2 text-right">Valor homologado</th>
+                    <th className="px-3 py-2">Vencedor</th>
+                    <th className="px-3 py-2">Publicação</th>
+                    <th className="px-3 py-2">Situação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r: any) => (
+                    <tr
+                      key={r.id}
+                      onClick={() => setDetailId(r.id)}
+                      className="border-b border-border hover:bg-muted/40 cursor-pointer transition"
+                      title="Ver detalhes"
+                    >
+                      <td className="px-3 py-2 max-w-md"><div className="line-clamp-2">{r.objeto}</div></td>
+                      <td className="px-3 py-2 max-w-xs"><div className="line-clamp-1 text-muted-foreground">{r.orgao}</div></td>
+                      <td className="px-3 py-2">{r.uf ?? "—"}</td>
+                      <td className="px-3 py-2 text-right">{fmtMoney(r.valor_estimado)}</td>
+                      <td className="px-3 py-2 text-right font-semibold text-emerald-600">{fmtMoney(r.valor_homologado)}</td>
+                      <td className="px-3 py-2 max-w-xs">
+                        {r.vencedor_nome ? (
+                          <div>
+                            <div className="line-clamp-1 text-xs font-medium">{r.vencedor_nome}</div>
+                            <div className="text-[10px] text-muted-foreground font-mono">{r.vencedor_cnpj ?? "—"}</div>
+                            {r.total_vencedores > 1 && (
+                              <div className="text-[10px] text-muted-foreground">+{r.total_vencedores - 1} outro(s)</div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">{fmtDate(r.data_publicacao)}</td>
+                      <td className="px-3 py-2"><span className="inline-block rounded-full bg-muted px-2 py-0.5 text-[10px]">{r.situacao ?? "—"}</span></td>
                     </tr>
                   ))}
                 </tbody>
