@@ -32,7 +32,7 @@ function MatchBadge({ source }: { source?: string }) {
 
 export default function ClienteDetalhePage() {
   const { id: empresaId } = useParams<{ id: string }>();
-  const [tab, setTab] = useState<"vitorias" | "contratos">("vitorias");
+  const [tab, setTab] = useState<"vitorias" | "contratos" | "mercado">("vitorias");
   const [search, setSearch] = useState("");
   const [onlyVencidas, setOnlyVencidas] = useState(true);
   const [onlyProprios, setOnlyProprios] = useState(true);
