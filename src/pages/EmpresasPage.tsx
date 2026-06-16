@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Building2, Zap, Plus, Loader2, X, Pencil, RefreshCw, Trophy, FileText } from "lucide-react";
+import { Building2, Zap, Plus, Loader2, X, Pencil, RefreshCw, Trophy, FileText, ArrowRight } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -260,22 +261,30 @@ export default function EmpresasPage() {
                   <Zap className="h-3.5 w-3.5" /> {emp.segmentos.join(", ")}
                 </div>
               )}
-              {/* Recorte materializado */}
-              <div className="mt-4 grid grid-cols-2 gap-2 rounded-lg border border-border bg-muted/30 p-3">
-                <div className="flex items-center gap-2">
+              {/* Recorte materializado — clicável */}
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <Link
+                  to={`/empresas/${emp.id}?tab=vitorias`}
+                  className="group flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-3 transition hover:border-primary hover:bg-primary/5"
+                >
                   <Trophy className="h-4 w-4 text-amber-500" />
-                  <div className="text-xs">
+                  <div className="text-xs flex-1">
                     <div className="font-semibold text-foreground">{vinculosByEmpresa?.[emp.id]?.vitorias ?? 0}</div>
                     <div className="text-muted-foreground">vitórias</div>
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
+                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition" />
+                </Link>
+                <Link
+                  to={`/empresas/${emp.id}?tab=contratos`}
+                  className="group flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-3 transition hover:border-primary hover:bg-primary/5"
+                >
                   <FileText className="h-4 w-4 text-primary" />
-                  <div className="text-xs">
+                  <div className="text-xs flex-1">
                     <div className="font-semibold text-foreground">{vinculosByEmpresa?.[emp.id]?.contratos ?? 0}</div>
                     <div className="text-muted-foreground">contratos</div>
                   </div>
-                </div>
+                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition" />
+                </Link>
               </div>
               {isAdmin && (
                 <button
