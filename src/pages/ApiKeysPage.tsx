@@ -43,13 +43,30 @@ export default function ApiKeysPage() {
   const { role } = useAuth();
   const queryClient = useQueryClient();
   const [newClientName, setNewClientName] = useState("");
+  const [newEmpresaId, setNewEmpresaId] = useState<string>(GLOBAL_SCOPE);
   const [revealedKey, setRevealedKey] = useState<{ client_name: string; api_key: string } | null>(null);
   const isAdmin = role === "admin_central";
 
   const { data: keys, isLoading } = useQuery({
     queryKey: ["api-keys"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("api_keys").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabase
+        .from("api_keys")
+        .select("*, empresas_clientes:empresa_cliente_id(id, nome)")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: isAdmin,
+  });
+
+  const { data: empresas } = useQuery({
+    queryKey: ["empresas-clientes-select"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("empresas_clientes")
+        .select("id, nome")
+        .order("nome");
       if (error) throw error;
       return data;
     },
@@ -57,13 +74,13 @@ export default function ApiKeysPage() {
   });
 
   const createKey = useMutation({
-    mutationFn: async (clientName: string) => {
+    mutationFn: async ({ clientName, empresaId }: { clientName: string; empresaId: string | null }) => {
       const apiKey = generateApiKey();
       const api_key_hash = await sha256Hex(apiKey);
       const api_key_prefix = apiKey.slice(0, 8);
       const { data, error } = await supabase
         .from("api_keys")
-        .insert({ client_name: clientName, api_key_hash, api_key_prefix })
+        .insert({ client_name: clientName, api_key_hash, api_key_prefix, empresa_cliente_id: empresaId })
         .select()
         .single();
       if (error) throw error;
@@ -72,6 +89,7 @@ export default function ApiKeysPage() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["api-keys"] });
       setNewClientName("");
+      setNewEmpresaId(GLOBAL_SCOPE);
       setRevealedKey({ client_name: data.client_name, api_key: data.api_key });
       toast({ title: "API Key criada", description: `Copie a chave agora — ela não será exibida novamente.` });
     },
