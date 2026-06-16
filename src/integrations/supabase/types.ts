@@ -1556,6 +1556,37 @@ export type Database = {
           valor_vencido: number
         }[]
       }
+      list_cliente_mercado: {
+        Args: {
+          p_date_from?: string
+          p_date_to?: string
+          p_empresa_id: string
+          p_limit?: number
+          p_modalidade?: string
+          p_offset?: number
+          p_only_homologadas?: boolean
+          p_search?: string
+          p_uf?: string
+        }
+        Returns: {
+          data_publicacao: string
+          data_resultado: string
+          id: string
+          modalidade: string
+          municipio: string
+          objeto: string
+          orgao: string
+          situacao: string
+          total_count: number
+          total_vencedores: number
+          uf: string
+          valor_estimado: number
+          valor_homologado: number
+          vencedor_cnpj: string
+          vencedor_nome: string
+          vencedor_valor: number
+        }[]
+      }
       list_empresas_vencedoras:
         | {
             Args: {
