@@ -175,21 +175,40 @@ export default function ApiKeysPage() {
           )}
 
           {/* Create new key */}
-          <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-            <h2 className="font-display text-sm font-semibold text-foreground mb-3">Nova Chave de API</h2>
-            <div className="flex gap-2 max-w-lg">
+          <div className="rounded-xl border border-border bg-card p-5 shadow-sm space-y-3">
+            <h2 className="font-display text-sm font-semibold text-foreground">Nova Chave de API</h2>
+            <div className="grid gap-3 md:grid-cols-[1fr_260px_auto]">
               <Input
                 placeholder="Nome do cliente / sistema..."
                 value={newClientName}
                 onChange={e => setNewClientName(e.target.value)}
                 maxLength={100}
-                onKeyDown={e => e.key === "Enter" && newClientName.trim() && createKey.mutate(newClientName.trim())}
               />
-              <Button onClick={() => createKey.mutate(newClientName.trim())} disabled={!newClientName.trim() || createKey.isPending}>
+              <Select value={newEmpresaId} onValueChange={setNewEmpresaId}>
+                <SelectTrigger><SelectValue placeholder="Escopo da chave..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={GLOBAL_SCOPE}>Global (admin)</SelectItem>
+                  {empresas?.map(e => (
+                    <SelectItem key={e.id} value={e.id}>Cliente: {e.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                onClick={() => createKey.mutate({
+                  clientName: newClientName.trim(),
+                  empresaId: newEmpresaId === GLOBAL_SCOPE ? null : newEmpresaId,
+                })}
+                disabled={!newClientName.trim() || createKey.isPending}
+              >
                 <Plus className="h-4 w-4 mr-1" /> Criar
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground">
+              Chaves vinculadas a um cliente entregam apenas o recorte daquele cliente em <code>/licitacoes</code>, <code>/contratos</code> e <code>/me/*</code>.
+              Chaves globais mantêm o comportamento atual e veem todos os dados.
+            </p>
           </div>
+
 
           {/* Keys table */}
           <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
