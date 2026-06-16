@@ -219,7 +219,8 @@ export default function ApiKeysPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Cliente</TableHead>
+                    <TableHead>Cliente / Sistema</TableHead>
+                    <TableHead>Escopo</TableHead>
                     <TableHead>Identificador</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Último uso</TableHead>
@@ -229,12 +230,22 @@ export default function ApiKeysPage() {
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
                   ) : !keys?.length ? (
-                    <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhuma chave criada</TableCell></TableRow>
-                  ) : keys.map(k => (
+                    <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Nenhuma chave criada</TableCell></TableRow>
+                  ) : keys.map((k: any) => (
                     <TableRow key={k.id}>
                       <TableCell className="font-medium">{k.client_name}</TableCell>
+                      <TableCell>
+                        {k.empresas_clientes ? (
+                          <Badge variant="outline" className="text-[10px] gap-1">
+                            <Building2 className="h-3 w-3" />
+                            {k.empresas_clientes.nome}
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-[10px]">Global</Badge>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
                           {k.api_key_prefix}…
@@ -245,6 +256,7 @@ export default function ApiKeysPage() {
                           {k.is_active ? "Ativa" : "Inativa"}
                         </Badge>
                       </TableCell>
+
                       <TableCell className="text-xs text-muted-foreground">
                         {k.last_used_at
                           ? new Date(k.last_used_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
