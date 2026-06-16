@@ -9,7 +9,7 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-const PHASES = ["pncp", "winners", "contratos", "sancionados", "auto_analysis"] as const;
+const PHASES = ["pncp", "winners", "contratos", "sancionados"] as const;
 type Phase = typeof PHASES[number];
 
 type PhaseTiming = {
@@ -34,7 +34,7 @@ const PHASE_LABELS: Record<Phase, string> = {
   winners: "Buscando vencedores das homologadas",
   contratos: "Ingerindo contratos do Portal da Transparência",
   sancionados: "Atualizando empresas sancionadas (CEIS/CNEP)",
-  auto_analysis: "Executando auto-análise IA",
+  
 };
 
 const MODALIDADES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
@@ -314,18 +314,6 @@ serve(async (req) => {
         phaseProgressTotal = 1;
       } else {
         phaseError = `Sancionados: HTTP ${result.status} ${(result.text || "").slice(0, 200)}`;
-        needsBackoff = true;
-      }
-    } else if (phase === "auto_analysis") {
-      const result = await invokeFn("auto-analysis", {});
-      if (result.ok && result.json) {
-        phaseRecords = Number(result.json.totalAnalyzed || result.json.processed || 0);
-        totalRecords += phaseRecords;
-        advancePhase = true;
-        phaseProgressCurrent = 1;
-        phaseProgressTotal = 1;
-      } else {
-        phaseError = `Auto-análise: HTTP ${result.status} ${(result.text || "").slice(0, 200)}`;
         needsBackoff = true;
       }
     }

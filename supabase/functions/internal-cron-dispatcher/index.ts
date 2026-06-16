@@ -17,7 +17,7 @@ const ALLOWED_TARGETS = new Set([
   "ingest-pncp",
   "ingest-pncp-dadosabertos",
   "ingest-querido-diario",
-  "auto-analysis",
+  
   "calculate-orgao-score",
 ]);
 
