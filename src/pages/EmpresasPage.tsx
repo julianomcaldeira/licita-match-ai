@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Building2, MoreHorizontal, Users, Zap, Plus, Loader2, X } from "lucide-react";
+import { Building2, Zap, Plus, Loader2, X, Pencil } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -26,6 +26,7 @@ const emptyForm: EmpresaForm = {
 
 export default function EmpresasPage() {
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<EmpresaForm>(emptyForm);
   const { role } = useAuth();
   const queryClient = useQueryClient();
@@ -43,22 +44,47 @@ export default function EmpresasPage() {
     },
   });
 
-  const createMutation = useMutation({
+  const resetForm = () => {
+    setForm(emptyForm);
+    setEditingId(null);
+    setShowForm(false);
+  };
+
+  const startEdit = (emp: any) => {
+    setEditingId(emp.id);
+    setForm({
+      nome: emp.nome ?? "",
+      cnpj: emp.cnpj ?? "",
+      descricao_atividade: emp.descricao_atividade ?? "",
+      segmentos: (emp.segmentos ?? []).join(", "),
+      palavras_chave: (emp.palavras_chave ?? []).join(", "),
+      prompt_personalizado: emp.prompt_personalizado ?? "",
+    });
+    setShowForm(true);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const saveMutation = useMutation({
     mutationFn: async (f: EmpresaForm) => {
-      const { error } = await supabase.from("empresas_clientes").insert({
+      const payload = {
         nome: f.nome,
         cnpj: f.cnpj || null,
         descricao_atividade: f.descricao_atividade || null,
-        segmentos: f.segmentos ? f.segmentos.split(",").map((s) => s.trim()) : [],
-        palavras_chave: f.palavras_chave ? f.palavras_chave.split(",").map((s) => s.trim()) : [],
+        segmentos: f.segmentos ? f.segmentos.split(",").map((s) => s.trim()).filter(Boolean) : [],
+        palavras_chave: f.palavras_chave ? f.palavras_chave.split(",").map((s) => s.trim()).filter(Boolean) : [],
         prompt_personalizado: f.prompt_personalizado || null,
-      });
-      if (error) throw error;
+      };
+      if (editingId) {
+        const { error } = await supabase.from("empresas_clientes").update(payload).eq("id", editingId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("empresas_clientes").insert(payload);
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
-      toast.success("Empresa criada!");
-      setShowForm(false);
-      setForm(emptyForm);
+      toast.success(editingId ? "Empresa atualizada!" : "Empresa criada!");
+      resetForm();
       queryClient.invalidateQueries({ queryKey: ["empresas"] });
     },
     onError: (e: any) => toast.error(e.message),
@@ -87,7 +113,7 @@ export default function EmpresasPage() {
         </div>
         {isAdmin && (
           <button
-            onClick={() => setShowForm(!showForm)}
+            onClick={() => (showForm ? resetForm() : setShowForm(true))}
             className="flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow hover:opacity-90 transition"
           >
             {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
@@ -96,14 +122,18 @@ export default function EmpresasPage() {
         )}
       </div>
 
-      {/* Create form */}
       {showForm && (
         <motion.form
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          onSubmit={(e) => { e.preventDefault(); createMutation.mutate(form); }}
+          onSubmit={(e) => { e.preventDefault(); saveMutation.mutate(form); }}
           className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-4"
         >
+          <div className="flex items-center justify-between">
+            <h2 className="font-display text-lg font-semibold text-foreground">
+              {editingId ? "Editar Empresa" : "Nova Empresa"}
+            </h2>
+          </div>
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-foreground">Nome *</label>
@@ -132,14 +162,18 @@ export default function EmpresasPage() {
             <label className="mb-1 block text-sm font-medium text-foreground">Prompt Personalizado para IA</label>
             <textarea value={form.prompt_personalizado} onChange={(e) => setForm({ ...form, prompt_personalizado: e.target.value })} rows={3} placeholder="Descreva o escopo da empresa para análise de IA..." className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
           </div>
-          <button type="submit" disabled={createMutation.isPending} className="flex h-10 items-center gap-2 rounded-lg bg-primary px-6 text-sm font-medium text-primary-foreground shadow hover:opacity-90 transition disabled:opacity-50">
-            {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Building2 className="h-4 w-4" />}
-            Criar Empresa
-          </button>
+          <div className="flex items-center gap-3">
+            <button type="submit" disabled={saveMutation.isPending} className="flex h-10 items-center gap-2 rounded-lg bg-primary px-6 text-sm font-medium text-primary-foreground shadow hover:opacity-90 transition disabled:opacity-50">
+              {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Building2 className="h-4 w-4" />}
+              {editingId ? "Salvar alterações" : "Criar Empresa"}
+            </button>
+            <button type="button" onClick={resetForm} className="flex h-10 items-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground hover:bg-muted transition">
+              Cancelar
+            </button>
+          </div>
         </motion.form>
       )}
 
-      {/* Cards */}
       {isLoading ? (
         <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
       ) : !empresas?.length ? (
@@ -163,9 +197,20 @@ export default function EmpresasPage() {
                   <Building2 className="h-6 w-6 text-primary" />
                 </div>
                 {isAdmin && (
-                  <button onClick={() => deleteMutation.mutate(emp.id)} className="text-muted-foreground hover:text-destructive transition" title="Remover">
-                    <X className="h-4 w-4" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => startEdit(emp)} className="text-muted-foreground hover:text-primary transition" title="Editar">
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (window.confirm(`Remover ${emp.nome}?`)) deleteMutation.mutate(emp.id);
+                      }}
+                      className="text-muted-foreground hover:text-destructive transition"
+                      title="Remover"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
                 )}
               </div>
               <h3 className="mt-4 font-display text-lg font-semibold text-foreground">{emp.nome}</h3>
