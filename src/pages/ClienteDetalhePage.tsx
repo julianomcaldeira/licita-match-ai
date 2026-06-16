@@ -139,7 +139,7 @@ export default function ClienteDetalhePage() {
       </div>
 
       {resumo && (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
           <div className="rounded-xl border border-border bg-card p-4">
             <div className="text-xs text-muted-foreground">Vitórias</div>
             <div className="mt-1 font-display text-2xl font-bold">{resumo.vitorias ?? 0}</div>
@@ -149,13 +149,29 @@ export default function ClienteDetalhePage() {
             <div className="mt-1 font-display text-xl font-bold">{fmtMoney(resumo.valor_total_vencido)}</div>
           </div>
           <div className="rounded-xl border border-border bg-card p-4">
-            <div className="text-xs text-muted-foreground">Contratos</div>
-            <div className="mt-1 font-display text-2xl font-bold">{resumo.contratos ?? 0}</div>
-          </div>
-          <div className="rounded-xl border border-border bg-card p-4">
             <div className="text-xs text-muted-foreground">Ticket médio</div>
             <div className="mt-1 font-display text-xl font-bold">{fmtMoney(resumo.ticket_medio)}</div>
           </div>
+          <div className="rounded-xl border border-border bg-card p-4">
+            <div className="text-xs text-muted-foreground">Contratos</div>
+            <div className="mt-1 font-display text-2xl font-bold">{resumo.contratos ?? 0}</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => { setTab("mercado"); setPage(0); }}
+            className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-left transition hover:bg-primary/10"
+          >
+            <div className="flex items-center gap-1 text-xs text-primary"><Target className="h-3 w-3" /> Mercado (concorrência)</div>
+            <div className="mt-1 font-display text-2xl font-bold text-primary">{(resumo.mercado_total ?? 0).toLocaleString("pt-BR")}</div>
+          </button>
+          <button
+            type="button"
+            onClick={() => { setTab("mercado"); setPage(0); }}
+            className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-left transition hover:bg-primary/10"
+          >
+            <div className="text-xs text-primary">Valor homologado mercado</div>
+            <div className="mt-1 font-display text-xl font-bold text-primary">{fmtMoney(resumo.mercado_valor_homologado)}</div>
+          </button>
         </div>
       )}
 
