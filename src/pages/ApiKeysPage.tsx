@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Key, Plus, Copy, Trash2, ToggleLeft, ToggleRight, BookOpen, CheckCircle2, Clock, ExternalLink } from "lucide-react";
+import { Key, Plus, Copy, Trash2, ToggleLeft, ToggleRight, BookOpen, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -22,10 +22,23 @@ const DOCS_ENDPOINTS = [
   { method: "GET", path: "/contratos", desc: "Consulta contratos públicos", params: "search, fornecedor_cnpj, limit, offset" },
 ];
 
+async function sha256Hex(input: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function generateApiKey(): string {
+  // 64 hex chars (~256 bits)
+  const arr = new Uint8Array(32);
+  crypto.getRandomValues(arr);
+  return Array.from(arr).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 export default function ApiKeysPage() {
   const { role } = useAuth();
   const queryClient = useQueryClient();
   const [newClientName, setNewClientName] = useState("");
+  const [revealedKey, setRevealedKey] = useState<{ client_name: string; api_key: string } | null>(null);
   const isAdmin = role === "admin_central";
 
   const { data: keys, isLoading } = useQuery({
@@ -40,14 +53,22 @@ export default function ApiKeysPage() {
 
   const createKey = useMutation({
     mutationFn: async (clientName: string) => {
-      const { data, error } = await supabase.from("api_keys").insert({ client_name: clientName }).select().single();
+      const apiKey = generateApiKey();
+      const api_key_hash = await sha256Hex(apiKey);
+      const api_key_prefix = apiKey.slice(0, 8);
+      const { data, error } = await supabase
+        .from("api_keys")
+        .insert({ client_name: clientName, api_key_hash, api_key_prefix })
+        .select()
+        .single();
       if (error) throw error;
-      return data;
+      return { ...data, api_key: apiKey };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["api-keys"] });
       setNewClientName("");
-      toast({ title: "API Key criada", description: `Chave gerada para ${data.client_name}` });
+      setRevealedKey({ client_name: data.client_name, api_key: data.api_key });
+      toast({ title: "API Key criada", description: `Copie a chave agora — ela não será exibida novamente.` });
     },
     onError: () => toast({ title: "Erro ao criar chave", variant: "destructive" }),
   });
@@ -102,6 +123,34 @@ export default function ApiKeysPage() {
         </TabsList>
 
         <TabsContent value="keys" className="space-y-4 mt-4">
+          {/* Reveal banner (one-time) */}
+          {revealedKey && (
+            <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-5 shadow-sm">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-amber-900 dark:text-amber-200">
+                    Copie a chave de {revealedKey.client_name} agora
+                  </h3>
+                  <p className="text-xs text-amber-800 dark:text-amber-300 mt-1">
+                    Por segurança, armazenamos apenas o hash. Esta é a única vez que você verá a chave completa.
+                  </p>
+                  <div className="flex items-center gap-2 mt-3">
+                    <code className="text-xs bg-white dark:bg-background px-3 py-2 rounded font-mono flex-1 break-all border">
+                      {revealedKey.api_key}
+                    </code>
+                    <Button size="sm" onClick={() => copyToClipboard(revealedKey.api_key)}>
+                      <Copy className="h-4 w-4 mr-1" /> Copiar
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setRevealedKey(null)}>
+                      Pronto
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Create new key */}
           <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
             <h2 className="font-display text-sm font-semibold text-foreground mb-3">Nova Chave de API</h2>
@@ -129,7 +178,7 @@ export default function ApiKeysPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Cliente</TableHead>
-                    <TableHead>API Key</TableHead>
+                    <TableHead>Identificador</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Último uso</TableHead>
                     <TableHead>Criada em</TableHead>
@@ -145,14 +194,9 @@ export default function ApiKeysPage() {
                     <TableRow key={k.id}>
                       <TableCell className="font-medium">{k.client_name}</TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-1">
-                          <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
-                            {k.api_key.slice(0, 8)}...{k.api_key.slice(-4)}
-                          </code>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyToClipboard(k.api_key)}>
-                            <Copy className="h-3 w-3" />
-                          </Button>
-                        </div>
+                        <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                          {k.api_key_prefix}…
+                        </code>
                       </TableCell>
                       <TableCell>
                         <Badge variant={k.is_active ? "default" : "secondary"} className="text-[10px]">
@@ -189,6 +233,9 @@ export default function ApiKeysPage() {
                 </TableBody>
               </Table>
             </div>
+            <p className="text-xs text-muted-foreground mt-3">
+              As chaves completas não são armazenadas em texto puro. Para rotacionar, crie uma nova chave e remova a antiga.
+            </p>
           </div>
         </TabsContent>
 

@@ -17,6 +17,11 @@ function err(message: string, status = 400) {
   return json({ error: message }, status);
 }
 
+async function sha256Hex(input: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 // Validate API key and return supabase service client
 async function authenticate(req: Request) {
   const apiKey =
@@ -32,10 +37,12 @@ async function authenticate(req: Request) {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
   );
 
+  const apiKeyHash = await sha256Hex(apiKey);
+
   const { data: keyRecord, error: keyErr } = await supabase
     .from("api_keys")
     .select("id, client_name, is_active")
-    .eq("api_key", apiKey)
+    .eq("api_key_hash", apiKeyHash)
     .maybeSingle();
 
   if (keyErr || !keyRecord) {
