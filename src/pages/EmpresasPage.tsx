@@ -260,7 +260,43 @@ export default function EmpresasPage() {
                   <Zap className="h-3.5 w-3.5" /> {emp.segmentos.join(", ")}
                 </div>
               )}
+              {/* Recorte materializado */}
+              <div className="mt-4 grid grid-cols-2 gap-2 rounded-lg border border-border bg-muted/30 p-3">
+                <div className="flex items-center gap-2">
+                  <Trophy className="h-4 w-4 text-amber-500" />
+                  <div className="text-xs">
+                    <div className="font-semibold text-foreground">{vinculosByEmpresa?.[emp.id]?.vitorias ?? 0}</div>
+                    <div className="text-muted-foreground">vitórias</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-primary" />
+                  <div className="text-xs">
+                    <div className="font-semibold text-foreground">{vinculosByEmpresa?.[emp.id]?.contratos ?? 0}</div>
+                    <div className="text-muted-foreground">contratos</div>
+                  </div>
+                </div>
+              </div>
+              {isAdmin && (
+                <button
+                  onClick={() => refreshMutation.mutate(emp.id)}
+                  disabled={refreshMutation.isPending}
+                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium text-foreground hover:bg-muted transition disabled:opacity-50"
+                  title="Recalcular vínculos a partir do CNPJ"
+                >
+                  {refreshMutation.isPending && refreshMutation.variables === emp.id
+                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    : <RefreshCw className="h-3.5 w-3.5" />}
+                  Reprocessar vínculos
+                </button>
+              )}
             </motion.div>
+          ))}
+        </motion.div>
+      )}
+    </div>
+  );
+}
           ))}
         </motion.div>
       )}
