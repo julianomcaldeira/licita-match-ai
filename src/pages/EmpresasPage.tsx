@@ -44,6 +44,38 @@ export default function EmpresasPage() {
     },
   });
 
+  const { data: vinculosByEmpresa } = useQuery({
+    queryKey: ["empresas-vinculos-count"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("cliente_vinculos")
+        .select("empresa_id, tipo");
+      if (error) throw error;
+      const map: Record<string, { vitorias: number; contratos: number }> = {};
+      (data || []).forEach((r: any) => {
+        if (!map[r.empresa_id]) map[r.empresa_id] = { vitorias: 0, contratos: 0 };
+        if (r.tipo === "licitacao_vencedor") map[r.empresa_id].vitorias++;
+        else if (r.tipo === "contrato") map[r.empresa_id].contratos++;
+      });
+      return map;
+    },
+  });
+
+  const refreshMutation = useMutation({
+    mutationFn: async (empresaId: string) => {
+      const { data, error } = await supabase.rpc("refresh_cliente_vinculos", { p_empresa_id: empresaId });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data: any) => {
+      const v = data?.vitorias_inseridas ?? 0;
+      const c = data?.contratos_inseridos ?? 0;
+      toast.success(`Vínculos atualizados: +${v} vitórias, +${c} contratos`);
+      queryClient.invalidateQueries({ queryKey: ["empresas-vinculos-count"] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
   const resetForm = () => {
     setForm(emptyForm);
     setEditingId(null);
