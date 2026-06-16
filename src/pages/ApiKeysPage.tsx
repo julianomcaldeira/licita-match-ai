@@ -9,17 +9,22 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const API_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/public-api`;
+const GLOBAL_SCOPE = "__global__";
 
 const DOCS_ENDPOINTS = [
-  { method: "GET", path: "/licitacoes", desc: "Busca licitações com filtros", params: "search, uf, modalidade, date_from, date_to, com_vencedor, limit, offset" },
-  { method: "GET", path: "/licitacoes/:id", desc: "Detalhes da licitação com itens e vencedores", params: "UUID da licitação" },
-  { method: "GET", path: "/orgaos", desc: "Lista órgãos públicos", params: "search, uf, order_by (total_licitacoes|total_valor), limit, offset" },
-  { method: "GET", path: "/empresas-vencedoras", desc: "Lista empresas vencedoras", params: "search, uf, order_by (total_vitorias|total_valor), limit, offset" },
-  { method: "GET", path: "/sancionadas", desc: "Empresas sancionadas (CEIS/CNEP)", params: "search, uf, tipo_cadastro (CEIS|CNEP), vigente (true|false), limit, offset" },
+  { method: "GET", path: "/me", desc: "Dados do cliente vinculado à chave (nome, CNPJs, segmentos, palavras-chave)", params: "—" },
+  { method: "GET", path: "/me/resumo", desc: "KPIs consolidados do recorte do cliente", params: "—" },
+  { method: "GET", path: "/me/vitorias", desc: "Licitações vencidas e contratos firmados (somente por CNPJ)", params: "limit, offset" },
+  { method: "GET", path: "/licitacoes", desc: "Licitações — recorte do cliente se a chave for vinculada", params: "search, uf, modalidade, date_from, date_to, only_vencidas, com_vencedor, limit, offset" },
+  { method: "GET", path: "/licitacoes/:id", desc: "Detalhe de licitação (404 se fora do recorte do cliente)", params: "UUID" },
+  { method: "GET", path: "/contratos", desc: "Contratos — recorte do cliente se a chave for vinculada", params: "search, uf, fornecedor_cnpj, date_from, date_to, only_proprios, limit, offset" },
+  { method: "GET", path: "/orgaos", desc: "Lista órgãos públicos (global)", params: "search, uf, order_by, limit, offset" },
+  { method: "GET", path: "/empresas-vencedoras", desc: "Empresas vencedoras (global)", params: "search, uf, order_by, limit, offset" },
+  { method: "GET", path: "/sancionadas", desc: "Empresas sancionadas CEIS/CNEP (global)", params: "search, uf, tipo_cadastro, vigente, limit, offset" },
   { method: "GET", path: "/check-sancionada/:cnpj", desc: "Verificação rápida de CNPJ sancionado", params: "CNPJ (apenas números)" },
-  { method: "GET", path: "/contratos", desc: "Consulta contratos públicos", params: "search, fornecedor_cnpj, limit, offset" },
 ];
 
 async function sha256Hex(input: string): Promise<string> {
