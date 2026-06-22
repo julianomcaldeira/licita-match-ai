@@ -309,7 +309,7 @@ Deno.serve(async (req) => {
 
     return err(`Unknown endpoint: /${path}. Check /public-api for available endpoints.`, 404);
   } catch (e: any) {
-    console.error("API error:", e);
-    return err("Internal server error.", 500);
+    console.error("API error:", path, e?.message, e?.code, e?.details, e?.hint, e?.stack);
+    return err(`Internal server error: ${e?.message || "unknown"}${e?.code ? ` [${e.code}]` : ""}${e?.hint ? ` hint: ${e.hint}` : ""}`, 500);
   }
 });
