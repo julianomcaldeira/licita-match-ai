@@ -83,7 +83,47 @@ Query params:
 | `limit`, `offset` | int | Paginação |
 
 ### 3.6 `GET /licitacoes/:id` — Detalhe da licitação
-Inclui itens e vencedores. Para chaves vinculadas, retorna `404` se a licitação não estiver no recorte do cliente.
+Retorna a licitação com `itens[]` aninhados. Cada item traz:
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `id` | uuid | ID do item |
+| `numero_item` | int | Nº do item no edital |
+| `descricao` | text | Descrição completa |
+| `quantidade` | numeric | Quantidade licitada |
+| `unidade` | text | Unidade de medida (UN, KG, …) |
+| `valor_unitario_estimado` | numeric | Preço unitário estimado |
+| `valor_unitario_final` | numeric | Preço unitário homologado |
+| `vencedores[]` | array | Vencedores do item (pode ser >1) |
+
+Cada `vencedores[]` traz: `id`, `cnpj`, `razao_social`, `valor_final`, `percentual_desconto`.
+
+Para chaves vinculadas, retorna `404` se a licitação não estiver no recorte do cliente.
+
+### 3.6.1 `GET /licitacoes/:id/itens` — Itens (lista plana p/ integração)
+Mesmo conteúdo dos itens acima, sem o envelope da licitação. Útil para sincronizar tabelas de itens/vencedores em outro sistema sem ter que descer pelo objeto completo.
+
+```json
+{
+  "data": [
+    {
+      "id": "…",
+      "licitacao_id": "…",
+      "numero_item": 1,
+      "descricao": "Veículo de Passeio Hatch…",
+      "quantidade": 1,
+      "unidade": "UN",
+      "valor_unitario_estimado": 83830.30,
+      "valor_unitario_final": 83800.00,
+      "vencedores": [
+        { "id": "…", "cnpj": "54977710000103", "razao_social": "D+ SAUDE VEICULOS…", "valor_final": 83800.00, "percentual_desconto": 0.04 }
+      ]
+    }
+  ],
+  "meta": { "scope": {…}, "licitacao_id": "…", "total": 3 }
+}
+```
+
 
 ### 3.7 `GET /contratos` — Contratos no recorte do cliente
 Query params:
