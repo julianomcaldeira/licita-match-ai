@@ -92,7 +92,8 @@ Deno.serve(async (req) => {
         "/me/resumo": "KPIs consolidados do recorte do cliente",
         "/me/vitorias": "Licitações vencidas e contratos firmados (somente por CNPJ)",
         "/licitacoes": "Licitações (recorte do cliente quando a chave for vinculada)",
-        "/licitacoes/:id": "Detalhe de licitação",
+        "/licitacoes/:id": "Detalhe de licitação (inclui itens + vencedores aninhados)",
+        "/licitacoes/:id/itens": "Itens da licitação com vencedores (descrição, qtd, unidade, valor unit. estimado/final, CNPJ, razão social, valor_final, % desconto)",
         "/contratos": "Contratos (recorte do cliente quando a chave for vinculada)",
         "/orgaos": "Órgãos públicos (global)",
         "/empresas-vencedoras": "Empresas vencedoras (global)",
@@ -215,12 +216,48 @@ Deno.serve(async (req) => {
 
       const { data: itens } = await supabase
         .from("licitacao_itens")
-        .select("*, licitacao_vencedores(*)")
+        .select("id, numero_item, descricao, quantidade, unidade, valor_unitario_estimado, valor_unitario_final, licitacao_vencedores(id, cnpj, razao_social, valor_final, percentual_desconto)")
         .eq("licitacao_id", id)
         .order("numero_item");
 
+      const itensNormalizados = (itens || []).map((it: any) => {
+        const { licitacao_vencedores, ...rest } = it;
+        return { ...rest, vencedores: licitacao_vencedores || [] };
+      });
+
       const { raw_json, ...licClean } = lic;
-      return json({ data: { ...licClean, itens: itens || [] }, meta: { scope } });
+      return json({ data: { ...licClean, itens: itensNormalizados }, meta: { scope } });
+    }
+
+    // ---------- LICITAÇÃO ITENS (endpoint dedicado p/ integração) ----------
+    const itensMatch = path.match(/^licitacoes\/([0-9a-f-]{36})\/itens$/);
+    if (itensMatch) {
+      const id = itensMatch[1];
+      if (empresaClienteId) {
+        const { data: vit } = await supabase
+          .from("cliente_vinculos")
+          .select("id").eq("empresa_id", empresaClienteId)
+          .eq("licitacao_id", id).maybeSingle();
+        if (!vit) {
+          const { data: rows } = await supabase.rpc("list_cliente_licitacoes", {
+            p_empresa_id: empresaClienteId, p_limit: 1, p_offset: 0,
+          });
+          if (!(rows || []).some((r: any) => r.id === id)) {
+            return err("Licitação fora do recorte deste cliente.", 404);
+          }
+        }
+      }
+      const { data: itens, error: e } = await supabase
+        .from("licitacao_itens")
+        .select("id, licitacao_id, numero_item, descricao, quantidade, unidade, valor_unitario_estimado, valor_unitario_final, licitacao_vencedores(id, cnpj, razao_social, valor_final, percentual_desconto)")
+        .eq("licitacao_id", id)
+        .order("numero_item");
+      if (e) throw e;
+      const data = (itens || []).map((it: any) => {
+        const { licitacao_vencedores, ...rest } = it;
+        return { ...rest, vencedores: licitacao_vencedores || [] };
+      });
+      return json({ data, meta: { scope, licitacao_id: id, total: data.length } });
     }
 
     // ---------- CONTRATOS ----------
