@@ -50,6 +50,54 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_usage_log: {
+        Row: {
+          cached: boolean
+          completion_tokens: number | null
+          created_at: string
+          duration_ms: number | null
+          error_message: string | null
+          function_name: string
+          id: string
+          metadata: Json
+          model: string | null
+          prompt_tokens: number | null
+          status: string
+          total_tokens: number | null
+          user_id: string | null
+        }
+        Insert: {
+          cached?: boolean
+          completion_tokens?: number | null
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          function_name: string
+          id?: string
+          metadata?: Json
+          model?: string | null
+          prompt_tokens?: number | null
+          status?: string
+          total_tokens?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          cached?: boolean
+          completion_tokens?: number | null
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          function_name?: string
+          id?: string
+          metadata?: Json
+          model?: string | null
+          prompt_tokens?: number | null
+          status?: string
+          total_tokens?: number | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       api_keys: {
         Row: {
           api_key_hash: string
@@ -1281,6 +1329,7 @@ export type Database = {
     }
     Functions: {
       _kw_or_clause: { Args: { p_kw: string[] }; Returns: string }
+      ai_usage_summary: { Args: never; Returns: Json }
       analytics_daily_by_status: {
         Args: { p_date_from?: string; p_date_to?: string }
         Returns: {
