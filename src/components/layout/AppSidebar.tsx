@@ -4,7 +4,6 @@ import {
   LayoutDashboard,
   Search,
   Building2,
-  Users,
   BarChart3,
   FileText,
   Settings,
@@ -15,7 +14,6 @@ import {
   ShieldCheck,
   Key,
   TrendingUp,
-  Brain,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -36,11 +34,11 @@ const navigation: NavItem[] = [
   { name: "Sancionadas", href: "/sancionadas", icon: ShieldAlert },
   { name: "Score Órgãos", href: "/score-orgaos", icon: ShieldCheck },
   { name: "Índice StartGi", href: "/indice-startgi", icon: TrendingUp, roles: ["admin_central", "admin_empresa"] },
-  { name: "Usuários", href: "/usuarios", icon: Users },
   { name: "Relatórios", href: "/relatorios", icon: FileText },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
   { name: "Monitor Ingestão", href: "/monitor-ingestao", icon: Activity },
-  { name: "Consumo IA", href: "/consumo-ia", icon: Brain, roles: ["admin_central"] },
+  { name: "API Pública", href: "/api", icon: Key },
+  { name: "Configurações", href: "/configuracoes", icon: Settings },
   { name: "API Pública", href: "/api", icon: Key },
   { name: "Configurações", href: "/configuracoes", icon: Settings },
 ];

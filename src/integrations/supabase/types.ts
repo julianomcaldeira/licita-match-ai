@@ -1329,7 +1329,24 @@ export type Database = {
     }
     Functions: {
       _kw_or_clause: { Args: { p_kw: string[] }; Returns: string }
-      ai_usage_summary: { Args: never; Returns: Json }
+      ai_usage_recent: {
+        Args: { p_empresa_id?: string; p_limit?: number; p_period?: string }
+        Returns: {
+          cached: boolean
+          created_at: string
+          duration_ms: number
+          empresa_nome: string
+          error_message: string
+          function_name: string
+          id: string
+          model: string
+          status: string
+          total_tokens: number
+        }[]
+      }
+      ai_usage_summary:
+        | { Args: never; Returns: Json }
+        | { Args: { p_empresa_id?: string; p_period?: string }; Returns: Json }
       analytics_daily_by_status: {
         Args: { p_date_from?: string; p_date_to?: string }
         Returns: {

@@ -21,8 +21,8 @@ import OrgaosScorePage from "@/pages/OrgaosScorePage";
 import ApiKeysPage from "@/pages/ApiKeysPage";
 import IndiceStartGiPage from "@/pages/IndiceStartGiPage";
 import AIMonitorPage from "@/pages/AIMonitorPage";
+import ConfiguracoesPage from "@/pages/ConfiguracoesPage";
 import NotFound from "@/pages/NotFound";
-import { Users, FileText, Settings } from "lucide-react";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -57,7 +57,7 @@ const App = () => (
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/monitor-ingestao" element={<IngestaoMonitorPage />} />
               <Route path="/consumo-ia" element={<AIMonitorPage />} />
-              <Route path="/configuracoes" element={<PlaceholderPage title="Configurações" description="Parâmetros gerais do sistema e integrações" icon={Settings} />} />
+              <Route path="/configuracoes" element={<ConfiguracoesPage />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
