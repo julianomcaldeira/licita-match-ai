@@ -4,7 +4,6 @@ import {
   LayoutDashboard,
   Search,
   Building2,
-  Users,
   BarChart3,
   FileText,
   Settings,
@@ -15,7 +14,6 @@ import {
   ShieldCheck,
   Key,
   TrendingUp,
-  Brain,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
