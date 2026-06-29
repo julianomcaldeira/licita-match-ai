@@ -39,8 +39,6 @@ const navigation: NavItem[] = [
   { name: "Monitor Ingestão", href: "/monitor-ingestao", icon: Activity },
   { name: "API Pública", href: "/api", icon: Key },
   { name: "Configurações", href: "/configuracoes", icon: Settings },
-  { name: "API Pública", href: "/api", icon: Key },
-  { name: "Configurações", href: "/configuracoes", icon: Settings },
 ];
 
 interface AppSidebarProps {
