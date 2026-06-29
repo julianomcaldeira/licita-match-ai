@@ -736,8 +736,8 @@ async function runAgent(opts: {
     question.length > 220 ||
     history.length >= 2;
   const MODELS = isComplex
-    ? ["openai/gpt-5-mini", "google/gemini-2.5-pro"]
-    : ["google/gemini-2.5-flash-lite", "google/gemini-2.5-flash", "openai/gpt-5-mini"];
+    ? ["google/gemini-3-flash-preview", "openai/gpt-5-mini"]
+    : ["google/gemini-3.1-flash-lite", "google/gemini-3-flash-preview"];
   let modelIdx = 0;
 
   for (let iter = 0; iter < 7; iter++) {
@@ -808,18 +808,26 @@ async function runAgent(opts: {
   return { answer: "Não consegui finalizar a análise — muitas iterações. Tente uma pergunta mais específica.", toolsUsed, sources: allSources };
 }
 
+async function logUsage(supabase: any, row: Record<string, unknown>) {
+  try { await supabase.from("ai_usage_log").insert(row); } catch (e) { console.error("logUsage failed", e); }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const t0 = Date.now();
+  let userId: string | null = null;
+  let supabase: any = null;
   try {
     const auth = await authenticateUser(req);
     if (!auth) return new Response(JSON.stringify({ error: "Não autorizado" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    userId = auth.userId;
     if (!checkRateLimit(auth.userId, 20, 3600000)) {
       return new Response(JSON.stringify({ error: "Limite de 20 perguntas/hora atingido. Tente mais tarde." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const apiKey = Deno.env.get("LOVABLE_API_KEY");
     if (!apiKey) throw new Error("LOVABLE_API_KEY não configurada.");
-    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
     const body = await req.json();
     const question: string = body.question || body.userQuestion || "";
@@ -831,44 +839,44 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Pergunta vazia." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Passo 1 — Cache: só consultamos quando NÃO há histórico (follow-up depende do contexto)
     const cacheKey = await sha256Hex(`${normalizeQuestion(question)}|p=${period_months}|uf=${uf || ""}`);
     if (history.length === 0) {
       const { data: cached } = await supabase
         .from("ai_query_cache")
-        .select("response")
+        .select("response,hits")
         .eq("cache_key", cacheKey)
         .gt("expires_at", new Date().toISOString())
         .maybeSingle();
       if (cached?.response) {
-        // hit: incrementa métrica fire-and-forget
-        supabase.from("ai_query_cache")
-          .update({ hits: ((cached as any).hits || 0) + 1 })
-          .eq("cache_key", cacheKey)
-          .then(() => {}, () => {});
+        supabase.from("ai_query_cache").update({ hits: ((cached as any).hits || 0) + 1 }).eq("cache_key", cacheKey).then(() => {}, () => {});
+        logUsage(supabase, { function_name: "market-analysis", model: "cache", user_id: userId, cached: true, duration_ms: Date.now() - t0, status: "success", metadata: { period_months, uf } });
         return new Response(JSON.stringify({ ...cached.response, cached: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
     }
 
     const result = await runAgent({ apiKey, supabase, question, history, uf, period_months });
 
-    // Salva no cache apenas se for resposta limpa (validador OK e sem erro de iteração)
     if (history.length === 0 && result.validation?.ok !== false && !result.answer.startsWith("Não consegui finalizar")) {
       supabase.from("ai_query_cache").upsert({
-        cache_key: cacheKey,
-        question,
+        cache_key: cacheKey, question,
         filters: { period_months, uf: uf || null },
-        response: result,
-        model_used: result.toolsUsed?.length ? "agent" : "direct",
+        response: result, model_used: result.toolsUsed?.length ? "agent" : "direct",
         expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       }, { onConflict: "cache_key" }).then(() => {}, (err: any) => console.error("cache upsert failed", err));
     }
 
+    logUsage(supabase, {
+      function_name: "market-analysis",
+      model: (result.toolsUsed?.length ? "agent-mix" : "direct"),
+      user_id: userId, cached: false, duration_ms: Date.now() - t0, status: "success",
+      metadata: { period_months, uf, tools: result.toolsUsed?.map(t => t.name) || [] }
+    });
     return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e: any) {
     console.error("market-analysis error:", e);
     const msg = e?.message || "Erro interno.";
     const status = msg.includes("Rate") ? 429 : msg.includes("Crédito") ? 402 : 500;
+    if (supabase) logUsage(supabase, { function_name: "market-analysis", user_id: userId, status: "error", duration_ms: Date.now() - t0, error_message: msg });
     return new Response(JSON.stringify({ error: msg }), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
