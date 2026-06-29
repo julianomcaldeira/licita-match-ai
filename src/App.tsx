@@ -57,7 +57,7 @@ const App = () => (
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/monitor-ingestao" element={<IngestaoMonitorPage />} />
               <Route path="/consumo-ia" element={<AIMonitorPage />} />
-              <Route path="/configuracoes" element={<PlaceholderPage title="Configurações" description="Parâmetros gerais do sistema e integrações" icon={Settings} />} />
+              <Route path="/configuracoes" element={<ConfiguracoesPage />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
