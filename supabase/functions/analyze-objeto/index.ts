@@ -36,19 +36,29 @@ async function authenticateUser(req: Request) {
   return { userId: data.claims.sub as string };
 }
 
+async function logUsage(row: Record<string, unknown>) {
+  try {
+    const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    await sb.from("ai_usage_log").insert(row);
+  } catch (e) { console.error("logUsage failed", e); }
+}
+
+const MODEL = "google/gemini-3.1-flash-lite";
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const t0 = Date.now();
+  let userId: string | null = null;
 
   try {
-    // Auth check
     const auth = await authenticateUser(req);
     if (!auth) {
       return new Response(JSON.stringify({ error: "Não autorizado" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    userId = auth.userId;
 
-    // Rate limit check
     if (!checkRateLimit(auth.userId, 20, 3600000)) {
       return new Response(JSON.stringify({ error: "Limite de requisições excedido. Tente novamente mais tarde." }), {
         status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -77,12 +87,9 @@ Responda em português brasileiro, de forma objetiva e profissional. Use markdow
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: MODEL,
         messages: [
           { role: "system", content: "Você é um especialista em licitações públicas brasileiras. Analise objetos de licitação e descreva claramente o que está sendo comprado/contratado." },
           { role: "user", content: prompt },
@@ -92,31 +99,33 @@ Responda em português brasileiro, de forma objetiva e profissional. Use markdow
     });
 
     if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Limite de requisições excedido. Tente novamente em alguns segundos." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Créditos insuficientes para análise IA." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
       const t = await response.text();
       console.error("AI gateway error:", response.status, t);
-      return new Response(JSON.stringify({ error: "Erro na análise IA" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      const errMsg = response.status === 429 ? "Limite de requisições excedido." :
+                     response.status === 402 ? "Créditos insuficientes para análise IA." : "Erro na análise IA";
+      logUsage({ function_name: "analyze-objeto", model: MODEL, user_id: userId, status: "error", duration_ms: Date.now() - t0, error_message: `${response.status}: ${errMsg}` });
+      return new Response(JSON.stringify({ error: errMsg }), {
+        status: response.status === 429 || response.status === 402 ? response.status : 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const result = await response.json();
+    const usage = result.usage || {};
     const analysis = result.choices?.[0]?.message?.content || "Não foi possível gerar a análise.";
+
+    logUsage({
+      function_name: "analyze-objeto", model: MODEL, user_id: userId,
+      status: "success", cached: false, duration_ms: Date.now() - t0,
+      prompt_tokens: usage.prompt_tokens, completion_tokens: usage.completion_tokens, total_tokens: usage.total_tokens,
+    });
 
     return new Response(JSON.stringify({ analysis }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("analyze-objeto error:", e);
+    logUsage({ function_name: "analyze-objeto", model: MODEL, user_id: userId, status: "error", duration_ms: Date.now() - t0, error_message: e?.message || "erro interno" });
     return new Response(JSON.stringify({ error: "Erro interno. Tente novamente." }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
