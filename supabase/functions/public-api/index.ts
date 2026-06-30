@@ -85,7 +85,10 @@ function scopeMeta(auth: AuthOk) {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "GET") return err("Only GET requests are supported.", 405);
+  // Bind req para habilitar gzip nas respostas
+  const J = (d: unknown, s = 200) => json(d, s, req);
+  const E = (m: string, s = 400) => err(m, s, req);
+  if (req.method !== "GET") return E("Only GET requests are supported.", 405);
 
   const url = new URL(req.url);
   const path = url.pathname.replace(/^\/public-api\/?/, "").replace(/\/$/, "");
