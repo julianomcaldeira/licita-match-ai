@@ -6,15 +6,21 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, OPTIONS",
 };
 
-function json(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
+function json(data: unknown, status = 200, req?: Request) {
+  const body = JSON.stringify(data);
+  const headers: Record<string, string> = { ...corsHeaders, "Content-Type": "application/json" };
+  const accepts = req?.headers.get("accept-encoding") || "";
+  if (body.length > 1024 && accepts.includes("gzip")) {
+    const stream = new Response(body).body!.pipeThrough(new CompressionStream("gzip"));
+    headers["Content-Encoding"] = "gzip";
+    headers["Vary"] = "Accept-Encoding";
+    return new Response(stream, { status, headers });
+  }
+  return new Response(body, { status, headers });
 }
 
-function err(message: string, status = 400) {
-  return json({ error: message }, status);
+function err(message: string, status = 400, req?: Request) {
+  return json({ error: message }, status, req);
 }
 
 async function sha256Hex(input: string): Promise<string> {
