@@ -69,7 +69,8 @@ async function authenticate(req: Request): Promise<{ error: Response } | AuthOk>
 }
 
 function parseParams(url: URL) {
-  const limit = Math.min(parseInt(url.searchParams.get("limit") || "50"), 500);
+  // Cap reduzido p/ controlar egress (era 500). Clientes que precisarem mais devem paginar.
+  const limit = Math.min(parseInt(url.searchParams.get("limit") || "50"), 100);
   const offset = parseInt(url.searchParams.get("offset") || "0");
   const search = url.searchParams.get("search") || null;
   const uf = url.searchParams.get("uf") || null;
