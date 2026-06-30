@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
   const path = url.pathname.replace(/^\/public-api\/?/, "").replace(/\/$/, "");
 
   if (!path || path === "") {
-    return json({
+    return J({
       name: "i-pesquisei Public API",
       version: "1.1",
       endpoints: {
@@ -123,7 +123,7 @@ Deno.serve(async (req) => {
   try {
     // ---------- /me ----------
     if (path === "me") {
-      if (!empresaClienteId) return json({ data: null, meta: { scope: null, note: "API key global (sem cliente vinculado)" } });
+      if (!empresaClienteId) return J({ data: null, meta: { scope: null, note: "API key global (sem cliente vinculado)" } });
       const { data: emp } = await supabase
         .from("empresas_clientes")
         .select("id, nome, cnpj, segmentos, palavras_chave, descricao_atividade")
@@ -133,18 +133,18 @@ Deno.serve(async (req) => {
         .from("cliente_cnpjs")
         .select("cnpj, rotulo")
         .eq("empresa_id", empresaClienteId);
-      return json({ data: { ...emp, cnpjs: cnpjs || [] }, meta: { scope } });
+      return J({ data: { ...emp, cnpjs: cnpjs || [] }, meta: { scope } });
     }
 
     if (path === "me/resumo") {
-      if (!empresaClienteId) return err("Esta API key não está vinculada a um cliente.", 400);
+      if (!empresaClienteId) return E("Esta API key não está vinculada a um cliente.", 400);
       const { data, error: e } = await supabase.rpc("cliente_resumo", { p_empresa_id: empresaClienteId });
       if (e) throw e;
-      return json({ data, meta: { scope } });
+      return J({ data, meta: { scope } });
     }
 
     if (path === "me/vitorias") {
-      if (!empresaClienteId) return err("Esta API key não está vinculada a um cliente.", 400);
+      if (!empresaClienteId) return E("Esta API key não está vinculada a um cliente.", 400);
       const { limit, offset } = parseParams(url);
       const { data, error: e } = await supabase
         .from("cliente_vinculos")
@@ -153,7 +153,7 @@ Deno.serve(async (req) => {
         .order("data_evento", { ascending: false, nullsFirst: false })
         .range(offset, offset + limit - 1);
       if (e) throw e;
-      return json({ data, meta: { scope, limit, offset } });
+      return J({ data, meta: { scope, limit, offset } });
     }
 
     // ---------- LICITAÇÕES ----------
@@ -173,7 +173,7 @@ Deno.serve(async (req) => {
           p_limit: limit, p_offset: offset,
         });
         if (e) throw e;
-        return json({ data, meta: { scope, limit, offset, total: data?.[0]?.total_count ?? 0 } });
+        return J({ data, meta: { scope, limit, offset, total: data?.[0]?.total_count ?? 0 } });
       }
 
       const comVencedor = url.searchParams.get("com_vencedor") === "true";
@@ -184,7 +184,7 @@ Deno.serve(async (req) => {
         p_limit: limit, p_offset: offset,
       });
       if (e) throw e;
-      return json({ data, meta: { scope, limit, offset, total: data?.[0]?.total_count ?? 0 } });
+      return J({ data, meta: { scope, limit, offset, total: data?.[0]?.total_count ?? 0 } });
     }
 
     // ---------- LICITAÇÃO DETALHE ----------
@@ -212,9 +212,9 @@ Deno.serve(async (req) => {
               .eq("id", id)
               .maybeSingle();
             // fallback simple: deny if not found in vínculos
-            if (!kw) return err("Licitação not found.", 404);
+            if (!kw) return E("Licitação not found.", 404);
             // For scoped keys, hide licitações fora do recorte
-            return err("Licitação fora do recorte deste cliente.", 404);
+            return E("Licitação fora do recorte deste cliente.", 404);
           }
         }
       }
@@ -222,7 +222,7 @@ Deno.serve(async (req) => {
       const { data: lic, error: e1 } = await supabase
         .from("licitacoes").select("*").eq("id", id).maybeSingle();
       if (e1) throw e1;
-      if (!lic) return err("Licitação not found.", 404);
+      if (!lic) return E("Licitação not found.", 404);
 
       const { data: itens } = await supabase
         .from("licitacao_itens")
@@ -236,7 +236,7 @@ Deno.serve(async (req) => {
       });
 
       const { raw_json, ...licClean } = lic;
-      return json({ data: { ...licClean, itens: itensNormalizados }, meta: { scope } });
+      return J({ data: { ...licClean, itens: itensNormalizados }, meta: { scope } });
     }
 
     // ---------- LICITAÇÃO ITENS (endpoint dedicado p/ integração) ----------
@@ -253,7 +253,7 @@ Deno.serve(async (req) => {
             p_empresa_id: empresaClienteId, p_limit: 1, p_offset: 0,
           });
           if (!(rows || []).some((r: any) => r.id === id)) {
-            return err("Licitação fora do recorte deste cliente.", 404);
+            return E("Licitação fora do recorte deste cliente.", 404);
           }
         }
       }
@@ -267,7 +267,7 @@ Deno.serve(async (req) => {
         const { licitacao_vencedores, ...rest } = it;
         return { ...rest, vencedores: licitacao_vencedores || [] };
       });
-      return json({ data, meta: { scope, licitacao_id: id, total: data.length } });
+      return J({ data, meta: { scope, licitacao_id: id, total: data.length } });
     }
 
     // ---------- CONTRATOS ----------
@@ -287,7 +287,7 @@ Deno.serve(async (req) => {
           p_limit: limit, p_offset: offset,
         });
         if (e) throw e;
-        return json({ data, meta: { scope, limit, offset, total: data?.[0]?.total_count ?? 0 } });
+        return J({ data, meta: { scope, limit, offset, total: data?.[0]?.total_count ?? 0 } });
       }
 
       let q = supabase.from("contratos")
@@ -298,7 +298,7 @@ Deno.serve(async (req) => {
       if (fornecedorCnpj) q = q.ilike("fornecedor_cnpj", `%${fornecedorCnpj}%`);
       const { data, count, error: e } = await q;
       if (e) throw e;
-      return json({ data, meta: { scope, limit, offset, total: count ?? 0 } });
+      return J({ data, meta: { scope, limit, offset, total: count ?? 0 } });
     }
 
     // ---------- ÓRGÃOS (global) ----------
@@ -309,7 +309,7 @@ Deno.serve(async (req) => {
         p_search: search, p_uf: uf, p_order_by: orderBy, p_limit: limit, p_offset: offset,
       });
       if (e) throw e;
-      return json({ data, meta: { scope, limit, offset, total: data?.[0]?.total_count ?? 0 } });
+      return J({ data, meta: { scope, limit, offset, total: data?.[0]?.total_count ?? 0 } });
     }
 
     if (path === "empresas-vencedoras") {
@@ -319,7 +319,7 @@ Deno.serve(async (req) => {
         p_search: search, p_uf: uf, p_order_by: orderBy, p_limit: limit, p_offset: offset,
       });
       if (e) throw e;
-      return json({ data, meta: { scope, limit, offset, total: data?.[0]?.total_count ?? 0 } });
+      return J({ data, meta: { scope, limit, offset, total: data?.[0]?.total_count ?? 0 } });
     }
 
     if (path === "sancionadas") {
@@ -339,7 +339,7 @@ Deno.serve(async (req) => {
       if (vigente === "true") q = q.or("data_fim.is.null,data_fim.gte." + new Date().toISOString().split("T")[0]);
       const { data, count, error: e } = await q;
       if (e) throw e;
-      return json({ data, meta: { scope, limit, offset, total: count ?? 0 } });
+      return J({ data, meta: { scope, limit, offset, total: count ?? 0 } });
     }
 
     const checkMatch = path.match(/^check-sancionada\/(\d{11,14})$/);
@@ -351,12 +351,12 @@ Deno.serve(async (req) => {
         .ilike("cnpj_cpf", `%${cnpj}%`);
       const records = data || [];
       const vigentes = records.filter((r: any) => !r.data_fim || new Date(r.data_fim) >= new Date());
-      return json({ cnpj, sancionada: vigentes.length > 0, total_registros: records.length, vigentes: vigentes.length, registros: records });
+      return J({ cnpj, sancionada: vigentes.length > 0, total_registros: records.length, vigentes: vigentes.length, registros: records });
     }
 
-    return err(`Unknown endpoint: /${path}. Check /public-api for available endpoints.`, 404);
+    return E(`Unknown endpoint: /${path}. Check /public-api for available endpoints.`, 404);
   } catch (e: any) {
     console.error("API error:", path, e?.message, e?.code, e?.details, e?.hint, e?.stack);
-    return err(`Internal server error: ${e?.message || "unknown"}${e?.code ? ` [${e.code}]` : ""}${e?.hint ? ` hint: ${e.hint}` : ""}`, 500);
+    return E(`Internal server error: ${e?.message || "unknown"}${e?.code ? ` [${e.code}]` : ""}${e?.hint ? ` hint: ${e.hint}` : ""}`, 500);
   }
 });
