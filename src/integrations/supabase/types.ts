@@ -463,6 +463,87 @@ export type Database = {
         }
         Relationships: []
       }
+      empenhos: {
+        Row: {
+          cnpj_orgao: string
+          codigo_siafi_orgao: string | null
+          contrato_id: string | null
+          created_at: string
+          data_emissao: string | null
+          fonte: string
+          fornecedor_cnpj: string | null
+          fornecedor_nome: string | null
+          id: string
+          licitacao_id: string | null
+          numero_documento: string | null
+          numero_empenho: string
+          observacao: string | null
+          orgao_nome: string | null
+          raw_json: Json | null
+          updated_at: string
+          valor_empenhado: number | null
+          valor_liquidado: number | null
+          valor_pago: number | null
+        }
+        Insert: {
+          cnpj_orgao: string
+          codigo_siafi_orgao?: string | null
+          contrato_id?: string | null
+          created_at?: string
+          data_emissao?: string | null
+          fonte?: string
+          fornecedor_cnpj?: string | null
+          fornecedor_nome?: string | null
+          id?: string
+          licitacao_id?: string | null
+          numero_documento?: string | null
+          numero_empenho: string
+          observacao?: string | null
+          orgao_nome?: string | null
+          raw_json?: Json | null
+          updated_at?: string
+          valor_empenhado?: number | null
+          valor_liquidado?: number | null
+          valor_pago?: number | null
+        }
+        Update: {
+          cnpj_orgao?: string
+          codigo_siafi_orgao?: string | null
+          contrato_id?: string | null
+          created_at?: string
+          data_emissao?: string | null
+          fonte?: string
+          fornecedor_cnpj?: string | null
+          fornecedor_nome?: string | null
+          id?: string
+          licitacao_id?: string | null
+          numero_documento?: string | null
+          numero_empenho?: string
+          observacao?: string | null
+          orgao_nome?: string | null
+          raw_json?: Json | null
+          updated_at?: string
+          valor_empenhado?: number | null
+          valor_liquidado?: number | null
+          valor_pago?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "empenhos_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "empenhos_licitacao_id_fkey"
+            columns: ["licitacao_id"]
+            isOneToOne: false
+            referencedRelation: "licitacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       empresas_clientes: {
         Row: {
           cnpj: string | null
@@ -1468,6 +1549,18 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      contratos_para_ingestao_empenhos: {
+        Args: { p_limit?: number; p_only_clientes?: boolean }
+        Returns: {
+          cnpj_orgao: string
+          codigo_siafi: string
+          contrato_id: string
+          data_assinatura: string
+          fornecedor_cnpj: string
+          licitacao_id: string
+          numero_contrato: string
+        }[]
+      }
       contratos_por_dia: {
         Args: { p_days?: number }
         Returns: {
@@ -1491,6 +1584,16 @@ export type Database = {
           orgao_nome: string
           total: number
           valor_total: number
+        }[]
+      }
+      empenhos_por_licitacoes: {
+        Args: { p_licitacao_ids: string[] }
+        Returns: {
+          licitacao_id: string
+          qtd_empenhos: number
+          total_empenhado: number
+          total_liquidado: number
+          total_pago: number
         }[]
       }
       f_unaccent: { Args: { "": string }; Returns: string }
