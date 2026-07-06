@@ -531,6 +531,23 @@ export default function LicitacoesPage() {
   const hasData = licitacoes.length > 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
+  // Empenhos agregados para as licitações visíveis (coluna "Empenhado")
+  const visibleIds = licitacoes.map((r: any) => r.id).filter(Boolean);
+  const { data: empenhosMap } = useQuery({
+    queryKey: ["empenhos-por-licitacoes", visibleIds],
+    enabled: visibleIds.length > 0,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("empenhos_por_licitacoes", {
+        p_licitacao_ids: visibleIds,
+      });
+      if (error) { console.warn("empenhos_por_licitacoes:", error.message); return {}; }
+      const map: Record<string, { total_empenhado: number; total_liquidado: number; total_pago: number; qtd_empenhos: number }> = {};
+      (data || []).forEach((r: any) => { map[r.licitacao_id] = r; });
+      return map;
+    },
+  });
+
   // --- Ingestion callbacks ---
   const startBulkIngestion = useCallback(async () => {
     abortRef.current = false;
@@ -1255,6 +1272,12 @@ export default function LicitacoesPage() {
                       <>
                         <th className="px-4 py-3 text-right font-medium text-muted-foreground">Val. Homologado</th>
                         <th className="px-4 py-3 text-right font-medium text-muted-foreground">Economia</th>
+                        <th className="px-4 py-3 text-right font-medium text-muted-foreground">
+                          <Tooltip>
+                            <TooltipTrigger asChild><span className="cursor-help border-b border-dotted border-muted-foreground/40">Empenhado</span></TooltipTrigger>
+                            <TooltipContent side="bottom" className="max-w-xs"><p className="text-xs">Valor já comprometido pelo órgão via empenho (Portal da Transparência — federal). Só populado para contratos de fornecedores cadastrados como clientes.</p></TooltipContent>
+                          </Tooltip>
+                        </th>
                         <th className="px-4 py-3 text-left font-medium text-muted-foreground">Vencedor</th>
                       </>
                     )}
@@ -1275,6 +1298,7 @@ export default function LicitacoesPage() {
                     const formattedDate = row.data_publicacao
                       ? (() => { const [y, m, d] = row.data_publicacao.split("-"); return `${d}/${m}/${y}`; })()
                       : "—";
+                    const empenhoRow = empenhosMap?.[row.id];
                     return (
                       <tr key={row.id} className="border-b border-border last:border-0 transition hover:bg-secondary/30 cursor-pointer" onClick={() => openDetail(row)}>
                         <td className="px-4 py-3">
@@ -1313,6 +1337,27 @@ export default function LicitacoesPage() {
                                   {formatCurrency(row.valor_estimado - row.valor_homologado)}
                                 </span>
                               ) : "—"}
+                            </td>
+                            <td className="px-4 py-3 text-right font-medium tabular-nums">
+                              {empenhoRow && empenhoRow.total_empenhado > 0 ? (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="text-primary cursor-help border-b border-dotted border-primary/40">
+                                      {formatCurrency(empenhoRow.total_empenhado)}
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="left" className="max-w-xs">
+                                    <div className="text-xs space-y-1">
+                                      <p><strong>{empenhoRow.qtd_empenhos}</strong> empenho{empenhoRow.qtd_empenhos > 1 ? "s" : ""}</p>
+                                      <p>Empenhado: {formatCurrency(empenhoRow.total_empenhado)}</p>
+                                      <p>Liquidado: {formatCurrency(empenhoRow.total_liquidado)}</p>
+                                      <p>Pago: {formatCurrency(empenhoRow.total_pago)}</p>
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
                             </td>
                             <td className="px-4 py-3 max-w-[200px]" onClick={(e) => e.stopPropagation()}>
                               {row.vencedor_nome ? (
