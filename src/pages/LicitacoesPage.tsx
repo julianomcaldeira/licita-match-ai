@@ -531,6 +531,23 @@ export default function LicitacoesPage() {
   const hasData = licitacoes.length > 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
+  // Empenhos agregados para as licitações visíveis (coluna "Empenhado")
+  const visibleIds = licitacoes.map((r: any) => r.id).filter(Boolean);
+  const { data: empenhosMap } = useQuery({
+    queryKey: ["empenhos-por-licitacoes", visibleIds],
+    enabled: visibleIds.length > 0,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("empenhos_por_licitacoes", {
+        p_licitacao_ids: visibleIds,
+      });
+      if (error) { console.warn("empenhos_por_licitacoes:", error.message); return {}; }
+      const map: Record<string, { total_empenhado: number; total_liquidado: number; total_pago: number; qtd_empenhos: number }> = {};
+      (data || []).forEach((r: any) => { map[r.licitacao_id] = r; });
+      return map;
+    },
+  });
+
   // --- Ingestion callbacks ---
   const startBulkIngestion = useCallback(async () => {
     abortRef.current = false;
