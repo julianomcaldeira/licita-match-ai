@@ -1338,6 +1338,27 @@ export default function LicitacoesPage() {
                                 </span>
                               ) : "—"}
                             </td>
+                            <td className="px-4 py-3 text-right font-medium tabular-nums">
+                              {empenhoRow && empenhoRow.total_empenhado > 0 ? (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="text-primary cursor-help border-b border-dotted border-primary/40">
+                                      {formatCurrency(empenhoRow.total_empenhado)}
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="left" className="max-w-xs">
+                                    <div className="text-xs space-y-1">
+                                      <p><strong>{empenhoRow.qtd_empenhos}</strong> empenho{empenhoRow.qtd_empenhos > 1 ? "s" : ""}</p>
+                                      <p>Empenhado: {formatCurrency(empenhoRow.total_empenhado)}</p>
+                                      <p>Liquidado: {formatCurrency(empenhoRow.total_liquidado)}</p>
+                                      <p>Pago: {formatCurrency(empenhoRow.total_pago)}</p>
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </td>
                             <td className="px-4 py-3 max-w-[200px]" onClick={(e) => e.stopPropagation()}>
                               {row.vencedor_nome ? (
                                 <button
