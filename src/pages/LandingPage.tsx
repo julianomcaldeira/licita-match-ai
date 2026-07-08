@@ -115,12 +115,7 @@ export default function LandingPage() {
       {/* NAV */}
       <header className="relative z-20 mx-auto flex max-w-7xl items-center justify-between px-6 py-6">
         <Link to="/" className="flex items-center gap-2">
-          <div
-            className="grid h-8 w-8 place-items-center rounded-md"
-            style={{ background: palette.accent, boxShadow: `0 0 24px ${palette.accent}66` }}
-          >
-            <span className="font-display text-sm font-bold text-white">i</span>
-          </div>
+          <img src={logoImg} alt="i-pesquisei" className="h-9 w-9 rounded-md object-contain" />
           <span className="font-display text-lg font-semibold tracking-tight text-slate-900">
             i-pesquisei
           </span>
@@ -129,7 +124,7 @@ export default function LandingPage() {
           </span>
         </Link>
         <nav className="hidden items-center gap-8 md:flex">
-          {nav.map((n) => (
+          {[...nav, { label: "Planos", href: "#planos" }].map((n) => (
             <a key={n.href} href={n.href} className="text-sm text-slate-400 transition hover:text-slate-900">
               {n.label}
             </a>
