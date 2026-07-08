@@ -44,10 +44,11 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
+            <Route path="/" element={<LandingPage />} />
             <Route path="/landing" element={<LandingPage />} />
             <Route path="/auth" element={<AuthPage />} />
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-              <Route path="/" element={<Dashboard />} />
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/licitacoes" element={<LicitacoesPage />} />
               <Route path="/empresas" element={<EmpresasPage />} />
               <Route path="/empresas/:id" element={<ClienteDetalhePage />} />
