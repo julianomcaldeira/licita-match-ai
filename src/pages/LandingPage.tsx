@@ -312,15 +312,15 @@ export default function LandingPage() {
         <div className="mb-14 flex flex-col items-start justify-between gap-6 lg:flex-row lg:items-end">
           <div>
             <span className="font-mono text-xs uppercase tracking-widest text-indigo-600">
-              / plataforma
+              / o que você ganha
             </span>
             <h2 className="font-display mt-3 max-w-2xl text-4xl font-semibold leading-tight text-slate-900 sm:text-5xl">
-              Seis módulos operando sobre a mesma base de dados.
+              Tudo que sua equipe precisa para vender pro governo.
             </h2>
           </div>
-          <p className="max-w-md text-sm text-slate-400">
-            Cada módulo compartilha o mesmo pipeline, as mesmas RLS policies e o mesmo
-            catálogo de RPCs — sem duplicação de fonte da verdade.
+          <p className="max-w-md text-sm text-slate-500">
+            Enquanto seus concorrentes ainda perdem tempo em planilha, você já sabe qual
+            edital vale disputar, quanto pedir e se o órgão paga em dia.
           </p>
         </div>
 
