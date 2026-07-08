@@ -168,7 +168,7 @@ export default function DiagnosticoDadosPage() {
         <div>
           <h1 className="text-2xl font-bold">Diagnóstico de Dados</h1>
           <p className="text-sm text-muted-foreground">
-            Snapshot somente-leitura. Nenhum dado é alterado.
+            Snapshot somente-leitura. Nenhum dado é alterado. Totais por fonte são estimados (planner) para evitar timeout em tabelas grandes.
             {ranAt && <> Última execução: {ranAt.toLocaleString("pt-BR")}.</>}
           </p>
         </div>
