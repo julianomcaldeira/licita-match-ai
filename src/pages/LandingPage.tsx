@@ -117,7 +117,7 @@ export default function LandingPage() {
             className="grid h-8 w-8 place-items-center rounded-md"
             style={{ background: palette.accent, boxShadow: `0 0 24px ${palette.accent}66` }}
           >
-            <span className="font-display text-sm font-bold text-slate-900">i</span>
+            <span className="font-display text-sm font-bold text-white">i</span>
           </div>
           <span className="font-display text-lg font-semibold tracking-tight text-slate-900">
             i-pesquisei
@@ -139,7 +139,7 @@ export default function LandingPage() {
           </Link>
           <Link
             to="/auth"
-            className="group inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-slate-900 transition"
+            className="group inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-white transition"
             style={{ background: palette.accent, boxShadow: `0 8px 30px ${palette.accent}55` }}
           >
             Acessar plataforma
@@ -164,7 +164,7 @@ export default function LandingPage() {
             <span
               className="bg-clip-text text-transparent"
               style={{
-                backgroundImage: `linear-gradient(120deg, #ffffff 0%, ${palette.accent} 60%, #a5b4fc 100%)`,
+                backgroundImage: `linear-gradient(120deg, #0f172a 0%, ${palette.accent} 70%, #6366f1 100%)`,
               }}
             >
               organizados como plataforma.
@@ -179,7 +179,7 @@ export default function LandingPage() {
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <Link
               to="/auth"
-              className="inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-medium text-slate-900 transition"
+              className="inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-medium text-white transition"
               style={{ background: palette.accent, boxShadow: `0 10px 40px ${palette.accent}66` }}
             >
               Entrar na plataforma
@@ -429,7 +429,7 @@ export default function LandingPage() {
               return (
                 <div
                   key={s}
-                  className="grid aspect-square place-items-center rounded-xl border border-slate-200 font-display text-lg font-semibold text-slate-900"
+                  className="grid aspect-square place-items-center rounded-xl border border-indigo-200 font-display text-lg font-semibold text-white"
                   style={{
                     background: `linear-gradient(140deg, rgba(79,70,229,${intensity * 0.55}), rgba(30,30,90,${intensity * 0.4}))`,
                   }}
@@ -486,7 +486,7 @@ export default function LandingPage() {
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link
               to="/auth"
-              className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-medium text-slate-900 transition"
+              className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-medium text-white transition"
               style={{ background: palette.accent, boxShadow: `0 12px 40px ${palette.accent}66` }}
             >
               Acessar plataforma
