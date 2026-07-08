@@ -31,58 +31,58 @@ const palette = {
 };
 
 const nav = [
-  { label: "Plataforma", href: "#plataforma" },
-  { label: "Dados", href: "#dados" },
+  { label: "Como funciona", href: "#arquitetura" },
+  { label: "Recursos", href: "#plataforma" },
   { label: "IA", href: "#ia" },
   { label: "Score", href: "#score" },
-  { label: "Arquitetura", href: "#arquitetura" },
+  { label: "Planos", href: "#planos" },
 ];
 
 const modulos = [
   {
-    icon: Database,
-    title: "Ingestão contínua",
-    desc: "Pipelines diários do PNCP (Consulta + Dados Abertos) e Portal da Transparência com janela deslizante de 7 dias e reprocesso incremental via sync_status.",
-  },
-  {
     icon: FileSearch,
-    title: "Consulta em 918k+ licitações",
-    desc: "Busca com trigram GIN, filtros AND, paginação virtual e timeouts de 12–30s. RPCs no servidor para contornar o limite de 1.000 registros.",
+    title: "Encontre o edital certo em segundos",
+    desc: "Busca inteligente em mais de 918 mil licitações do Brasil inteiro. Filtre por órgão, valor, região e objeto — e descubra oportunidades que seus concorrentes ainda nem viram.",
   },
   {
     icon: Cpu,
-    title: "Análise IA Gemini",
-    desc: "Resumo objetivo em 2–3 linhas, tabela markdown e 3 ações recomendadas por licitação. Persistência local e auditoria de consumo.",
+    title: "IA que lê o edital por você",
+    desc: "Resumo em 3 linhas, tabela de itens e 3 ações recomendadas para cada licitação. Economize horas de leitura e decida em minutos se vale disputar.",
   },
   {
     icon: Gauge,
-    title: "Score de órgãos AAA–D",
-    desc: "Bom pagador consolidado de 3 fontes (Portal, SICONFI, interno). Recalculado às 05:00 via pg_cron e exposto como badge reutilizável.",
+    title: "Saiba se o órgão paga em dia",
+    desc: "Score AAA–D de bom pagador para cada órgão público, cruzando Portal da Transparência, SICONFI e histórico de contratos. Nunca mais entre em disputa às cegas.",
   },
   {
-    icon: Radar,
-    title: "Monitor de ingestão",
-    desc: "Logs paginados no servidor, validação diária do dashboard (RPCs vs banco em 5 períodos × 7 métricas) e status por fonte.",
+    icon: BarChart3,
+    title: "Inteligência competitiva pronta",
+    desc: "Veja quem venceu o quê, por quanto e onde. Mapeie concorrentes, identifique nichos rentáveis e ajuste sua estratégia com dados oficiais e atualizados diariamente.",
   },
   {
     icon: ShieldCheck,
-    title: "Multi-tenant com RLS",
-    desc: "Isolamento por empresa_id, roles (admin_central / admin_empresa / usuário), edge functions com JWT e rate limiting.",
+    title: "Sua equipe inteira em um só lugar",
+    desc: "Multi-usuário com permissões por papel, isolamento total dos seus dados e histórico de tudo que sua equipe pesquisou. Governança sem complicação.",
+  },
+  {
+    icon: Database,
+    title: "Dados oficiais, sempre atualizados",
+    desc: "Consumimos PNCP e Portal da Transparência todos os dias, automaticamente. Você acessa a informação no dia seguinte ao lançamento — sem planilha, sem gambiarra.",
   },
 ];
 
 const stats = [
-  { k: "918k+", v: "licitações indexadas" },
-  { k: "2 fontes", v: "PNCP + Portal Transparência" },
-  { k: "5 crons", v: "01h · 02h · 03h · 04h · 05h" },
-  { k: "RLS", v: "isolamento por tenant" },
+  { k: "918k+", v: "licitações no radar" },
+  { k: "R$ 2,3T", v: "em contratos mapeados" },
+  { k: "5.500+", v: "órgãos com score" },
+  { k: "D+1", v: "dados atualizados" },
 ];
 
 const arquitetura = [
-  { step: "01", title: "Coleta", body: "Edge functions agendadas por pg_cron consomem PNCP Consulta, PNCP Dados Abertos e Portal da Transparência. Bruto persistido em pncp_raw." },
-  { step: "02", title: "Normalização", body: "Deduplicação por CNPJ do órgão + número do contrato. Vencedores múltiplos com unique(item_id, cnpj). Materialized views para órgãos e empresas." },
-  { step: "03", title: "Análise", body: "RPCs com count estimado, índices compostos, ILIKE + GIN trigram e resolução deferida de vencedores para consultas em 30s." },
-  { step: "04", title: "Entrega", body: "Dashboard realtime multi-tenant, relatórios dinâmicos com export CSV em lotes de 1.000 e API keys para consumo externo." },
+  { step: "01", title: "Coletamos", body: "Todos os dias buscamos automaticamente o que foi publicado no PNCP e no Portal da Transparência. Você não precisa fazer nada." },
+  { step: "02", title: "Organizamos", body: "Cruzamos, deduplicamos e enriquecemos os dados com informações de vencedores, órgãos e histórico de contratos." },
+  { step: "03", title: "Analisamos", body: "IA lê cada edital e devolve resumo, itens e ações recomendadas. Score de órgão calculado com metodologia auditável." },
+  { step: "04", title: "Entregamos", body: "Dashboard, relatórios e alertas prontos. Sua equipe acessa em segundos o que levaria dias para consolidar manualmente." },
 ];
 
 export default function LandingPage() {
@@ -118,7 +118,7 @@ export default function LandingPage() {
           <img
             src={logoImg}
             alt="i-pesquisei"
-            className="h-16 w-auto object-contain md:h-20 lg:h-24"
+            className="h-10 w-auto object-contain md:h-12"
           />
         </Link>
         <nav className="hidden items-center gap-8 md:flex">
@@ -152,23 +152,23 @@ export default function LandingPage() {
         >
           <div className="inline-flex items-center gap-2 rounded-full border border-indigo-300 bg-indigo-100 px-3 py-1 text-xs text-indigo-600">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-400" />
-            Pipeline ativo · janela D+1 · 5 crons/dia
+            918 mil licitações · atualizadas todo dia
           </div>
           <h1 className="font-display mt-6 text-5xl font-semibold leading-[1.05] tracking-tight text-slate-900 sm:text-6xl lg:text-7xl">
-            Dados públicos,{" "}
+            Ganhe mais licitações,{" "}
             <span
               className="bg-clip-text text-transparent"
               style={{
                 backgroundImage: `linear-gradient(120deg, #0f172a 0%, ${palette.accent} 70%, #6366f1 100%)`,
               }}
             >
-              organizados como plataforma.
+              gastando menos tempo procurando.
             </span>
           </h1>
-          <p className="mt-6 max-w-xl text-lg leading-relaxed text-slate-400">
-            i-pesquisei consolida PNCP e Portal da Transparência em uma base multi-tenant com
-            RLS, análises IA e score de órgãos. Um lugar único para observar, cruzar e operar
-            sobre o mercado público brasileiro.
+          <p className="mt-6 max-w-xl text-lg leading-relaxed text-slate-600">
+            A plataforma B2G que reúne todo o mercado público brasileiro em um só lugar.
+            Encontre editais, avalie órgãos, analise concorrentes e feche mais negócios com o
+            governo — com dados oficiais e IA trabalhando pra você.
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -177,14 +177,14 @@ export default function LandingPage() {
               className="inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-medium text-white transition"
               style={{ background: palette.accent, boxShadow: `0 10px 40px ${palette.accent}66` }}
             >
-              Entrar na plataforma
+              Começar teste grátis de 7 dias
               <ArrowRight className="h-4 w-4" />
             </Link>
             <a
-              href="#arquitetura"
+              href="#planos"
               className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-medium text-slate-700 backdrop-blur transition hover:bg-slate-100"
             >
-              Ver arquitetura
+              Ver planos e preços
             </a>
           </div>
 
@@ -312,15 +312,15 @@ export default function LandingPage() {
         <div className="mb-14 flex flex-col items-start justify-between gap-6 lg:flex-row lg:items-end">
           <div>
             <span className="font-mono text-xs uppercase tracking-widest text-indigo-600">
-              / plataforma
+              / o que você ganha
             </span>
             <h2 className="font-display mt-3 max-w-2xl text-4xl font-semibold leading-tight text-slate-900 sm:text-5xl">
-              Seis módulos operando sobre a mesma base de dados.
+              Tudo que sua equipe precisa para vender pro governo.
             </h2>
           </div>
-          <p className="max-w-md text-sm text-slate-400">
-            Cada módulo compartilha o mesmo pipeline, as mesmas RLS policies e o mesmo
-            catálogo de RPCs — sem duplicação de fonte da verdade.
+          <p className="max-w-md text-sm text-slate-500">
+            Enquanto seus concorrentes ainda perdem tempo em planilha, você já sabe qual
+            edital vale disputar, quanto pedir e se o órgão paga em dia.
           </p>
         </div>
 
@@ -357,22 +357,20 @@ export default function LandingPage() {
           className="relative overflow-hidden rounded-2xl border border-slate-200 p-8"
           style={{ background: `linear-gradient(160deg, ${palette.bg2}, ${palette.bg})` }}
         >
-          <span className="font-mono text-xs uppercase tracking-widest text-indigo-600">/ dados</span>
+          <span className="font-mono text-xs uppercase tracking-widest text-indigo-600">/ dados oficiais</span>
           <h3 className="font-display mt-3 text-3xl font-semibold text-slate-900">
-            Duas fontes oficiais, uma base consistente.
+            A mesma fonte que o governo usa — só que organizada.
           </h3>
-          <p className="mt-3 text-sm leading-relaxed text-slate-400">
-            PNCP (Consulta + Dados Abertos) e Portal da Transparência ingeridos com janela
-            deslizante de 7 dias, subdivisão resiliente de intervalos e deduplicação por CNPJ
-            do órgão e número do contrato.
+          <p className="mt-3 text-sm leading-relaxed text-slate-600">
+            Trabalhamos com as bases oficiais do PNCP e do Portal da Transparência.
+            Nada de dados de terceiros ou informação atrasada: você vê o que foi publicado
+            ontem, hoje. Sem risco de perder prazo por falta de informação.
           </p>
-          <ul className="mt-6 space-y-2 font-mono text-xs text-slate-600">
-            <li>· 01:00 — PNCP incremental</li>
-            <li>· 02:00 — resolução de vencedores</li>
-            <li>· 03:00 — análises IA em fila</li>
-            <li>· 04:00 — PNCP dados abertos (bulk)</li>
-            <li>· 04:30 — validação do dashboard</li>
-            <li>· 05:00 — recálculo de score</li>
+          <ul className="mt-6 space-y-2 text-sm text-slate-700">
+            <li className="flex items-start gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" /> Novas licitações no seu painel em até 24h</li>
+            <li className="flex items-start gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" /> Vencedores e valores homologados atualizados</li>
+            <li className="flex items-start gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" /> Histórico completo desde 2023</li>
+            <li className="flex items-start gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" /> Cobertura nacional: União, estados e municípios</li>
           </ul>
         </div>
 
@@ -381,23 +379,23 @@ export default function LandingPage() {
           className="relative overflow-hidden rounded-2xl border border-slate-200 p-8"
           style={{ background: `linear-gradient(160deg, ${palette.accentSoft}55, ${palette.bg})` }}
         >
-          <span className="font-mono text-xs uppercase tracking-widest text-indigo-600">/ ia</span>
+          <span className="font-mono text-xs uppercase tracking-widest text-indigo-600">/ ia gemini</span>
           <h3 className="font-display mt-3 text-3xl font-semibold text-slate-900">
-            Análise objetiva por licitação.
+            Pare de ler edital de 80 páginas.
           </h3>
-          <p className="mt-3 text-sm leading-relaxed text-slate-400">
-            Resumo em 2–3 linhas, tabela markdown com itens e exatamente 3 ações
-            recomendadas — geradas via Lovable AI Gateway e persistidas para consulta
-            posterior sem custo adicional.
+          <p className="mt-3 text-sm leading-relaxed text-slate-600">
+            Nossa IA lê o edital por você e devolve, em segundos, um resumo objetivo,
+            a lista dos itens e três ações concretas para decidir se vale disputar.
+            É como ter um analista dedicado em cada licitação.
           </p>
           <div className="mt-6 rounded-xl border border-slate-200 bg-slate-950 p-4 font-mono text-xs leading-relaxed text-slate-300">
-            <div className="mb-2 text-indigo-600">↳ analysis.summary</div>
-            Pregão eletrônico para aquisição de equipamentos hospitalares. Órgão histórico
-            de pagamentos regulares. Concorrência estimada moderada.
-            <div className="mt-3 text-indigo-600">↳ analysis.actions</div>
-            1. Verificar habilitação técnica ANVISA<br />
-            2. Simular margem sobre valor de referência<br />
-            3. Consultar histórico do órgão no Score
+            <div className="mb-2 text-indigo-400">↳ resumo</div>
+            Pregão eletrônico para equipamentos hospitalares. Órgão com histórico
+            regular de pagamentos. Concorrência moderada. Boa oportunidade.
+            <div className="mt-3 text-indigo-400">↳ ações recomendadas</div>
+            1. Confirmar habilitação técnica ANVISA<br />
+            2. Simular margem sobre o valor de referência<br />
+            3. Verificar o Score do órgão antes de propor
           </div>
         </div>
       </section>
@@ -407,15 +405,15 @@ export default function LandingPage() {
         <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2">
           <div>
             <span className="font-mono text-xs uppercase tracking-widest text-indigo-600">
-              / score de órgãos
+              / score do órgão
             </span>
             <h2 className="font-display mt-3 text-4xl font-semibold leading-tight text-slate-900 sm:text-5xl">
-              De AAA a D, com metodologia auditável.
+              Descubra se o órgão paga em dia — antes de propor.
             </h2>
-            <p className="mt-4 text-sm leading-relaxed text-slate-400">
-              Consolidação de três fontes — Portal da Transparência, SICONFI e histórico
-              interno de contratos — em um score reutilizável exibido como badge em toda a
-              plataforma.
+            <p className="mt-4 text-sm leading-relaxed text-slate-600">
+              Cada órgão recebe uma nota de AAA a D com base em dados oficiais do Portal
+              da Transparência, SICONFI e histórico de contratos. Você entra na disputa
+              já sabendo se vale o esforço.
             </p>
           </div>
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
@@ -440,10 +438,10 @@ export default function LandingPage() {
       {/* ARQUITETURA */}
       <section id="arquitetura" className="relative z-10 mx-auto max-w-7xl px-6 py-24">
         <span className="font-mono text-xs uppercase tracking-widest text-indigo-600">
-          / arquitetura
+          / como funciona
         </span>
         <h2 className="font-display mt-3 max-w-3xl text-4xl font-semibold leading-tight text-slate-900 sm:text-5xl">
-          Da coleta à entrega, um pipeline observável.
+          Você faz o login. A gente faz o trabalho pesado.
         </h2>
         <div className="mt-12 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           {arquitetura.map((a) => (
@@ -455,7 +453,7 @@ export default function LandingPage() {
               <h4 className="font-display mt-2 text-xl font-semibold text-slate-900">
                 {a.title}
               </h4>
-              <p className="mt-3 text-sm leading-relaxed text-slate-400">{a.body}</p>
+              <p className="mt-3 text-sm leading-relaxed text-slate-600">{a.body}</p>
             </div>
           ))}
         </div>
