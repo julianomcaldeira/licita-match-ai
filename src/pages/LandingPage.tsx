@@ -152,23 +152,23 @@ export default function LandingPage() {
         >
           <div className="inline-flex items-center gap-2 rounded-full border border-indigo-300 bg-indigo-100 px-3 py-1 text-xs text-indigo-600">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-400" />
-            Pipeline ativo · janela D+1 · 5 crons/dia
+            918 mil licitações · atualizadas todo dia
           </div>
           <h1 className="font-display mt-6 text-5xl font-semibold leading-[1.05] tracking-tight text-slate-900 sm:text-6xl lg:text-7xl">
-            Dados públicos,{" "}
+            Ganhe mais licitações,{" "}
             <span
               className="bg-clip-text text-transparent"
               style={{
                 backgroundImage: `linear-gradient(120deg, #0f172a 0%, ${palette.accent} 70%, #6366f1 100%)`,
               }}
             >
-              organizados como plataforma.
+              gastando menos tempo procurando.
             </span>
           </h1>
-          <p className="mt-6 max-w-xl text-lg leading-relaxed text-slate-400">
-            i-pesquisei consolida PNCP e Portal da Transparência em uma base multi-tenant com
-            RLS, análises IA e score de órgãos. Um lugar único para observar, cruzar e operar
-            sobre o mercado público brasileiro.
+          <p className="mt-6 max-w-xl text-lg leading-relaxed text-slate-600">
+            A plataforma B2G que reúne todo o mercado público brasileiro em um só lugar.
+            Encontre editais, avalie órgãos, analise concorrentes e feche mais negócios com o
+            governo — com dados oficiais e IA trabalhando pra você.
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -177,14 +177,14 @@ export default function LandingPage() {
               className="inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-medium text-white transition"
               style={{ background: palette.accent, boxShadow: `0 10px 40px ${palette.accent}66` }}
             >
-              Entrar na plataforma
+              Começar teste grátis de 7 dias
               <ArrowRight className="h-4 w-4" />
             </Link>
             <a
-              href="#arquitetura"
+              href="#planos"
               className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-medium text-slate-700 backdrop-blur transition hover:bg-slate-100"
             >
-              Ver arquitetura
+              Ver planos e preços
             </a>
           </div>
 
