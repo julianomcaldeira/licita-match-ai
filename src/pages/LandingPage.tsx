@@ -438,10 +438,10 @@ export default function LandingPage() {
       {/* ARQUITETURA */}
       <section id="arquitetura" className="relative z-10 mx-auto max-w-7xl px-6 py-24">
         <span className="font-mono text-xs uppercase tracking-widest text-indigo-600">
-          / arquitetura
+          / como funciona
         </span>
         <h2 className="font-display mt-3 max-w-3xl text-4xl font-semibold leading-tight text-slate-900 sm:text-5xl">
-          Da coleta à entrega, um pipeline observável.
+          Você faz o login. A gente faz o trabalho pesado.
         </h2>
         <div className="mt-12 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           {arquitetura.map((a) => (
@@ -453,7 +453,7 @@ export default function LandingPage() {
               <h4 className="font-display mt-2 text-xl font-semibold text-slate-900">
                 {a.title}
               </h4>
-              <p className="mt-3 text-sm leading-relaxed text-slate-400">{a.body}</p>
+              <p className="mt-3 text-sm leading-relaxed text-slate-600">{a.body}</p>
             </div>
           ))}
         </div>
