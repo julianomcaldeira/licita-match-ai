@@ -92,7 +92,7 @@ export default function LandingPage() {
       {/* Ambient grid + glow */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div
-          className="absolute inset-0 opacity-[0.35]"
+          className="absolute inset-0 opacity-[0.18]"
           style={{
             backgroundImage:
               "linear-gradient(rgba(79,70,229,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(79,70,229,0.08) 1px, transparent 1px)",
@@ -101,11 +101,11 @@ export default function LandingPage() {
           }}
         />
         <div
-          className="absolute -top-40 left-1/2 h-[600px] w-[900px] -translate-x-1/2 rounded-full blur-[140px] opacity-40"
+          className="absolute -top-40 left-1/2 h-[600px] w-[900px] -translate-x-1/2 rounded-full blur-[140px] opacity-30"
           style={{ background: `radial-gradient(circle, ${palette.accent} 0%, transparent 60%)` }}
         />
         <div
-          className="absolute bottom-0 right-0 h-[500px] w-[500px] rounded-full blur-[160px] opacity-30"
+          className="absolute bottom-0 right-0 h-[500px] w-[500px] rounded-full blur-[160px] opacity-20"
           style={{ background: `radial-gradient(circle, ${palette.accentSoft} 0%, transparent 70%)` }}
         />
       </div>
@@ -395,7 +395,7 @@ export default function LandingPage() {
             recomendadas — geradas via Lovable AI Gateway e persistidas para consulta
             posterior sem custo adicional.
           </p>
-          <div className="mt-6 rounded-xl border border-slate-200 bg-black/30 p-4 font-mono text-xs leading-relaxed text-slate-600">
+          <div className="mt-6 rounded-xl border border-slate-200 bg-slate-950 p-4 font-mono text-xs leading-relaxed text-slate-300">
             <div className="mb-2 text-indigo-600">↳ analysis.summary</div>
             Pregão eletrônico para aquisição de equipamentos hospitalares. Órgão histórico
             de pagamentos regulares. Concorrência estimada moderada.
