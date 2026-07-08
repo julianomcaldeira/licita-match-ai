@@ -73,19 +73,21 @@ async function fetchLicitacoesByOrgao(
         continue;
       }
 
-      const rows = licitacoes.map((l: any) => ({
-        id_origem: `pt-lic-${l.id || Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        fonte: "PORTAL_TRANSPARENCIA",
-        orgao: l.unidadeGestora?.orgaoVinculado?.nome || l.unidadeGestora?.orgaoMaximo?.nome || "Não informado",
-        modalidade: l.modalidadeLicitacao?.descricao || null,
-        objeto: l.objeto || "Sem descrição",
-        data_publicacao: l.dataAbertura ? l.dataAbertura.split("T")[0] : null,
-        valor_estimado: l.valorLicitacao || null,
-        situacao: l.situacao || null,
-        uf: null,
-        municipio: null,
-        raw_json: l,
-      }));
+      const rows = licitacoes
+        .filter((l: any) => l.id != null && l.id !== "")
+        .map((l: any) => ({
+          id_origem: `pt-lic-${l.id}`,
+          fonte: "PORTAL_TRANSPARENCIA",
+          orgao: l.unidadeGestora?.orgaoVinculado?.nome || l.unidadeGestora?.orgaoMaximo?.nome || "Não informado",
+          modalidade: l.modalidadeLicitacao?.descricao || null,
+          objeto: l.objeto || "Sem descrição",
+          data_publicacao: l.dataAbertura ? l.dataAbertura.split("T")[0] : null,
+          valor_estimado: l.valorLicitacao || null,
+          situacao: l.situacao || null,
+          uf: null,
+          municipio: null,
+          raw_json: l,
+        }));
 
       for (let i = 0; i < rows.length; i += 50) {
         const batch = rows.slice(i, i + 50);
