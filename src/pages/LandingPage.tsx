@@ -405,15 +405,15 @@ export default function LandingPage() {
         <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2">
           <div>
             <span className="font-mono text-xs uppercase tracking-widest text-indigo-600">
-              / score de órgãos
+              / score do órgão
             </span>
             <h2 className="font-display mt-3 text-4xl font-semibold leading-tight text-slate-900 sm:text-5xl">
-              De AAA a D, com metodologia auditável.
+              Descubra se o órgão paga em dia — antes de propor.
             </h2>
-            <p className="mt-4 text-sm leading-relaxed text-slate-400">
-              Consolidação de três fontes — Portal da Transparência, SICONFI e histórico
-              interno de contratos — em um score reutilizável exibido como badge em toda a
-              plataforma.
+            <p className="mt-4 text-sm leading-relaxed text-slate-600">
+              Cada órgão recebe uma nota de AAA a D com base em dados oficiais do Portal
+              da Transparência, SICONFI e histórico de contratos. Você entra na disputa
+              já sabendo se vale o esforço.
             </p>
           </div>
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
