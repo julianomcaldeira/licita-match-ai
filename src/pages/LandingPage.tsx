@@ -40,49 +40,49 @@ const nav = [
 
 const modulos = [
   {
-    icon: Database,
-    title: "Ingestão contínua",
-    desc: "Pipelines diários do PNCP (Consulta + Dados Abertos) e Portal da Transparência com janela deslizante de 7 dias e reprocesso incremental via sync_status.",
-  },
-  {
     icon: FileSearch,
-    title: "Consulta em 918k+ licitações",
-    desc: "Busca com trigram GIN, filtros AND, paginação virtual e timeouts de 12–30s. RPCs no servidor para contornar o limite de 1.000 registros.",
+    title: "Encontre o edital certo em segundos",
+    desc: "Busca inteligente em mais de 918 mil licitações do Brasil inteiro. Filtre por órgão, valor, região e objeto — e descubra oportunidades que seus concorrentes ainda nem viram.",
   },
   {
     icon: Cpu,
-    title: "Análise IA Gemini",
-    desc: "Resumo objetivo em 2–3 linhas, tabela markdown e 3 ações recomendadas por licitação. Persistência local e auditoria de consumo.",
+    title: "IA que lê o edital por você",
+    desc: "Resumo em 3 linhas, tabela de itens e 3 ações recomendadas para cada licitação. Economize horas de leitura e decida em minutos se vale disputar.",
   },
   {
     icon: Gauge,
-    title: "Score de órgãos AAA–D",
-    desc: "Bom pagador consolidado de 3 fontes (Portal, SICONFI, interno). Recalculado às 05:00 via pg_cron e exposto como badge reutilizável.",
+    title: "Saiba se o órgão paga em dia",
+    desc: "Score AAA–D de bom pagador para cada órgão público, cruzando Portal da Transparência, SICONFI e histórico de contratos. Nunca mais entre em disputa às cegas.",
   },
   {
-    icon: Radar,
-    title: "Monitor de ingestão",
-    desc: "Logs paginados no servidor, validação diária do dashboard (RPCs vs banco em 5 períodos × 7 métricas) e status por fonte.",
+    icon: BarChart3,
+    title: "Inteligência competitiva pronta",
+    desc: "Veja quem venceu o quê, por quanto e onde. Mapeie concorrentes, identifique nichos rentáveis e ajuste sua estratégia com dados oficiais e atualizados diariamente.",
   },
   {
     icon: ShieldCheck,
-    title: "Multi-tenant com RLS",
-    desc: "Isolamento por empresa_id, roles (admin_central / admin_empresa / usuário), edge functions com JWT e rate limiting.",
+    title: "Sua equipe inteira em um só lugar",
+    desc: "Multi-usuário com permissões por papel, isolamento total dos seus dados e histórico de tudo que sua equipe pesquisou. Governança sem complicação.",
+  },
+  {
+    icon: Database,
+    title: "Dados oficiais, sempre atualizados",
+    desc: "Consumimos PNCP e Portal da Transparência todos os dias, automaticamente. Você acessa a informação no dia seguinte ao lançamento — sem planilha, sem gambiarra.",
   },
 ];
 
 const stats = [
-  { k: "918k+", v: "licitações indexadas" },
-  { k: "2 fontes", v: "PNCP + Portal Transparência" },
-  { k: "5 crons", v: "01h · 02h · 03h · 04h · 05h" },
-  { k: "RLS", v: "isolamento por tenant" },
+  { k: "918k+", v: "licitações no radar" },
+  { k: "R$ 2,3T", v: "em contratos mapeados" },
+  { k: "5.500+", v: "órgãos com score" },
+  { k: "D+1", v: "dados atualizados" },
 ];
 
 const arquitetura = [
-  { step: "01", title: "Coleta", body: "Edge functions agendadas por pg_cron consomem PNCP Consulta, PNCP Dados Abertos e Portal da Transparência. Bruto persistido em pncp_raw." },
-  { step: "02", title: "Normalização", body: "Deduplicação por CNPJ do órgão + número do contrato. Vencedores múltiplos com unique(item_id, cnpj). Materialized views para órgãos e empresas." },
-  { step: "03", title: "Análise", body: "RPCs com count estimado, índices compostos, ILIKE + GIN trigram e resolução deferida de vencedores para consultas em 30s." },
-  { step: "04", title: "Entrega", body: "Dashboard realtime multi-tenant, relatórios dinâmicos com export CSV em lotes de 1.000 e API keys para consumo externo." },
+  { step: "01", title: "Coletamos", body: "Todos os dias buscamos automaticamente o que foi publicado no PNCP e no Portal da Transparência. Você não precisa fazer nada." },
+  { step: "02", title: "Organizamos", body: "Cruzamos, deduplicamos e enriquecemos os dados com informações de vencedores, órgãos e histórico de contratos." },
+  { step: "03", title: "Analisamos", body: "IA lê cada edital e devolve resumo, itens e ações recomendadas. Score de órgão calculado com metodologia auditável." },
+  { step: "04", title: "Entregamos", body: "Dashboard, relatórios e alertas prontos. Sua equipe acessa em segundos o que levaria dias para consolidar manualmente." },
 ];
 
 export default function LandingPage() {
