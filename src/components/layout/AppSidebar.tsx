@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   Key,
   TrendingUp,
+  Stethoscope,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
