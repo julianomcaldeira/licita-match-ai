@@ -40,7 +40,7 @@ async function collectPtDuplicates() {
   const pageSize = 1000;
   let from = 0;
   while (true) {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from("licitacoes")
       .select("rid:raw_json->>id")
       .eq("fonte", "PORTAL_TRANSPARENCIA")
