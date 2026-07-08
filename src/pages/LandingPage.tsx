@@ -31,11 +31,11 @@ const palette = {
 };
 
 const nav = [
-  { label: "Plataforma", href: "#plataforma" },
-  { label: "Dados", href: "#dados" },
+  { label: "Como funciona", href: "#arquitetura" },
+  { label: "Recursos", href: "#plataforma" },
   { label: "IA", href: "#ia" },
   { label: "Score", href: "#score" },
-  { label: "Arquitetura", href: "#arquitetura" },
+  { label: "Planos", href: "#planos" },
 ];
 
 const modulos = [
