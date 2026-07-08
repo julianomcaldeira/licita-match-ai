@@ -23,6 +23,7 @@ import IndiceStartGiPage from "@/pages/IndiceStartGiPage";
 import AIMonitorPage from "@/pages/AIMonitorPage";
 import ConfiguracoesPage from "@/pages/ConfiguracoesPage";
 import DiagnosticoDadosPage from "@/pages/DiagnosticoDadosPage";
+import LandingPage from "@/pages/LandingPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -43,6 +44,7 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
+            <Route path="/landing" element={<LandingPage />} />
             <Route path="/auth" element={<AuthPage />} />
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
               <Route path="/" element={<Dashboard />} />
