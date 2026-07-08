@@ -114,14 +114,12 @@ export default function LandingPage() {
 
       {/* NAV */}
       <header className="relative z-20 mx-auto flex max-w-7xl items-center justify-between px-6 py-6">
-        <Link to="/" className="flex items-center gap-2">
-          <img src={logoImg} alt="i-pesquisei" className="h-9 w-9 rounded-md object-contain" />
-          <span className="font-display text-lg font-semibold tracking-tight text-slate-900">
-            i-pesquisei
-          </span>
-          <span className="ml-2 hidden rounded-full border border-indigo-300 bg-indigo-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-widest text-indigo-600 sm:inline">
-            Inteligência B2G
-          </span>
+        <Link to="/" className="flex items-center">
+          <img
+            src={logoImg}
+            alt="i-pesquisei"
+            className="h-16 w-auto object-contain md:h-20 lg:h-24"
+          />
         </Link>
         <nav className="hidden items-center gap-8 md:flex">
           {[...nav, { label: "Planos", href: "#planos" }].map((n) => (
