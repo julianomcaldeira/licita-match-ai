@@ -12,7 +12,9 @@ import {
   Cpu,
   FileSearch,
   Gauge,
+  Check,
 } from "lucide-react";
+import logoImg from "@/assets/logo-ipesquisei.png";
 
 /**
  * Landing pública — i-pesquisei
