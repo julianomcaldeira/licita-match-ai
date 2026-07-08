@@ -29,7 +29,7 @@ type NavItem = {
 };
 
 const navigation: NavItem[] = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Licitações", href: "/licitacoes", icon: Search },
   { name: "Empresas", href: "/empresas", icon: Building2 },
   { name: "Sancionadas", href: "/sancionadas", icon: ShieldAlert },

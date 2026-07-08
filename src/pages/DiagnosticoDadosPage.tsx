@@ -189,7 +189,7 @@ export default function DiagnosticoDadosPage() {
   }, [authLoading, role]);
 
   if (authLoading) return null;
-  if (role !== "admin_central") return <Navigate to="/" replace />;
+  if (role !== "admin_central") return <Navigate to="/dashboard" replace />;
 
   return (
     <div className="container mx-auto p-6 space-y-6">
