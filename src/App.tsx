@@ -22,6 +22,7 @@ import ApiKeysPage from "@/pages/ApiKeysPage";
 import IndiceStartGiPage from "@/pages/IndiceStartGiPage";
 import AIMonitorPage from "@/pages/AIMonitorPage";
 import ConfiguracoesPage from "@/pages/ConfiguracoesPage";
+import DiagnosticoDadosPage from "@/pages/DiagnosticoDadosPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient({
