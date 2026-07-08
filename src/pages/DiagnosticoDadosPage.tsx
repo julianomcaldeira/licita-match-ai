@@ -109,49 +109,52 @@ export default function DiagnosticoDadosPage() {
   async function run() {
     setLoading(true);
     setError(null);
-    try {
-      const [
-        total,
-        pncp,
-        pt,
-        pncpDA,
-        homolog,
-        empenhosTotal,
-        ptDup,
-        empMulti,
-      ] = await Promise.all([
-        countExact("licitacoes"),
-        countExact("licitacoes", (q) => q.eq("fonte", "PNCP")),
-        countExact("licitacoes", (q) => q.eq("fonte", "PORTAL_TRANSPARENCIA")),
-        countExact("licitacoes", (q) => q.eq("fonte", "PNCP_DADOS_ABERTOS")),
-        supabase.rpc("licitacoes_pendentes_winners_count").then(({ data, error }) => {
-          if (error) throw error;
-          return Number(data ?? 0);
-        }),
-        countExact("empenhos"),
-        collectPtDuplicates(),
-        collectEmpenhosMultiContrato(),
-      ]);
+    const tasks = {
+      total: countExact("licitacoes"),
+      pncp: countExact("licitacoes", (q) => q.eq("fonte", "PNCP")),
+      pt: countExact("licitacoes", (q) => q.eq("fonte", "PORTAL_TRANSPARENCIA")),
+      pncpDA: countExact("licitacoes", (q) => q.eq("fonte", "PNCP_DADOS_ABERTOS")),
+      homolog: supabase.rpc("licitacoes_pendentes_winners_count").then(({ data, error }) => {
+        if (error) throw error;
+        return Number(data ?? 0);
+      }),
+      empenhosTotal: countExact("empenhos"),
+      ptDup: collectPtDuplicates(),
+      empMulti: collectEmpenhosMultiContrato(),
+    };
 
-      setMetrics({
-        totalLicitacoes: total,
-        porFonte: {
-          PNCP: pncp,
-          PORTAL_TRANSPARENCIA: pt,
-          PNCP_DADOS_ABERTOS: pncpDA,
-        },
-        ptDuplicateGroups: ptDup.groups,
-        ptDuplicateExcess: ptDup.excess,
-        homologadasSemVencedores: homolog,
-        totalEmpenhos: empenhosTotal,
-        empenhosMultiContrato: empMulti,
-      });
-      setRanAt(new Date());
-    } catch (e: any) {
-      setError(e?.message ?? "Erro ao consultar métricas");
-    } finally {
-      setLoading(false);
-    }
+    const keys = Object.keys(tasks) as (keyof typeof tasks)[];
+    const results = await Promise.allSettled(Object.values(tasks));
+    const out: Record<string, any> = {};
+    const errs: string[] = [];
+    results.forEach((r, i) => {
+      const k = keys[i];
+      if (r.status === "fulfilled") {
+        out[k] = r.value;
+      } else {
+        out[k] = null;
+        const msg = (r.reason as any)?.message ?? String(r.reason);
+        errs.push(`${k}: ${msg}`);
+        console.error(`[diagnostico] ${k} falhou:`, r.reason);
+      }
+    });
+
+    setMetrics({
+      totalLicitacoes: out.total ?? null,
+      porFonte: {
+        PNCP: out.pncp ?? null,
+        PORTAL_TRANSPARENCIA: out.pt ?? null,
+        PNCP_DADOS_ABERTOS: out.pncpDA ?? null,
+      },
+      ptDuplicateGroups: out.ptDup?.groups ?? 0,
+      ptDuplicateExcess: out.ptDup?.excess ?? 0,
+      homologadasSemVencedores: out.homolog ?? null,
+      totalEmpenhos: out.empenhosTotal ?? null,
+      empenhosMultiContrato: out.empMulti ?? 0,
+    });
+    setRanAt(new Date());
+    setError(errs.length ? errs.join(" • ") : null);
+    setLoading(false);
   }
 
   useEffect(() => {
