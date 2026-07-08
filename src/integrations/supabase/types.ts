@@ -1586,6 +1586,7 @@ export type Database = {
           valor_total: number
         }[]
       }
+      diagnostico_orfaos_homologadas: { Args: never; Returns: Json }
       empenhos_por_licitacoes: {
         Args: { p_licitacao_ids: string[] }
         Returns: {

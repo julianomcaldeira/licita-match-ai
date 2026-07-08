@@ -106,6 +106,20 @@ async function getLatestHomologadasSemVencedores() {
   return Number(data?.homologadas_sem_vencedores ?? 0);
 }
 
+type OrfaosBreakdown = {
+  total: number;
+  sem_itens: number;
+  com_itens_sem_venc: number;
+  por_fonte: { fonte: string; count: number }[];
+  por_situacao: { situacao: string; count: number }[];
+};
+
+async function getOrfaosBreakdown(): Promise<OrfaosBreakdown | null> {
+  const { data, error } = await (supabase as any).rpc("diagnostico_orfaos_homologadas");
+  if (error) throw error;
+  return (data as OrfaosBreakdown) ?? null;
+}
+
 function fmt(n: number | null) {
   if (n == null) return "—";
   return n.toLocaleString("pt-BR");
@@ -114,6 +128,7 @@ function fmt(n: number | null) {
 export default function DiagnosticoDadosPage() {
   const { role, loading: authLoading } = useAuth();
   const [metrics, setMetrics] = useState<Metrics>(initial);
+  const [orfaos, setOrfaos] = useState<OrfaosBreakdown | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ranAt, setRanAt] = useState<Date | null>(null);
@@ -130,6 +145,7 @@ export default function DiagnosticoDadosPage() {
       empenhosTotal: countExact("empenhos"),
       ptDup: collectPtDuplicates(),
       empMulti: collectEmpenhosMultiContrato(),
+      orfaosBreak: getOrfaosBreakdown(),
     };
 
     const keys = Object.keys(tasks) as (keyof typeof tasks)[];
@@ -161,6 +177,7 @@ export default function DiagnosticoDadosPage() {
       totalEmpenhos: out.empenhosTotal ?? null,
       empenhosMultiContrato: out.empMulti ?? 0,
     });
+    setOrfaos(out.orfaosBreak ?? null);
     setRanAt(new Date());
     setError(errs.length ? errs.join(" • ") : null);
     setLoading(false);
@@ -271,6 +288,65 @@ export default function DiagnosticoDadosPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">
+            5. Composição das homologadas sem vencedor
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6 text-sm">
+          <p className="text-xs text-muted-foreground">
+            Universo: <span className="font-mono">valor_homologado &gt; 0</span> e nenhum vencedor em <span className="font-mono">licitacao_vencedores</span> (via <span className="font-mono">licitacao_itens</span>). Apenas leitura.
+          </p>
+
+          <div className="flex flex-wrap gap-6 border-y py-3">
+            <div>
+              <div className="text-xs text-muted-foreground">Total órfãs</div>
+              <div className="font-mono text-lg">{fmt(orfaos?.total ?? null)}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">Sem nenhum item cadastrado</div>
+              <div className="font-mono text-lg">{fmt(orfaos?.sem_itens ?? null)}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">Com itens, porém sem vencedor</div>
+              <div className="font-mono text-lg">{fmt(orfaos?.com_itens_sem_venc ?? null)}</div>
+            </div>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2">
+            <div>
+              <h4 className="font-medium mb-2">Quebra por fonte</h4>
+              <div className="space-y-1">
+                {(orfaos?.por_fonte ?? []).map((r) => (
+                  <div key={r.fonte} className="flex justify-between border-b py-1">
+                    <span>{r.fonte}</span>
+                    <span className="font-mono">{fmt(r.count)}</span>
+                  </div>
+                ))}
+                {!orfaos && <div className="text-xs text-muted-foreground">—</div>}
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-medium mb-2">Quebra por situação</h4>
+              <div className="space-y-1">
+                {(orfaos?.por_situacao ?? []).map((r) => (
+                  <div key={r.situacao} className="flex justify-between border-b py-1">
+                    <span>{r.situacao}</span>
+                    <span className="font-mono">{fmt(r.count)}</span>
+                  </div>
+                ))}
+                {!orfaos && <div className="text-xs text-muted-foreground">—</div>}
+              </div>
+              <p className="text-xs text-muted-foreground pt-2">
+                Situações como <em>Revogada</em>, <em>Anulada</em>, <em>Deserta</em> e <em>Fracassada</em> naturalmente podem não ter vencedor. <em>Divulgada no PNCP</em>/<em>Homologada</em> deveriam ter e indicam encadeamento incompleto.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
