@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   Key,
   TrendingUp,
+  Stethoscope,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -38,6 +39,7 @@ const navigation: NavItem[] = [
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
   { name: "Monitor Ingestão", href: "/monitor-ingestao", icon: Activity },
   { name: "API Pública", href: "/api", icon: Key },
+  { name: "Diagnóstico Dados", href: "/diagnostico-dados", icon: Stethoscope, roles: ["admin_central"] },
   { name: "Configurações", href: "/configuracoes", icon: Settings },
 ];
 
