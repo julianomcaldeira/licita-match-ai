@@ -40,42 +40,42 @@ const nav = [
 
 const modulos = [
   {
-    icon: FileSearch,
-    title: "Encontre o edital certo em segundos",
-    desc: "Busca inteligente em mais de 918 mil licitações do Brasil inteiro. Filtre por órgão, valor, região e objeto — e descubra oportunidades que seus concorrentes ainda nem viram.",
+    icon: Gauge,
+    title: "Score de bom pagador do órgão",
+    desc: "Nota AAA–D exclusiva do i-pesquisei, cruzando Portal da Transparência, SICONFI e histórico de contratos. Você sabe, antes de propor, se o órgão paga em dia — algo que nenhum portal de licitação entrega.",
   },
   {
     icon: Cpu,
-    title: "IA que lê o edital por você",
-    desc: "Resumo em 3 linhas, tabela de itens e 3 ações recomendadas para cada licitação. Economize horas de leitura e decida em minutos se vale disputar.",
-  },
-  {
-    icon: Gauge,
-    title: "Saiba se o órgão paga em dia",
-    desc: "Score AAA–D de bom pagador para cada órgão público, cruzando Portal da Transparência, SICONFI e histórico de contratos. Nunca mais entre em disputa às cegas.",
+    title: "IA que lê o edital e recomenda ações",
+    desc: "Resumo objetivo, tabela de itens e 3 ações concretas para cada licitação. Em vez de você ler 80 páginas, a IA diz o que importa e o que fazer a seguir.",
   },
   {
     icon: BarChart3,
-    title: "Inteligência competitiva pronta",
-    desc: "Veja quem venceu o quê, por quanto e onde. Mapeie concorrentes, identifique nichos rentáveis e ajuste sua estratégia com dados oficiais e atualizados diariamente.",
+    title: "Inteligência competitiva de mercado",
+    desc: "Quem venceu, por quanto, com que margem sobre o estimado e em que regiões. Mapeie concorrentes, encontre nichos e precifique com base no que já foi homologado.",
+  },
+  {
+    icon: Radar,
+    title: "Análise de comportamento do órgão",
+    desc: "Frequência de compra, sazonalidade, tipo de objeto, faixas de valor e histórico de vencedores. Entenda como cada órgão realmente contrata — não só o que ele publicou.",
   },
   {
     icon: ShieldCheck,
-    title: "Sua equipe inteira em um só lugar",
-    desc: "Multi-usuário com permissões por papel, isolamento total dos seus dados e histórico de tudo que sua equipe pesquisou. Governança sem complicação.",
+    title: "Plataforma multi-tenant com governança",
+    desc: "Sua equipe organizada por papéis, isolamento total dos dados da sua empresa e histórico auditável de tudo. Feito para operar de verdade, não para uso individual.",
   },
   {
     icon: Database,
-    title: "Dados oficiais, sempre atualizados",
-    desc: "Consumimos PNCP e Portal da Transparência todos os dias, automaticamente. Você acessa a informação no dia seguinte ao lançamento — sem planilha, sem gambiarra.",
+    title: "Base unificada, dados enriquecidos",
+    desc: "PNCP + Portal da Transparência consolidados, deduplicados e cruzados com CNPJs, vencedores e contratos. Uma fonte única — não seis abas de portais oficiais abertas.",
   },
 ];
 
 const stats = [
-  { k: "918k+", v: "licitações no radar" },
+  { k: "AAA–D", v: "score exclusivo de órgãos" },
+  { k: "IA", v: "análise por licitação" },
   { k: "R$ 2,3T", v: "em contratos mapeados" },
-  { k: "5.500+", v: "órgãos com score" },
-  { k: "D+1", v: "dados atualizados" },
+  { k: "D+1", v: "dados sempre atualizados" },
 ];
 
 const arquitetura = [
