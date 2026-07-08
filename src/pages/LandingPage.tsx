@@ -357,22 +357,20 @@ export default function LandingPage() {
           className="relative overflow-hidden rounded-2xl border border-slate-200 p-8"
           style={{ background: `linear-gradient(160deg, ${palette.bg2}, ${palette.bg})` }}
         >
-          <span className="font-mono text-xs uppercase tracking-widest text-indigo-600">/ dados</span>
+          <span className="font-mono text-xs uppercase tracking-widest text-indigo-600">/ dados oficiais</span>
           <h3 className="font-display mt-3 text-3xl font-semibold text-slate-900">
-            Duas fontes oficiais, uma base consistente.
+            A mesma fonte que o governo usa — só que organizada.
           </h3>
-          <p className="mt-3 text-sm leading-relaxed text-slate-400">
-            PNCP (Consulta + Dados Abertos) e Portal da Transparência ingeridos com janela
-            deslizante de 7 dias, subdivisão resiliente de intervalos e deduplicação por CNPJ
-            do órgão e número do contrato.
+          <p className="mt-3 text-sm leading-relaxed text-slate-600">
+            Trabalhamos com as bases oficiais do PNCP e do Portal da Transparência.
+            Nada de dados de terceiros ou informação atrasada: você vê o que foi publicado
+            ontem, hoje. Sem risco de perder prazo por falta de informação.
           </p>
-          <ul className="mt-6 space-y-2 font-mono text-xs text-slate-600">
-            <li>· 01:00 — PNCP incremental</li>
-            <li>· 02:00 — resolução de vencedores</li>
-            <li>· 03:00 — análises IA em fila</li>
-            <li>· 04:00 — PNCP dados abertos (bulk)</li>
-            <li>· 04:30 — validação do dashboard</li>
-            <li>· 05:00 — recálculo de score</li>
+          <ul className="mt-6 space-y-2 text-sm text-slate-700">
+            <li className="flex items-start gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" /> Novas licitações no seu painel em até 24h</li>
+            <li className="flex items-start gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" /> Vencedores e valores homologados atualizados</li>
+            <li className="flex items-start gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" /> Histórico completo desde 2023</li>
+            <li className="flex items-start gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" /> Cobertura nacional: União, estados e municípios</li>
           </ul>
         </div>
 
@@ -381,23 +379,23 @@ export default function LandingPage() {
           className="relative overflow-hidden rounded-2xl border border-slate-200 p-8"
           style={{ background: `linear-gradient(160deg, ${palette.accentSoft}55, ${palette.bg})` }}
         >
-          <span className="font-mono text-xs uppercase tracking-widest text-indigo-600">/ ia</span>
+          <span className="font-mono text-xs uppercase tracking-widest text-indigo-600">/ ia gemini</span>
           <h3 className="font-display mt-3 text-3xl font-semibold text-slate-900">
-            Análise objetiva por licitação.
+            Pare de ler edital de 80 páginas.
           </h3>
-          <p className="mt-3 text-sm leading-relaxed text-slate-400">
-            Resumo em 2–3 linhas, tabela markdown com itens e exatamente 3 ações
-            recomendadas — geradas via Lovable AI Gateway e persistidas para consulta
-            posterior sem custo adicional.
+          <p className="mt-3 text-sm leading-relaxed text-slate-600">
+            Nossa IA lê o edital por você e devolve, em segundos, um resumo objetivo,
+            a lista dos itens e três ações concretas para decidir se vale disputar.
+            É como ter um analista dedicado em cada licitação.
           </p>
           <div className="mt-6 rounded-xl border border-slate-200 bg-slate-950 p-4 font-mono text-xs leading-relaxed text-slate-300">
-            <div className="mb-2 text-indigo-600">↳ analysis.summary</div>
-            Pregão eletrônico para aquisição de equipamentos hospitalares. Órgão histórico
-            de pagamentos regulares. Concorrência estimada moderada.
-            <div className="mt-3 text-indigo-600">↳ analysis.actions</div>
-            1. Verificar habilitação técnica ANVISA<br />
-            2. Simular margem sobre valor de referência<br />
-            3. Consultar histórico do órgão no Score
+            <div className="mb-2 text-indigo-400">↳ resumo</div>
+            Pregão eletrônico para equipamentos hospitalares. Órgão com histórico
+            regular de pagamentos. Concorrência moderada. Boa oportunidade.
+            <div className="mt-3 text-indigo-400">↳ ações recomendadas</div>
+            1. Confirmar habilitação técnica ANVISA<br />
+            2. Simular margem sobre o valor de referência<br />
+            3. Verificar o Score do órgão antes de propor
           </div>
         </div>
       </section>
