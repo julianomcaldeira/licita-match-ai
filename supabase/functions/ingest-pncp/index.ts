@@ -770,8 +770,8 @@ async function handleGapFill(supabase: any) {
 
   // For each high-volume modalidade, find the last date with data
   const MODALIDADE_NAMES: Record<number, string> = {
-    4: "Concorrência - Eletrônica", 5: "Pregão - Eletrônico", 6: "Dispensa",
-    7: "Inexigibilidade", 8: "Pregão - Presencial", 9: "Concorrência - Presencial",
+    4: "Concorrência - Eletrônica", 5: "Concorrência - Presencial", 6: "Pregão - Eletrônico",
+    7: "Pregão - Presencial", 8: "Dispensa de Licitação", 9: "Inexigibilidade",
     12: "Credenciamento",
   };
 
