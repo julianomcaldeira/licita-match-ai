@@ -27,7 +27,7 @@ const initial: Metrics = {
 };
 
 async function countExact(table: string, filter?: (q: any) => any): Promise<number> {
-  let q: any = (supabase as any).from(table).select("*", { count: "exact", head: true });
+  let q: any = (supabase as any).from(table).select("*", { count: "estimated", head: true });
   if (filter) q = filter(q);
   const { count, error } = await q;
   if (error) throw error;
