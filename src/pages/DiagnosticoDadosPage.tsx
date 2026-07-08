@@ -106,6 +106,20 @@ async function getLatestHomologadasSemVencedores() {
   return Number(data?.homologadas_sem_vencedores ?? 0);
 }
 
+type OrfaosBreakdown = {
+  total: number;
+  sem_itens: number;
+  com_itens_sem_venc: number;
+  por_fonte: { fonte: string; count: number }[];
+  por_situacao: { situacao: string; count: number }[];
+};
+
+async function getOrfaosBreakdown(): Promise<OrfaosBreakdown | null> {
+  const { data, error } = await (supabase as any).rpc("diagnostico_orfaos_homologadas");
+  if (error) throw error;
+  return (data as OrfaosBreakdown) ?? null;
+}
+
 function fmt(n: number | null) {
   if (n == null) return "—";
   return n.toLocaleString("pt-BR");
