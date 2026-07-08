@@ -12,7 +12,9 @@ import {
   Cpu,
   FileSearch,
   Gauge,
+  Check,
 } from "lucide-react";
+import logoImg from "@/assets/logo-ipesquisei.png";
 
 /**
  * Landing pública — i-pesquisei
@@ -113,12 +115,7 @@ export default function LandingPage() {
       {/* NAV */}
       <header className="relative z-20 mx-auto flex max-w-7xl items-center justify-between px-6 py-6">
         <Link to="/" className="flex items-center gap-2">
-          <div
-            className="grid h-8 w-8 place-items-center rounded-md"
-            style={{ background: palette.accent, boxShadow: `0 0 24px ${palette.accent}66` }}
-          >
-            <span className="font-display text-sm font-bold text-white">i</span>
-          </div>
+          <img src={logoImg} alt="i-pesquisei" className="h-9 w-9 rounded-md object-contain" />
           <span className="font-display text-lg font-semibold tracking-tight text-slate-900">
             i-pesquisei
           </span>
@@ -127,7 +124,7 @@ export default function LandingPage() {
           </span>
         </Link>
         <nav className="hidden items-center gap-8 md:flex">
-          {nav.map((n) => (
+          {[...nav, { label: "Planos", href: "#planos" }].map((n) => (
             <a key={n.href} href={n.href} className="text-sm text-slate-400 transition hover:text-slate-900">
               {n.label}
             </a>
@@ -466,6 +463,128 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* PLANOS */}
+      <section id="planos" className="relative z-10 mx-auto max-w-7xl px-6 py-24">
+        <div className="mb-14 flex flex-col items-start justify-between gap-6 lg:flex-row lg:items-end">
+          <div>
+            <span className="font-mono text-xs uppercase tracking-widest text-indigo-600">
+              / planos
+            </span>
+            <h2 className="font-display mt-3 max-w-2xl text-4xl font-semibold leading-tight text-slate-900 sm:text-5xl">
+              Escolha o plano e comece hoje.
+            </h2>
+          </div>
+          <p className="max-w-md text-sm text-slate-500">
+            Todos os planos incluem acesso ao pipeline PNCP + Portal da Transparência,
+            RLS multi-tenant e atualização diária.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          {[
+            {
+              name: "Starter",
+              price: "R$ 490",
+              period: "/mês",
+              desc: "Para times pequenos validando o mercado público.",
+              features: [
+                "1 empresa (tenant)",
+                "Até 3 usuários",
+                "Consulta ilimitada às 918k+ licitações",
+                "Score de órgãos AAA–D",
+                "Exportação CSV até 10k linhas",
+              ],
+              cta: "Começar agora",
+              highlight: false,
+            },
+            {
+              name: "Growth",
+              price: "R$ 1.490",
+              period: "/mês",
+              desc: "Operação recorrente com análise IA por licitação.",
+              features: [
+                "Até 10 usuários",
+                "Análise IA Gemini incluída",
+                "Relatórios dinâmicos + API keys",
+                "Ingestão on-demand por CNPJ de órgão",
+                "Suporte prioritário",
+              ],
+              cta: "Assinar Growth",
+              highlight: true,
+            },
+            {
+              name: "Enterprise",
+              price: "Sob consulta",
+              period: "",
+              desc: "Volume alto, integrações e SLA dedicado.",
+              features: [
+                "Usuários ilimitados",
+                "SLA e ambiente dedicado",
+                "Integração via API + webhooks",
+                "Onboarding e treinamento",
+                "Dados históricos completos",
+              ],
+              cta: "Falar com vendas",
+              highlight: false,
+            },
+          ].map((p) => (
+            <div
+              key={p.name}
+              className={`relative flex flex-col rounded-2xl border p-8 transition ${
+                p.highlight
+                  ? "border-indigo-400 bg-white shadow-[0_30px_80px_-30px_rgba(79,70,229,0.45)]"
+                  : "border-slate-200 bg-white/70"
+              }`}
+            >
+              {p.highlight && (
+                <span
+                  className="absolute -top-3 left-8 rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-white"
+                  style={{ background: palette.accent }}
+                >
+                  Mais escolhido
+                </span>
+              )}
+              <div className="font-display text-lg font-semibold text-slate-900">{p.name}</div>
+              <p className="mt-2 text-sm text-slate-500">{p.desc}</p>
+              <div className="mt-6 flex items-baseline gap-1">
+                <span className="font-display text-4xl font-semibold text-slate-900">
+                  {p.price}
+                </span>
+                <span className="text-sm text-slate-500">{p.period}</span>
+              </div>
+              <ul className="mt-6 space-y-3 text-sm text-slate-700">
+                {p.features.map((f) => (
+                  <li key={f} className="flex items-start gap-2">
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" />
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link
+                to="/auth"
+                className={`mt-8 inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-medium transition ${
+                  p.highlight
+                    ? "text-white"
+                    : "border border-slate-300 text-slate-900 hover:bg-slate-100"
+                }`}
+                style={
+                  p.highlight
+                    ? { background: palette.accent, boxShadow: `0 10px 30px ${palette.accent}55` }
+                    : undefined
+                }
+              >
+                {p.cta}
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          ))}
+        </div>
+
+        <p className="mt-8 text-center text-xs text-slate-400">
+          7 dias de teste em qualquer plano · cancele quando quiser · pagamento em BRL
+        </p>
+      </section>
+
       {/* CTA */}
       <section className="relative z-10 mx-auto max-w-5xl px-6 py-24">
         <div
@@ -477,11 +596,11 @@ export default function LandingPage() {
         >
           <Sparkles className="mx-auto h-8 w-8 text-indigo-600" />
           <h2 className="font-display mt-6 text-4xl font-semibold text-slate-900 sm:text-5xl">
-            Explore a base pública como se fosse sua.
+            Comece hoje. Cancele quando quiser.
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-sm text-slate-600">
-            Acesso multi-tenant, RLS por empresa, RPCs otimizadas e todo o histórico do
-            PNCP desde 2023 disponíveis a partir do primeiro login.
+            7 dias de teste gratuito em qualquer plano. Ative sua empresa em menos de 2
+            minutos e comece a operar sobre 918k+ licitações no primeiro login.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link
@@ -489,14 +608,14 @@ export default function LandingPage() {
               className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-medium text-white transition"
               style={{ background: palette.accent, boxShadow: `0 12px 40px ${palette.accent}66` }}
             >
-              Acessar plataforma
+              Começar teste grátis
               <ArrowRight className="h-4 w-4" />
             </Link>
             <a
-              href="#plataforma"
+              href="#planos"
               className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white/70 px-6 py-3 text-sm font-medium text-slate-700 backdrop-blur transition hover:bg-slate-100"
             >
-              Revisar módulos
+              Ver planos
             </a>
           </div>
         </div>
