@@ -22,6 +22,7 @@ import ApiKeysPage from "@/pages/ApiKeysPage";
 import IndiceStartGiPage from "@/pages/IndiceStartGiPage";
 import AIMonitorPage from "@/pages/AIMonitorPage";
 import ConfiguracoesPage from "@/pages/ConfiguracoesPage";
+import DiagnosticoDadosPage from "@/pages/DiagnosticoDadosPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -58,6 +59,7 @@ const App = () => (
               <Route path="/monitor-ingestao" element={<IngestaoMonitorPage />} />
               <Route path="/consumo-ia" element={<AIMonitorPage />} />
               <Route path="/configuracoes" element={<ConfiguracoesPage />} />
+              <Route path="/diagnostico-dados" element={<DiagnosticoDadosPage />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
