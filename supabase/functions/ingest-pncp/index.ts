@@ -988,23 +988,6 @@ function isSchedulerMode(mode: string): boolean {
   return ["cron", "winners", "bulk-backfill", "backfill", "gap-fill"].includes(mode);
 }
 
-function hasSchedulerToken(req: Request): boolean {
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) return false;
-
-  const token = authHeader.replace("Bearer ", "").trim();
-  if (!token || token.split(".").length < 2) return false;
-
-  try {
-    const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
-    const claims = JSON.parse(atob(padded));
-    return claims?.role === "anon";
-  } catch {
-    return false;
-  }
-}
-
 // --- Main handler ---
 
 serve(async (req) => {
@@ -1016,15 +999,20 @@ serve(async (req) => {
   const requestedMode = typeof body.mode === "string" ? body.mode : "ingest";
   const mode = requestedMode === "backfill" ? "bulk-backfill" : requestedMode;
 
-  const schedulerAuthorized = isSchedulerMode(requestedMode) && hasSchedulerToken(req);
-  if (!schedulerAuthorized) {
+  const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
+  const providedToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7).trim() : null;
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  const isServiceRole = !!providedToken && !!serviceKey && providedToken === serviceKey;
+
+  if (!isServiceRole) {
     const auth = await authenticateAdmin(req);
     if (!auth) {
-      return new Response(JSON.stringify({ error: "Não autorizado. Acesso restrito a administradores." }), {
+      return new Response(JSON.stringify({ error: "Não autorizado" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
   }
+
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
