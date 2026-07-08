@@ -596,11 +596,11 @@ export default function LandingPage() {
         >
           <Sparkles className="mx-auto h-8 w-8 text-indigo-600" />
           <h2 className="font-display mt-6 text-4xl font-semibold text-slate-900 sm:text-5xl">
-            Explore a base pública como se fosse sua.
+            Comece hoje. Cancele quando quiser.
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-sm text-slate-600">
-            Acesso multi-tenant, RLS por empresa, RPCs otimizadas e todo o histórico do
-            PNCP desde 2023 disponíveis a partir do primeiro login.
+            7 dias de teste gratuito em qualquer plano. Ative sua empresa em menos de 2
+            minutos e comece a operar sobre 918k+ licitações no primeiro login.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link
@@ -608,14 +608,14 @@ export default function LandingPage() {
               className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-medium text-white transition"
               style={{ background: palette.accent, boxShadow: `0 12px 40px ${palette.accent}66` }}
             >
-              Acessar plataforma
+              Começar teste grátis
               <ArrowRight className="h-4 w-4" />
             </Link>
             <a
-              href="#plataforma"
+              href="#planos"
               className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white/70 px-6 py-3 text-sm font-medium text-slate-700 backdrop-blur transition hover:bg-slate-100"
             >
-              Revisar módulos
+              Ver planos
             </a>
           </div>
         </div>
