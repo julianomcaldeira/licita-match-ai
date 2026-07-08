@@ -118,7 +118,7 @@ export default function LandingPage() {
           <img
             src={logoImg}
             alt="i-pesquisei"
-            className="h-16 w-auto object-contain md:h-20 lg:h-24"
+            className="h-10 w-auto object-contain md:h-12"
           />
         </Link>
         <nav className="hidden items-center gap-8 md:flex">
