@@ -94,6 +94,18 @@ async function collectEmpenhosMultiContrato() {
   return multi;
 }
 
+async function getLatestHomologadasSemVencedores() {
+  const { data, error } = await supabase
+    .from("auditoria_ingestao")
+    .select("homologadas_sem_vencedores")
+    .order("executed_at", { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return Number(data?.homologadas_sem_vencedores ?? 0);
+}
+
 function fmt(n: number | null) {
   if (n == null) return "—";
   return n.toLocaleString("pt-BR");
@@ -114,10 +126,7 @@ export default function DiagnosticoDadosPage() {
       pncp: countExact("licitacoes", (q) => q.eq("fonte", "PNCP")),
       pt: countExact("licitacoes", (q) => q.eq("fonte", "PORTAL_TRANSPARENCIA")),
       pncpDA: countExact("licitacoes", (q) => q.eq("fonte", "PNCP_DADOS_ABERTOS")),
-      homolog: supabase.rpc("licitacoes_pendentes_winners_count").then(({ data, error }) => {
-        if (error) throw error;
-        return Number(data ?? 0);
-      }),
+      homolog: getLatestHomologadasSemVencedores(),
       empenhosTotal: countExact("empenhos"),
       ptDup: collectPtDuplicates(),
       empMulti: collectEmpenhosMultiContrato(),
@@ -241,7 +250,7 @@ export default function DiagnosticoDadosPage() {
               <span className="font-mono">{fmt(metrics.homologadasSemVencedores)}</span>
             </div>
             <p className="text-xs text-muted-foreground pt-2">
-              Fonte: RPC <code>licitacoes_pendentes_winners_count</code>.
+              Fonte: última auditoria de ingestão registrada no banco.
             </p>
           </CardContent>
         </Card>
