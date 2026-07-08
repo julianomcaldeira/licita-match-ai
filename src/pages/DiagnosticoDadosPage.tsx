@@ -27,7 +27,7 @@ const initial: Metrics = {
 };
 
 async function countExact(table: string, filter?: (q: any) => any): Promise<number> {
-  let q: any = (supabase as any).from(table).select("*", { count: "exact", head: true });
+  let q: any = (supabase as any).from(table).select("*", { count: "estimated", head: true });
   if (filter) q = filter(q);
   const { count, error } = await q;
   if (error) throw error;
@@ -168,7 +168,7 @@ export default function DiagnosticoDadosPage() {
         <div>
           <h1 className="text-2xl font-bold">Diagnóstico de Dados</h1>
           <p className="text-sm text-muted-foreground">
-            Snapshot somente-leitura. Nenhum dado é alterado.
+            Snapshot somente-leitura. Nenhum dado é alterado. Totais por fonte são estimados (planner) para evitar timeout em tabelas grandes.
             {ranAt && <> Última execução: {ranAt.toLocaleString("pt-BR")}.</>}
           </p>
         </div>
