@@ -16,6 +16,53 @@ type Metrics = {
   empenhosMultiContrato: number;
 };
 
+const CLASS_ORDER = ["AAA","AA","A","BBB","BB","B","CCC","CC","C","D","SD"];
+
+type ScoreDiag = {
+  total: number;
+  porClasse: Record<string, number>;
+  altosSemPortal: { nome_orgao: string; score_classificacao: string; fontes_utilizadas: string[] }[];
+  altosSemPortalTotal: number;
+  soContratosInternos: number;
+};
+
+async function collectScoreDiag(): Promise<ScoreDiag> {
+  const pageSize = 1000;
+  let from = 0;
+  const porClasse: Record<string, number> = {};
+  const altosSemPortal: ScoreDiag["altosSemPortal"] = [];
+  let altosSemPortalTotal = 0;
+  let soContratosInternos = 0;
+  let total = 0;
+  while (true) {
+    const { data, error } = await (supabase as any)
+      .from("orgaos_score")
+      .select("nome_orgao,score_classificacao,fontes_utilizadas")
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    for (const r of data as any[]) {
+      total += 1;
+      const cls = r.score_classificacao || "SD";
+      porClasse[cls] = (porClasse[cls] ?? 0) + 1;
+      const fontes: string[] = r.fontes_utilizadas ?? [];
+      const temPortal = fontes.some((f) => (f || "").startsWith("portal_transparencia"));
+      if (["AAA","AA","A"].includes(cls) && !temPortal) {
+        altosSemPortalTotal += 1;
+        if (altosSemPortal.length < 20) altosSemPortal.push({
+          nome_orgao: r.nome_orgao,
+          score_classificacao: cls,
+          fontes_utilizadas: fontes,
+        });
+      }
+      if (fontes.length === 1 && fontes[0] === "contratos_internos") soContratosInternos += 1;
+    }
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return { total, porClasse, altosSemPortal, altosSemPortalTotal, soContratosInternos };
+}
+
 const initial: Metrics = {
   totalLicitacoes: null,
   porFonte: {},
@@ -129,6 +176,7 @@ export default function DiagnosticoDadosPage() {
   const { role, loading: authLoading } = useAuth();
   const [metrics, setMetrics] = useState<Metrics>(initial);
   const [orfaos, setOrfaos] = useState<OrfaosBreakdown | null>(null);
+  const [scoreDiag, setScoreDiag] = useState<ScoreDiag | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ranAt, setRanAt] = useState<Date | null>(null);
@@ -146,6 +194,7 @@ export default function DiagnosticoDadosPage() {
       ptDup: collectPtDuplicates(),
       empMulti: collectEmpenhosMultiContrato(),
       orfaosBreak: getOrfaosBreakdown(),
+      scoreDiag: collectScoreDiag(),
     };
 
     const keys = Object.keys(tasks) as (keyof typeof tasks)[];
@@ -178,6 +227,7 @@ export default function DiagnosticoDadosPage() {
       empenhosMultiContrato: out.empMulti ?? 0,
     });
     setOrfaos(out.orfaosBreak ?? null);
+    setScoreDiag(out.scoreDiag ?? null);
     setRanAt(new Date());
     setError(errs.length ? errs.join(" • ") : null);
     setLoading(false);
@@ -344,6 +394,73 @@ export default function DiagnosticoDadosPage() {
                 Situações como <em>Revogada</em>, <em>Anulada</em>, <em>Deserta</em> e <em>Fracassada</em> naturalmente podem não ter vencedor. <em>Divulgada no PNCP</em>/<em>Homologada</em> deveriam ter e indicam encadeamento incompleto.
               </p>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">6. Qualidade dos scores de órgãos</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6 text-sm">
+          <p className="text-xs text-muted-foreground">
+            Leitura direta de <span className="font-mono">orgaos_score</span>. Nada é recalculado ou alterado.
+            Fontes de pagamento são identificadas por prefixo <span className="font-mono">portal_transparencia:*</span> em <span className="font-mono">fontes_utilizadas</span>.
+          </p>
+
+          <div className="flex flex-wrap gap-6 border-y py-3">
+            <div>
+              <div className="text-xs text-muted-foreground">Total de órgãos com score</div>
+              <div className="font-mono text-lg">{fmt(scoreDiag?.total ?? null)}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">≥ A sem fonte Portal da Transparência</div>
+              <div className="font-mono text-lg text-destructive">{fmt(scoreDiag?.altosSemPortalTotal ?? null)}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">Calculados só com contratos_internos</div>
+              <div className="font-mono text-lg">{fmt(scoreDiag?.soContratosInternos ?? null)}</div>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="font-medium mb-2">Quebra por classificação</h4>
+            <div className="grid gap-1 sm:grid-cols-2">
+              {CLASS_ORDER.map((cls) => (
+                <div key={cls} className="flex justify-between border-b py-1">
+                  <span className="font-mono">{cls}</span>
+                  <span className="font-mono">{fmt(scoreDiag?.porClasse?.[cls] ?? 0)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h4 className="font-medium mb-2">
+              Órgãos com classificação ≥ A sem examinar pagamentos (top 20)
+            </h4>
+            {scoreDiag && scoreDiag.altosSemPortal.length === 0 ? (
+              <div className="text-xs text-muted-foreground">Nenhum caso encontrado.</div>
+            ) : (
+              <div className="space-y-1">
+                {(scoreDiag?.altosSemPortal ?? []).map((r, i) => (
+                  <div key={i} className="flex justify-between gap-4 border-b py-1">
+                    <span className="truncate">{r.nome_orgao}</span>
+                    <span className="flex gap-2 shrink-0">
+                      <span className="font-mono">{r.score_classificacao}</span>
+                      <span className="font-mono text-xs text-muted-foreground">
+                        [{r.fontes_utilizadas.join(", ") || "—"}]
+                      </span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {scoreDiag && scoreDiag.altosSemPortalTotal > scoreDiag.altosSemPortal.length && (
+              <p className="text-xs text-muted-foreground pt-2">
+                Exibindo {scoreDiag.altosSemPortal.length} de {scoreDiag.altosSemPortalTotal}.
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>
