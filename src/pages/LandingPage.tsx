@@ -16,7 +16,7 @@ import {
   Check,
   CalendarCheck,
 } from "lucide-react";
-import logoImg from "@/assets/logo-ipesquisei-indigo.png";
+import logoImg from "@/assets/logo-ipesquisei.png";
 
 /**
  * Landing pública — i-pesquisei
