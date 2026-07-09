@@ -167,36 +167,38 @@ export default function LandingPage() {
       </div>
 
       {/* NAV */}
-      <header className="relative z-20 mx-auto flex max-w-7xl items-center justify-between px-6 py-6">
-        <Link to="/" className="flex items-center">
-          <img src={logoImg} alt="i-pesquisei" className="h-10 w-auto object-contain md:h-12" />
-        </Link>
-        <nav className="hidden items-center gap-8 md:flex">
-          {nav.map((n) => (
-            <a
-              key={n.href}
-              href={n.href}
-              className="text-sm text-slate-500 transition hover:text-slate-900"
-            >
-              {n.label}
-            </a>
-          ))}
-        </nav>
-        <div className="flex items-center gap-3">
-          <Link
-            to="/auth"
-            className="hidden text-sm text-slate-600 hover:text-slate-900 sm:inline"
-          >
-            Entrar
+      <header className="relative z-20 bg-white">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+          <Link to="/" className="flex items-center">
+            <img src={logoImg} alt="i-pesquisei" className="h-7 w-auto object-contain md:h-8" />
           </Link>
-          <a
-            href="#contato"
-            className="group inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-white transition"
-            style={{ background: palette.accent, boxShadow: `0 8px 30px ${palette.accent}55` }}
-          >
-            Agende uma demonstração
-            <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
-          </a>
+          <nav className="hidden items-center gap-8 md:flex">
+            {nav.map((n) => (
+              <a
+                key={n.href}
+                href={n.href}
+                className="text-sm text-slate-500 transition hover:text-slate-900"
+              >
+                {n.label}
+              </a>
+            ))}
+          </nav>
+          <div className="flex items-center gap-3">
+            <Link
+              to="/auth"
+              className="hidden text-sm text-slate-600 hover:text-slate-900 sm:inline"
+            >
+              Entrar
+            </Link>
+            <a
+              href="#contato"
+              className="group inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-white transition"
+              style={{ background: palette.accent, boxShadow: `0 8px 30px ${palette.accent}55` }}
+            >
+              Agende uma demonstração
+              <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+            </a>
+          </div>
         </div>
       </header>
 
