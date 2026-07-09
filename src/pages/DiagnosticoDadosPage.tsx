@@ -176,6 +176,7 @@ export default function DiagnosticoDadosPage() {
   const { role, loading: authLoading } = useAuth();
   const [metrics, setMetrics] = useState<Metrics>(initial);
   const [orfaos, setOrfaos] = useState<OrfaosBreakdown | null>(null);
+  const [scoreDiag, setScoreDiag] = useState<ScoreDiag | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ranAt, setRanAt] = useState<Date | null>(null);
@@ -193,6 +194,7 @@ export default function DiagnosticoDadosPage() {
       ptDup: collectPtDuplicates(),
       empMulti: collectEmpenhosMultiContrato(),
       orfaosBreak: getOrfaosBreakdown(),
+      scoreDiag: collectScoreDiag(),
     };
 
     const keys = Object.keys(tasks) as (keyof typeof tasks)[];
