@@ -227,6 +227,7 @@ export default function DiagnosticoDadosPage() {
       empenhosMultiContrato: out.empMulti ?? 0,
     });
     setOrfaos(out.orfaosBreak ?? null);
+    setScoreDiag(out.scoreDiag ?? null);
     setRanAt(new Date());
     setError(errs.length ? errs.join(" • ") : null);
     setLoading(false);
