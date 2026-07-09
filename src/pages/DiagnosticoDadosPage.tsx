@@ -16,6 +16,53 @@ type Metrics = {
   empenhosMultiContrato: number;
 };
 
+const CLASS_ORDER = ["AAA","AA","A","BBB","BB","B","CCC","CC","C","D","SD"];
+
+type ScoreDiag = {
+  total: number;
+  porClasse: Record<string, number>;
+  altosSemPortal: { nome_orgao: string; score_classificacao: string; fontes_utilizadas: string[] }[];
+  altosSemPortalTotal: number;
+  soContratosInternos: number;
+};
+
+async function collectScoreDiag(): Promise<ScoreDiag> {
+  const pageSize = 1000;
+  let from = 0;
+  const porClasse: Record<string, number> = {};
+  const altosSemPortal: ScoreDiag["altosSemPortal"] = [];
+  let altosSemPortalTotal = 0;
+  let soContratosInternos = 0;
+  let total = 0;
+  while (true) {
+    const { data, error } = await (supabase as any)
+      .from("orgaos_score")
+      .select("nome_orgao,score_classificacao,fontes_utilizadas")
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    for (const r of data as any[]) {
+      total += 1;
+      const cls = r.score_classificacao || "SD";
+      porClasse[cls] = (porClasse[cls] ?? 0) + 1;
+      const fontes: string[] = r.fontes_utilizadas ?? [];
+      const temPortal = fontes.some((f) => (f || "").startsWith("portal_transparencia"));
+      if (["AAA","AA","A"].includes(cls) && !temPortal) {
+        altosSemPortalTotal += 1;
+        if (altosSemPortal.length < 20) altosSemPortal.push({
+          nome_orgao: r.nome_orgao,
+          score_classificacao: cls,
+          fontes_utilizadas: fontes,
+        });
+      }
+      if (fontes.length === 1 && fontes[0] === "contratos_internos") soContratosInternos += 1;
+    }
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return { total, porClasse, altosSemPortal, altosSemPortalTotal, soContratosInternos };
+}
+
 const initial: Metrics = {
   totalLicitacoes: null,
   porFonte: {},
