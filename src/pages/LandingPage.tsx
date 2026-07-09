@@ -207,8 +207,8 @@ export default function LandingPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: "easeOut" }}
         >
-          <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-pink-300 bg-pink-100 px-3 py-1 text-xs text-pink-600">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-pink-400" />
+          <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-indigo-300 bg-indigo-100 px-3 py-1 text-xs text-indigo-600">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-400" />
             Inteligência em compras governamentais
           </div>
           <h1 className="font-display mx-auto mt-6 max-w-4xl text-5xl font-semibold leading-[1.05] tracking-tight text-slate-900 sm:text-6xl lg:text-7xl">
@@ -250,7 +250,7 @@ export default function LandingPage() {
       {/* O QUE VOCÊ ENXERGA */}
       <section id="recorte" className="relative z-10 mx-auto max-w-7xl px-6 py-20">
         <div className="mb-14 max-w-3xl">
-          <span className="font-mono text-xs uppercase tracking-widest text-pink-600">
+          <span className="font-mono text-xs uppercase tracking-widest text-indigo-600">
             / o que você enxerga
           </span>
           <h2 className="font-display mt-3 text-4xl font-semibold leading-tight text-slate-900 sm:text-5xl">
@@ -270,7 +270,7 @@ export default function LandingPage() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-80px" }}
               transition={{ duration: 0.5, delay: i * 0.05 }}
-              className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-8 transition hover:border-pink-400"
+              className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-8 transition hover:border-indigo-400"
             >
               <div
                 className="absolute inset-x-0 top-0 h-px opacity-0 transition group-hover:opacity-100"
@@ -280,12 +280,12 @@ export default function LandingPage() {
               />
               <div className="flex items-start justify-between">
                 <div
-                  className="grid h-12 w-12 place-items-center rounded-xl border border-pink-300"
+                  className="grid h-12 w-12 place-items-center rounded-xl border border-indigo-300"
                   style={{ background: `${palette.accent}18` }}
                 >
-                  <r.icon className="h-5 w-5 text-pink-600" />
+                  <r.icon className="h-5 w-5 text-indigo-600" />
                 </div>
-                <span className="font-mono text-[11px] uppercase tracking-widest text-pink-600">
+                <span className="font-mono text-[11px] uppercase tracking-widest text-indigo-600">
                   {r.tag}
                 </span>
               </div>
@@ -301,7 +301,7 @@ export default function LandingPage() {
       {/* DIFERENCIAIS — Por que não é só o PNCP */}
       <section id="diferenciais" className="relative z-10 mx-auto max-w-7xl px-6 py-20">
         <div className="mb-14 max-w-3xl">
-          <span className="font-mono text-xs uppercase tracking-widest text-pink-600">
+          <span className="font-mono text-xs uppercase tracking-widest text-indigo-600">
             / por que não é só o PNCP
           </span>
           <h2 className="font-display mt-3 text-4xl font-semibold leading-tight text-slate-900 sm:text-5xl">
@@ -325,10 +325,10 @@ export default function LandingPage() {
               className="relative rounded-2xl border border-slate-200 bg-white p-8"
             >
               <div
-                className="mb-5 grid h-11 w-11 place-items-center rounded-xl border border-pink-300"
+                className="mb-5 grid h-11 w-11 place-items-center rounded-xl border border-indigo-300"
                 style={{ background: `${palette.accent}18` }}
               >
-                <d.icon className="h-5 w-5 text-pink-600" />
+                <d.icon className="h-5 w-5 text-indigo-600" />
               </div>
               <h3 className="font-display text-lg font-semibold text-slate-900">{d.title}</h3>
               <p className="mt-2 text-sm leading-relaxed text-slate-600">{d.desc}</p>
@@ -340,7 +340,7 @@ export default function LandingPage() {
       {/* PLANOS */}
       <section id="planos" className="relative z-10 mx-auto max-w-7xl px-6 py-24">
         <div className="mb-14 max-w-3xl">
-          <span className="font-mono text-xs uppercase tracking-widest text-pink-600">
+          <span className="font-mono text-xs uppercase tracking-widest text-indigo-600">
             / planos
           </span>
           <h2 className="font-display mt-3 text-4xl font-semibold leading-tight text-slate-900 sm:text-5xl">
@@ -358,7 +358,7 @@ export default function LandingPage() {
               key={p.name}
               className={`relative flex flex-col rounded-2xl border p-8 transition ${
                 p.highlight
-                  ? "border-pink-400 bg-white shadow-[0_30px_80px_-30px_rgba(79,70,229,0.45)]"
+                  ? "border-indigo-400 bg-white shadow-[0_30px_80px_-30px_rgba(79,70,229,0.45)]"
                   : "border-slate-200 bg-white/70"
               }`}
             >
@@ -375,7 +375,7 @@ export default function LandingPage() {
               <ul className="mt-6 flex-1 space-y-3 text-sm text-slate-700">
                 {p.features.map((f) => (
                   <li key={f} className="flex items-start gap-2">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-pink-600" />
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" />
                     <span>{f}</span>
                   </li>
                 ))}
@@ -404,14 +404,14 @@ export default function LandingPage() {
       {/* CTA final + Formulário */}
       <section id="contato" className="relative z-10 mx-auto max-w-6xl px-6 py-24">
         <div
-          className="grid grid-cols-1 gap-10 overflow-hidden rounded-3xl border border-pink-300 p-10 lg:grid-cols-2 lg:p-14"
+          className="grid grid-cols-1 gap-10 overflow-hidden rounded-3xl border border-indigo-300 p-10 lg:grid-cols-2 lg:p-14"
           style={{
             background: `linear-gradient(140deg, ${palette.accentSoft}, ${palette.bg2})`,
             boxShadow: `0 40px 120px -20px ${palette.accent}55`,
           }}
         >
           <div>
-            <CalendarCheck className="h-8 w-8 text-pink-600" />
+            <CalendarCheck className="h-8 w-8 text-indigo-600" />
             <h2 className="font-display mt-6 text-4xl font-semibold leading-tight text-slate-900 sm:text-5xl">
               Agende uma demonstração.
             </h2>
@@ -421,15 +421,15 @@ export default function LandingPage() {
             </p>
             <ul className="mt-6 space-y-2 text-sm text-slate-700">
               <li className="flex items-start gap-2">
-                <Check className="mt-0.5 h-4 w-4 shrink-0 text-pink-600" />
+                <Check className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" />
                 Demonstração personalizada com o seu histórico
               </li>
               <li className="flex items-start gap-2">
-                <Check className="mt-0.5 h-4 w-4 shrink-0 text-pink-600" />
+                <Check className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" />
                 Diagnóstico do seu mercado governamental
               </li>
               <li className="flex items-start gap-2">
-                <Check className="mt-0.5 h-4 w-4 shrink-0 text-pink-600" />
+                <Check className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" />
                 Proposta comercial no formato certo para você
               </li>
             </ul>
@@ -453,7 +453,7 @@ export default function LandingPage() {
                   required
                   value={form.nome}
                   onChange={(e) => setForm({ ...form, nome: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-pink-400 focus:ring-2 focus:ring-pink-100"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                   placeholder="Seu nome completo"
                 />
               </div>
@@ -463,7 +463,7 @@ export default function LandingPage() {
                   required
                   value={form.empresa}
                   onChange={(e) => setForm({ ...form, empresa: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-pink-400 focus:ring-2 focus:ring-pink-100"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                   placeholder="Razão social ou fantasia"
                 />
               </div>
@@ -475,7 +475,7 @@ export default function LandingPage() {
                     type="email"
                     value={form.email}
                     onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-pink-400 focus:ring-2 focus:ring-pink-100"
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                     placeholder="voce@empresa.com"
                   />
                 </div>
@@ -485,7 +485,7 @@ export default function LandingPage() {
                     required
                     value={form.telefone}
                     onChange={(e) => setForm({ ...form, telefone: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-pink-400 focus:ring-2 focus:ring-pink-100"
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                     placeholder="(11) 99999-0000"
                   />
                 </div>
@@ -518,7 +518,7 @@ export default function LandingPage() {
       <footer className="relative z-10 mx-auto max-w-7xl px-6 pb-12 pt-6">
         <div className="flex flex-col items-start justify-between gap-4 border-t border-slate-200 pt-8 sm:flex-row sm:items-center">
           <div className="flex items-center gap-2">
-            <Database className="h-4 w-4 text-pink-600" />
+            <Database className="h-4 w-4 text-indigo-600" />
             <span className="font-mono text-xs text-slate-500">
               i-pesquisei · inteligência em compras governamentais
             </span>
