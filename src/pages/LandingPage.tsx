@@ -26,10 +26,10 @@ import logoImg from "@/assets/logo-ipesquisei.png";
  */
 
 const palette = {
-  bg: "#fdf7fa",
-  bg2: "#fce7f1",
-  accent: "#ec4899",
-  accentSoft: "#f9a8d4",
+  bg: "#f8fafc",
+  bg2: "#eef2ff",
+  accent: "#4f46e5",
+  accentSoft: "#c7d2fe",
 };
 
 const nav = [
