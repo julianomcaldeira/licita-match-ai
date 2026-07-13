@@ -362,8 +362,9 @@ export default function LicitacoesPage() {
       const buildBaseQuery = () => {
         let query = supabase
           .from("licitacoes")
-          .select("id, orgao, objeto, modalidade, valor_estimado, valor_homologado, data_publicacao, uf, municipio, situacao, numero_controle_pncp")
-          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+          .select("id, orgao, objeto, modalidade, valor_estimado, valor_homologado, data_publicacao, uf, municipio, situacao, numero_controle_pncp", { count: "estimated" })
+          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
 
         if (isAbertas) {
           query = query.order("data_publicacao", { ascending: false });
