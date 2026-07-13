@@ -437,11 +437,13 @@ export default function LicitacoesPage() {
           const fetchedRows = (data || []) as any[];
           const hasMore = fetchedRows.length > PAGE_SIZE;
           const rows = hasMore ? fetchedRows.slice(0, PAGE_SIZE) : fetchedRows;
-          const totalCount = hasMore
-            ? (page + 2) * PAGE_SIZE
-            : page * PAGE_SIZE + rows.length;
+          const rpcTotal = Number(rows[0]?.total_count ?? fetchedRows[0]?.total_count ?? 0);
+          const totalCount = rpcTotal > 0
+            ? rpcTotal
+            : (hasMore ? (page + 2) * PAGE_SIZE + 1 : page * PAGE_SIZE + rows.length);
 
           return { rows, totalCount };
+
         } catch (rpcError) {
           console.error("search_licitacoes falhou, usando fallback:", rpcError);
 
