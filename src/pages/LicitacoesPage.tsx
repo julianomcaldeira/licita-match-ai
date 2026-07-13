@@ -484,43 +484,42 @@ export default function LicitacoesPage() {
             fallbackQuery = fallbackQuery.in("id", licitacaoIds);
           }
 
-          const fallbackResult = await withTimeout<{ data: any[] | null; error: any }>(
-            fallbackQuery as PromiseLike<{ data: any[] | null; error: any }>,
+          const fallbackResult = await withTimeout<{ data: any[] | null; error: any; count?: number | null }>(
+            fallbackQuery as PromiseLike<{ data: any[] | null; error: any; count?: number | null }>,
             QUERY_TIMEOUT_MS,
             "A busca de fallback demorou demais."
           );
-          const { data: fallbackRows, error: fallbackError } = fallbackResult;
+          const { data: fallbackRows, error: fallbackError, count: fallbackCount } = fallbackResult;
           if (fallbackError) {
             throw rpcError;
           }
 
           const fetchedRows = (fallbackRows || []) as any[];
-          const hasMore = fetchedRows.length > PAGE_SIZE;
-          const rows = hasMore ? fetchedRows.slice(0, PAGE_SIZE) : fetchedRows;
-          const totalCount = hasMore
-            ? (page + 2) * PAGE_SIZE
-            : page * PAGE_SIZE + rows.length;
+          const rows = fetchedRows.slice(0, PAGE_SIZE);
+          const totalCount = typeof fallbackCount === "number" && fallbackCount >= 0
+            ? fallbackCount
+            : (fetchedRows.length > PAGE_SIZE ? (page + 2) * PAGE_SIZE + 1 : page * PAGE_SIZE + rows.length);
 
           return { rows, totalCount };
         }
       }
 
       const query = buildBaseQuery();
-      const queryResult = await withTimeout<{ data: any[] | null; error: any }>(
-        query as PromiseLike<{ data: any[] | null; error: any }>,
+      const queryResult = await withTimeout<{ data: any[] | null; error: any; count?: number | null }>(
+        query as PromiseLike<{ data: any[] | null; error: any; count?: number | null }>,
         QUERY_TIMEOUT_MS
       );
-      const { data, error } = queryResult;
+      const { data, error, count } = queryResult;
       if (error) throw error;
 
       const fetchedRows = (data || []) as any[];
-      const hasMore = fetchedRows.length > PAGE_SIZE;
-      const rows = hasMore ? fetchedRows.slice(0, PAGE_SIZE) : fetchedRows;
-      const totalCount = hasMore
-        ? (page + 2) * PAGE_SIZE
-        : page * PAGE_SIZE + rows.length;
+      const rows = fetchedRows.slice(0, PAGE_SIZE);
+      const totalCount = typeof count === "number" && count >= 0
+        ? count
+        : (fetchedRows.length > PAGE_SIZE ? (page + 2) * PAGE_SIZE + 1 : page * PAGE_SIZE + rows.length);
 
       return { rows, totalCount };
+
     },
     placeholderData: (prev) => prev,
     staleTime: 60_000,
