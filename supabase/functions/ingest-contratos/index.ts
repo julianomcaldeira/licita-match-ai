@@ -93,7 +93,7 @@ async function fetchLicitacoesByOrgao(
         const batch = rows.slice(i, i + 50);
         const { error } = await supabase
           .from("licitacoes")
-          .upsert(batch, { onConflict: "id_origem,fonte" });
+          .upsert(batch, { onConflict: "id_origem,fonte", ignoreDuplicates: true });
         if (error) errors.push(`Orgao ${codigoOrgao} p${pagina}: ${error.message}`);
         else total += batch.length;
       }
@@ -202,9 +202,10 @@ async function fetchContratosBulk(
 
       for (let i = 0; i < rows.length; i += 50) {
         const batch = rows.slice(i, i + 50);
+        // Bulk: só inserimos novos. Enriquecimento com licitacao_id ocorre em fetchContratoByNumero (upsert com update).
         const { error } = await supabase
           .from("contratos")
-          .upsert(batch, { onConflict: "cnpj_orgao,numero_contrato" });
+          .upsert(batch, { onConflict: "cnpj_orgao,numero_contrato", ignoreDuplicates: true });
         if (error) errors.push(`orgao=${codigoOrgao} p${pagina}: ${error.message}`);
         else total += batch.length;
       }
