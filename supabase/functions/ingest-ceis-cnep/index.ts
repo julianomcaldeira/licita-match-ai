@@ -177,9 +177,11 @@ Deno.serve(async (req) => {
         const rows = items.map((item: any) => mapItem(item, tipo));
         for (let i = 0; i < rows.length; i += 100) {
           const batch = rows.slice(i, i + 100);
+          // ignoreDuplicates evita 5.400× updates por linha inalterada.
+          // Novos itens entram; atualizações a rows existentes só ocorrem em refresh manual.
           const { error } = await supabase
             .from("empresas_sancionadas")
-            .upsert(batch, { onConflict: "id_origem,tipo_cadastro" });
+            .upsert(batch, { onConflict: "id_origem,tipo_cadastro", ignoreDuplicates: true });
           if (error) errors.push(`p${pagina}: ${error.message}`);
           else total += batch.length;
         }

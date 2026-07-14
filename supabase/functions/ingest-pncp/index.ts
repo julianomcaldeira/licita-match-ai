@@ -290,32 +290,40 @@ async function fetchAllPages(
 
       for (let i = 0; i < filteredRows.length; i += 200) {
         const batch = filteredRows.slice(i, i + 200);
+        // Insert-only: reduz ~22M updates/dia em licitacoes. Enriquecimentos posteriores
+        // (valor_homologado, situacao) devem ir por caminho dedicado, não por reupsert cego.
+        const { error } = await supabase
+          .from("licitacoes")
+          .upsert(batch, { onConflict: "id_origem,fonte", ignoreDuplicates: true });
+        if (error) {
+          errors.push(`Mod ${modalidade} pag ${pagina}: ${error.message}`);
+          continue;
+        }
+        total += batch.length;
+
         if (fetchWinners) {
-          const { data: upserted, error } = await supabase
+          // Buscar os ids de TODAS as licitações do batch (novas + já existentes) para processar winners.
+          const ids = batch.map((r: any) => r.id_origem).filter(Boolean);
+          if (ids.length === 0) continue;
+          const { data: lics, error: selErr } = await supabase
             .from("licitacoes")
-            .upsert(batch, { onConflict: "id_origem,fonte" })
-            .select("id, numero_controle_pncp, raw_json");
-          if (error) {
-            errors.push(`Mod ${modalidade} pag ${pagina}: ${error.message}`);
-          } else {
-            total += batch.length;
-            if (upserted) {
-              const PARALLEL = 15;
-              for (let j = 0; j < upserted.length; j += PARALLEL) {
-                const winBatch = upserted.slice(j, j + PARALLEL);
-                const results = await Promise.allSettled(
-                  winBatch.map((lic: any) => processWinner(supabase, lic))
-                );
-                for (const r of results) {
-                  if (r.status === "fulfilled") winnersFound += r.value;
-                }
-              }
+            .select("id, numero_controle_pncp, raw_json")
+            .eq("fonte", "PNCP")
+            .in("id_origem", ids);
+          if (selErr || !lics) {
+            if (selErr) errors.push(`Mod ${modalidade} pag ${pagina} select: ${selErr.message}`);
+            continue;
+          }
+          const PARALLEL = 15;
+          for (let j = 0; j < lics.length; j += PARALLEL) {
+            const winBatch = lics.slice(j, j + PARALLEL);
+            const results = await Promise.allSettled(
+              winBatch.map((lic: any) => processWinner(supabase, lic))
+            );
+            for (const r of results) {
+              if (r.status === "fulfilled") winnersFound += r.value;
             }
           }
-        } else {
-          const { error } = await supabase.from("licitacoes").upsert(batch, { onConflict: "id_origem,fonte" });
-          if (error) errors.push(`Mod ${modalidade} pag ${pagina}: ${error.message}`);
-          else total += batch.length;
         }
       }
 
@@ -400,10 +408,15 @@ async function processWinner(supabase: any, lic: any): Promise<number> {
   const seq = raw?.sequencialCompra;
   let winnersFound = 0;
 
-  if (!cnpj || !ano || !seq) {
+  // Helper: guard branches (sem itens) — insert-only para não regravar o placeholder toda execução.
+  const insertPlaceholder = async () => {
     await supabase.from("licitacao_itens").upsert({
       licitacao_id: lic.id, descricao: raw?.objetoCompra || "Item geral", numero_item: 0,
-    }, { onConflict: "licitacao_id,numero_item" });
+    }, { onConflict: "licitacao_id,numero_item", ignoreDuplicates: true });
+  };
+
+  if (!cnpj || !ano || !seq) {
+    await insertPlaceholder();
     return 0;
   }
 
@@ -411,17 +424,13 @@ async function processWinner(supabase: any, lic: any): Promise<number> {
     const itensResp = await fetch(`${PNCP_DATA_URL}/orgaos/${cnpj}/compras/${ano}/${seq}/itens`, { headers: { Accept: "application/json" } });
     if (!itensResp.ok) {
       await itensResp.text();
-      await supabase.from("licitacao_itens").upsert({
-        licitacao_id: lic.id, descricao: raw?.objetoCompra || "Item geral", numero_item: 0,
-      }, { onConflict: "licitacao_id,numero_item" });
+      await insertPlaceholder();
       return 0;
     }
 
     const itens = await itensResp.json();
     if (!Array.isArray(itens) || itens.length === 0) {
-      await supabase.from("licitacao_itens").upsert({
-        licitacao_id: lic.id, descricao: raw?.objetoCompra || "Item geral", numero_item: 0,
-      }, { onConflict: "licitacao_id,numero_item" });
+      await insertPlaceholder();
       return 0;
     }
 
@@ -438,16 +447,23 @@ async function processWinner(supabase: any, lic: any): Promise<number> {
       }));
 
     if (itemRows.length === 0) {
-      await supabase.from("licitacao_itens").upsert({
-        licitacao_id: lic.id, descricao: raw?.objetoCompra || "Item geral", numero_item: 0,
-      }, { onConflict: "licitacao_id,numero_item" });
+      await insertPlaceholder();
       return 0;
     }
 
+    // Insert-only: elimina os ~480M updates/dia em licitacao_itens.
+    // Buscamos os ids depois (novos + já existentes) para vincular vencedores.
+    const { error: upErr } = await supabase
+      .from("licitacao_itens")
+      .upsert(itemRows, { onConflict: "licitacao_id,numero_item", ignoreDuplicates: true });
+    if (upErr) return 0;
+
+    const numeros = itemRows.map((r: any) => r.numero_item);
     const { data: dbItems } = await supabase
       .from("licitacao_itens")
-      .upsert(itemRows, { onConflict: "licitacao_id,numero_item" })
-      .select("id, numero_item");
+      .select("id, numero_item")
+      .eq("licitacao_id", lic.id)
+      .in("numero_item", numeros);
 
     if (!dbItems || dbItems.length === 0) return 0;
 
@@ -491,9 +507,10 @@ async function processWinner(supabase: any, lic: any): Promise<number> {
               }));
 
             if (winnerRows.length > 0) {
+              // ignoreDuplicates: elimina 99% dos 213M savepoint-rollbacks.
               const { error: winErr } = await supabase
                 .from("licitacao_vencedores")
-                .upsert(winnerRows, { onConflict: "item_id,cnpj" });
+                .upsert(winnerRows, { onConflict: "item_id,cnpj", ignoreDuplicates: true });
               if (!winErr) count = winnerRows.length;
             }
             return count;
