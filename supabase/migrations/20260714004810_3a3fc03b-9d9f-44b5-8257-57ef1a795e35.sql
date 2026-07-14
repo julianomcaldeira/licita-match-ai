@@ -1,0 +1,1 @@
+REINDEX INDEX public.idx_licitacoes_objeto_lower_trgm;
