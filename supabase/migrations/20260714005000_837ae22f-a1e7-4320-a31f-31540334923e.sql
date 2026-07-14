@@ -1,0 +1,1 @@
+REINDEX INDEX public.licitacoes_pkey;
