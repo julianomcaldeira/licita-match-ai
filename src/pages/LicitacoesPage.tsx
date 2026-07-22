@@ -898,11 +898,11 @@ export default function LicitacoesPage() {
 
       {/* Filters */}
       <div className="rounded-xl border border-border bg-card p-4 space-y-4">
-        {/* Row 1: Keyword + Status radio buttons */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-4 items-end">
+        {/* Row 1: Objeto + Itens + Status */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_auto] gap-4 items-end">
           <div className="space-y-1">
             <div className="flex items-center gap-1">
-              <label className="text-xs font-medium text-muted-foreground">Palavra-chave</label>
+              <label className="text-xs font-medium text-muted-foreground">Palavra-chave (objeto)</label>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-4 w-4 p-0 hover:bg-transparent">
@@ -910,17 +910,42 @@ export default function LicitacoesPage() {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="max-w-xs">
-                  <p className="text-xs">Busca no objeto E nos itens da licitação. Use espaços para buscar todas as palavras (AND). Ex: "plataforma ead"</p>
+                  <p className="text-xs">Busca no <strong>objeto</strong> (título) da licitação. Ex: "aquisição medicamentos".</p>
                 </TooltipContent>
               </Tooltip>
             </div>
             <Input
-              placeholder="Ex: plataforma ead, computador, consultoria..."
+              placeholder="Ex: plataforma ead, consultoria..."
               value={filterSearch}
               onChange={(e) => setFilterSearch(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
               className="h-9"
             />
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground">Itens</label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-4 w-4 p-0 hover:bg-transparent">
+                    <span className="text-[10px] text-muted-foreground cursor-help">ⓘ</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs">
+                  <p className="text-xs">Busca na <strong>descrição dos itens</strong> da licitação. Use espaços para exigir todas as palavras (AND). Ex: "seringa descartável 5ml".</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            <div className="relative">
+              <Package className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Ex: notebook, seringa 5ml, cadeira..."
+                value={filterItens}
+                onChange={(e) => setFilterItens(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                className="h-9 pl-8"
+              />
+            </div>
           </div>
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Status</label>
@@ -942,6 +967,8 @@ export default function LicitacoesPage() {
             </div>
           </div>
         </div>
+
+
 
         {/* Expandable filters section */}
         <div>
