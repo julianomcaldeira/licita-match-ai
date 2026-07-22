@@ -33,6 +33,8 @@ const runMetrics = {
   http_5xx: 0,
   fetch_timeouts: 0,
 };
+let runtimeParallel = 10;
+
 
 async function fetchWithTimeout(url: string): Promise<Response> {
   let lastErr: unknown = null;
