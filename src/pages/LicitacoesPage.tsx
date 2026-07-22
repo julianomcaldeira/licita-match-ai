@@ -162,6 +162,7 @@ export default function LicitacoesPage() {
   // Filter state
   const [filterOrgao, setFilterOrgao] = useState("");
   const [filterSearch, setFilterSearch] = useState("");
+  const [filterItens, setFilterItens] = useState("");
   const defaultDateFrom = new Date(2023, 0, 1);
   const [filterDateFrom, setFilterDateFrom] = useState<Date | undefined>(defaultDateFrom);
   const [filterDateTo, setFilterDateTo] = useState<Date | undefined>();
@@ -220,7 +221,7 @@ export default function LicitacoesPage() {
 
 
   const [appliedFilters, setAppliedFilters] = useState<{
-    orgao: string; search: string; dateFrom?: string; dateTo?: string; uf?: string; situacao?: string; vencedor?: string; tab: "abertas" | "encerradas";
+    orgao: string; search: string; itens?: string; dateFrom?: string; dateTo?: string; uf?: string; situacao?: string; vencedor?: string; tab: "abertas" | "encerradas";
   }>({ orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd"), tab: "abertas" });
 
   const hasWinnerFilter = filterVencedores.length > 0;
@@ -246,6 +247,7 @@ export default function LicitacoesPage() {
     setAppliedFilters({
       orgao: filterOrgao.trim(),
       search: filterSearch.trim(),
+      itens: filterItens.trim() || undefined,
       dateFrom: filterDateFrom ? format(filterDateFrom, "yyyy-MM-dd") : undefined,
       dateTo: filterDateTo ? format(filterDateTo, "yyyy-MM-dd") : undefined,
       uf: filterUf || undefined,
@@ -263,6 +265,7 @@ export default function LicitacoesPage() {
     setAppliedFilters({
       orgao: filterOrgao.trim(),
       search: filterSearch.trim(),
+      itens: filterItens.trim() || undefined,
       dateFrom: filterDateFrom ? format(filterDateFrom, "yyyy-MM-dd") : undefined,
       dateTo: filterDateTo ? format(filterDateTo, "yyyy-MM-dd") : undefined,
       uf: filterUf || undefined,
@@ -273,6 +276,7 @@ export default function LicitacoesPage() {
   const handleClearFilters = () => {
     setFilterOrgao("");
     setFilterSearch("");
+    setFilterItens("");
     setFilterDateFrom(defaultDateFrom);
     setFilterDateTo(undefined);
     setFilterUf("");
@@ -282,7 +286,7 @@ export default function LicitacoesPage() {
     setAppliedFilters({ orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd"), tab: activeTab });
   };
 
-  const hasActiveFilters = appliedFilters.orgao || appliedFilters.search || appliedFilters.dateFrom || appliedFilters.dateTo || appliedFilters.uf || appliedFilters.situacao || appliedFilters.vencedor;
+  const hasActiveFilters = appliedFilters.orgao || appliedFilters.search || appliedFilters.itens || appliedFilters.dateFrom || appliedFilters.dateTo || appliedFilters.uf || appliedFilters.situacao || appliedFilters.vencedor;
 
   const searchByWinner = (name: string) => {
     activateWinnerMode();
@@ -352,7 +356,7 @@ export default function LicitacoesPage() {
   };
 
   const isAbertas = appliedFilters.vencedor ? false : appliedFilters.tab === "abertas";
-  const useRpc = !!(appliedFilters.vencedor || appliedFilters.search);
+  const useRpc = !!(appliedFilters.vencedor || appliedFilters.search || appliedFilters.itens);
 
   const { data: queryResult, isLoading, isFetching, isError, error: queryError, refetch } = useQuery({
     queryKey: ["licitacoes-all", page, appliedFilters],
@@ -425,6 +429,7 @@ export default function LicitacoesPage() {
             p_sem_resultado: isAbertas,
             p_limit: PAGE_SIZE + 1,
             p_offset: page * PAGE_SIZE,
+            p_itens: appliedFilters.itens || null,
           });
           const rpcResult = await withTimeout<{ data: any[] | null; error: any }>(
             rpcPromise as PromiseLike<{ data: any[] | null; error: any }>,
@@ -617,6 +622,7 @@ export default function LicitacoesPage() {
     const items: { label: string; value: string }[] = [];
     items.push({ label: "Aba", value: appliedFilters.tab === "abertas" ? "Abertas / Em Andamento" : "Encerradas / Com Resultado" });
     if (appliedFilters.search) items.push({ label: "Palavra-chave", value: appliedFilters.search });
+    if (appliedFilters.itens) items.push({ label: "Itens", value: appliedFilters.itens });
     if (appliedFilters.orgao) items.push({ label: "Órgão", value: appliedFilters.orgao });
     if (appliedFilters.uf) items.push({ label: "UF", value: appliedFilters.uf });
     if (appliedFilters.situacao) items.push({ label: "Situação", value: appliedFilters.situacao });
@@ -630,7 +636,7 @@ export default function LicitacoesPage() {
   const computeExportCount = useCallback(async (): Promise<number | null> => {
     const MAX_EXPORT = 10000;
     const hasResultadoStatus = appliedFilters.situacao === "Concluída";
-    const useRpcExport = !!(appliedFilters.vencedor || appliedFilters.search);
+    const useRpcExport = !!(appliedFilters.vencedor || appliedFilters.search || appliedFilters.itens);
     try {
       if (useRpcExport) {
         const rpcSituacao = isAbertas
@@ -654,6 +660,7 @@ export default function LicitacoesPage() {
             p_sem_resultado: isAbertas,
             p_limit: probeBatch,
             p_offset: off,
+            p_itens: appliedFilters.itens || null,
           });
           if (error) throw error;
           const n = (data || []).length;
@@ -712,7 +719,7 @@ export default function LicitacoesPage() {
       const MAX_EXPORT = 10000;
       const batchSize = 1000;
       const hasResultadoStatus = appliedFilters.situacao === "Concluída";
-      const useRpcExport = !!(appliedFilters.vencedor || appliedFilters.search);
+      const useRpcExport = !!(appliedFilters.vencedor || appliedFilters.search || appliedFilters.itens);
 
       // Build a filtered base query (mirrors buildBaseQuery in main fetch, no pagination)
       const buildFilteredQuery = (from: number, to: number) => {
@@ -776,6 +783,7 @@ export default function LicitacoesPage() {
             p_sem_resultado: isAbertas,
             p_limit: batchSize,
             p_offset: offset,
+            p_itens: appliedFilters.itens || null,
           });
           if (error) throw error;
           const rows = (data || []) as any[];
@@ -890,11 +898,11 @@ export default function LicitacoesPage() {
 
       {/* Filters */}
       <div className="rounded-xl border border-border bg-card p-4 space-y-4">
-        {/* Row 1: Keyword + Status radio buttons */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-4 items-end">
+        {/* Row 1: Objeto + Itens + Status */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_auto] gap-4 items-end">
           <div className="space-y-1">
             <div className="flex items-center gap-1">
-              <label className="text-xs font-medium text-muted-foreground">Palavra-chave</label>
+              <label className="text-xs font-medium text-muted-foreground">Palavra-chave (objeto)</label>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-4 w-4 p-0 hover:bg-transparent">
@@ -902,17 +910,42 @@ export default function LicitacoesPage() {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="max-w-xs">
-                  <p className="text-xs">Busca no objeto E nos itens da licitação. Use espaços para buscar todas as palavras (AND). Ex: "plataforma ead"</p>
+                  <p className="text-xs">Busca no <strong>objeto</strong> (título) da licitação. Ex: "aquisição medicamentos".</p>
                 </TooltipContent>
               </Tooltip>
             </div>
             <Input
-              placeholder="Ex: plataforma ead, computador, consultoria..."
+              placeholder="Ex: plataforma ead, consultoria..."
               value={filterSearch}
               onChange={(e) => setFilterSearch(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
               className="h-9"
             />
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground">Itens</label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-4 w-4 p-0 hover:bg-transparent">
+                    <span className="text-[10px] text-muted-foreground cursor-help">ⓘ</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs">
+                  <p className="text-xs">Busca na <strong>descrição dos itens</strong> da licitação. Use espaços para exigir todas as palavras (AND). Ex: "seringa descartável 5ml".</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            <div className="relative">
+              <Package className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Ex: notebook, seringa 5ml, cadeira..."
+                value={filterItens}
+                onChange={(e) => setFilterItens(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                className="h-9 pl-8"
+              />
+            </div>
           </div>
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Status</label>
@@ -934,6 +967,8 @@ export default function LicitacoesPage() {
             </div>
           </div>
         </div>
+
+
 
         {/* Expandable filters section */}
         <div>

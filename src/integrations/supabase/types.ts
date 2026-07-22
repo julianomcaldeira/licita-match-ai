@@ -1948,37 +1948,70 @@ export type Database = {
       run_ingestion_audit: { Args: never; Returns: string }
       sanitize_keywords: { Args: { p_kw: string[] }; Returns: string[] }
       schedule_auto_ingestion: { Args: { p_force?: boolean }; Returns: Json }
-      search_licitacoes: {
-        Args: {
-          p_com_vencedor?: boolean
-          p_date_from?: string
-          p_date_to?: string
-          p_limit?: number
-          p_modalidade?: string
-          p_offset?: number
-          p_orgao?: string
-          p_search?: string
-          p_sem_resultado?: boolean
-          p_situacao?: string
-          p_uf?: string
-          p_vencedor?: string
-        }
-        Returns: {
-          data_publicacao: string
-          id: string
-          modalidade: string
-          municipio: string
-          numero_controle_pncp: string
-          objeto: string
-          orgao: string
-          situacao: string
-          total_count: number
-          uf: string
-          valor_estimado: number
-          valor_homologado: number
-          vencedor_nome: string
-        }[]
-      }
+      search_licitacoes:
+        | {
+            Args: {
+              p_com_vencedor?: boolean
+              p_date_from?: string
+              p_date_to?: string
+              p_limit?: number
+              p_modalidade?: string
+              p_offset?: number
+              p_orgao?: string
+              p_search?: string
+              p_sem_resultado?: boolean
+              p_situacao?: string
+              p_uf?: string
+              p_vencedor?: string
+            }
+            Returns: {
+              data_publicacao: string
+              id: string
+              modalidade: string
+              municipio: string
+              numero_controle_pncp: string
+              objeto: string
+              orgao: string
+              situacao: string
+              total_count: number
+              uf: string
+              valor_estimado: number
+              valor_homologado: number
+              vencedor_nome: string
+            }[]
+          }
+        | {
+            Args: {
+              p_com_vencedor?: boolean
+              p_date_from?: string
+              p_date_to?: string
+              p_itens?: string
+              p_limit?: number
+              p_modalidade?: string
+              p_offset?: number
+              p_orgao?: string
+              p_search?: string
+              p_sem_resultado?: boolean
+              p_situacao?: string
+              p_uf?: string
+              p_vencedor?: string
+            }
+            Returns: {
+              data_publicacao: string
+              id: string
+              modalidade: string
+              municipio: string
+              numero_controle_pncp: string
+              objeto: string
+              orgao: string
+              situacao: string
+              total_count: number
+              uf: string
+              valor_estimado: number
+              valor_homologado: number
+              vencedor_nome: string
+            }[]
+          }
       set_winners_backlog_cursor: {
         Args: { p_cursor: string; p_processed?: number }
         Returns: undefined
