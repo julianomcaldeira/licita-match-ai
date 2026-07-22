@@ -61,8 +61,23 @@ export function CoberturaTab() {
     staleTime: 5 * 60_000,
   });
 
+  const autoscale = useQuery({
+    queryKey: ["cobertura-autoscale"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("cron_autoscale_state")
+        .select("target,limit_per_run,parallelism,last_decision_at,last_reason,last_metrics,budget_ms")
+        .order("target");
+      if (error) throw error;
+      return data ?? [];
+    },
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  });
+
   const loading = gaps.isLoading || reprocess.isLoading || clientes.isLoading;
   const totalPendente = (gaps.data?.total_gaps ?? 0) + (reprocess.data?.total ?? 0);
+
 
   const summary = [
     {
