@@ -370,6 +370,51 @@ export type Database = {
           },
         ]
       }
+      cron_autoscale_state: {
+        Row: {
+          budget_ms: number
+          last_decision_at: string | null
+          last_metrics: Json | null
+          last_reason: string | null
+          limit_per_run: number
+          max_limit: number
+          max_parallel: number
+          min_limit: number
+          min_parallel: number
+          parallelism: number
+          target: string
+          updated_at: string
+        }
+        Insert: {
+          budget_ms?: number
+          last_decision_at?: string | null
+          last_metrics?: Json | null
+          last_reason?: string | null
+          limit_per_run?: number
+          max_limit?: number
+          max_parallel?: number
+          min_limit?: number
+          min_parallel?: number
+          parallelism?: number
+          target: string
+          updated_at?: string
+        }
+        Update: {
+          budget_ms?: number
+          last_decision_at?: string | null
+          last_metrics?: Json | null
+          last_reason?: string | null
+          limit_per_run?: number
+          max_limit?: number
+          max_parallel?: number
+          min_limit?: number
+          min_parallel?: number
+          parallelism?: number
+          target?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       dashboard_validation_runs: {
         Row: {
           actual: number | null
@@ -1485,6 +1530,15 @@ export type Database = {
           is_active: boolean
         }[]
       }
+      autoscale_pncp_fill_gaps: {
+        Args: never
+        Returns: {
+          new_limit: number
+          new_parallel: number
+          reason: string
+          target: string
+        }[]
+      }
       check_vencedores_sancionados: {
         Args: { p_limit?: number }
         Returns: {
@@ -1609,6 +1663,13 @@ export type Database = {
         }[]
       }
       f_unaccent: { Args: { "": string }; Returns: string }
+      get_autoscale_state: {
+        Args: { p_target: string }
+        Returns: {
+          limit_per_run: number
+          parallelism: number
+        }[]
+      }
       get_dashboard_validation_summary: {
         Args: never
         Returns: {
