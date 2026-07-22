@@ -1939,6 +1939,24 @@ export type Database = {
       }
       pncp_dadosabertos_backfill_fast_tick: { Args: never; Returns: Json }
       pncp_dadosabertos_backfill_tick: { Args: never; Returns: Json }
+      pncp_gaps_por_orgao_ano: {
+        Args: { p_limit?: number; p_min_ano?: number }
+        Returns: {
+          ano: number
+          cnpj: string
+          seq: number
+        }[]
+      }
+      pncp_licitacoes_para_reprocessar: {
+        Args: { p_limit?: number }
+        Returns: {
+          ano: number
+          cnpj: string
+          id: string
+          numero_controle_pncp: string
+          seq: number
+        }[]
+      }
       refresh_all_mvs: { Args: never; Returns: undefined }
       refresh_cliente_vinculos: {
         Args: { p_empresa_id?: string }
