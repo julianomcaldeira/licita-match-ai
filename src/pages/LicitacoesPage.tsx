@@ -429,6 +429,7 @@ export default function LicitacoesPage() {
             p_sem_resultado: isAbertas,
             p_limit: PAGE_SIZE + 1,
             p_offset: page * PAGE_SIZE,
+            p_itens: appliedFilters.itens || null,
           });
           const rpcResult = await withTimeout<{ data: any[] | null; error: any }>(
             rpcPromise as PromiseLike<{ data: any[] | null; error: any }>,
