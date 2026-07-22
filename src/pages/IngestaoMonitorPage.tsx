@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   CheckCircle2, XCircle, AlertTriangle, Clock, Database, Activity,
-  RefreshCw, Loader2, Brain, Building2, Search, ChevronLeft, ChevronRight, FileText,
+  RefreshCw, Loader2, Brain, Building2, Search, ChevronLeft, ChevronRight, FileText, Target,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import { ContratosIngestaoTab } from "@/components/dashboard/ContratosIngestaoTa
 import { IngestaoManualButton } from "@/components/dashboard/IngestaoManualButton";
 import { AuditoriaTab } from "@/components/dashboard/AuditoriaTab";
 import { DashboardValidationTab } from "@/components/dashboard/DashboardValidationTab";
+import { CoberturaTab } from "@/components/dashboard/CoberturaTab";
 
 const LOG_PAGE_SIZE = 20;
 
@@ -178,11 +179,16 @@ export default function IngestaoMonitorPage() {
       <Tabs defaultValue="ingestao" className="space-y-4">
         <TabsList>
           <TabsTrigger value="ingestao" className="gap-1.5"><Database className="h-3.5 w-3.5" /> Ingestão</TabsTrigger>
+          <TabsTrigger value="cobertura" className="gap-1.5"><Target className="h-3.5 w-3.5" /> Cobertura</TabsTrigger>
           <TabsTrigger value="contratos" className="gap-1.5"><FileText className="h-3.5 w-3.5" /> Contratos</TabsTrigger>
           <TabsTrigger value="analise" className="gap-1.5"><Brain className="h-3.5 w-3.5" /> Auto-Análise IA</TabsTrigger>
           <TabsTrigger value="auditoria" className="gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" /> Auditoria</TabsTrigger>
           <TabsTrigger value="validacao" className="gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" /> Validação Dashboard</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="cobertura">
+          <CoberturaTab />
+        </TabsContent>
 
         <TabsContent value="contratos">
           <ContratosIngestaoTab />
