@@ -162,6 +162,7 @@ export default function LicitacoesPage() {
   // Filter state
   const [filterOrgao, setFilterOrgao] = useState("");
   const [filterSearch, setFilterSearch] = useState("");
+  const [filterItens, setFilterItens] = useState("");
   const defaultDateFrom = new Date(2023, 0, 1);
   const [filterDateFrom, setFilterDateFrom] = useState<Date | undefined>(defaultDateFrom);
   const [filterDateTo, setFilterDateTo] = useState<Date | undefined>();
@@ -220,7 +221,7 @@ export default function LicitacoesPage() {
 
 
   const [appliedFilters, setAppliedFilters] = useState<{
-    orgao: string; search: string; dateFrom?: string; dateTo?: string; uf?: string; situacao?: string; vencedor?: string; tab: "abertas" | "encerradas";
+    orgao: string; search: string; itens?: string; dateFrom?: string; dateTo?: string; uf?: string; situacao?: string; vencedor?: string; tab: "abertas" | "encerradas";
   }>({ orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd"), tab: "abertas" });
 
   const hasWinnerFilter = filterVencedores.length > 0;
@@ -246,6 +247,7 @@ export default function LicitacoesPage() {
     setAppliedFilters({
       orgao: filterOrgao.trim(),
       search: filterSearch.trim(),
+      itens: filterItens.trim() || undefined,
       dateFrom: filterDateFrom ? format(filterDateFrom, "yyyy-MM-dd") : undefined,
       dateTo: filterDateTo ? format(filterDateTo, "yyyy-MM-dd") : undefined,
       uf: filterUf || undefined,
@@ -263,6 +265,7 @@ export default function LicitacoesPage() {
     setAppliedFilters({
       orgao: filterOrgao.trim(),
       search: filterSearch.trim(),
+      itens: filterItens.trim() || undefined,
       dateFrom: filterDateFrom ? format(filterDateFrom, "yyyy-MM-dd") : undefined,
       dateTo: filterDateTo ? format(filterDateTo, "yyyy-MM-dd") : undefined,
       uf: filterUf || undefined,
@@ -273,6 +276,7 @@ export default function LicitacoesPage() {
   const handleClearFilters = () => {
     setFilterOrgao("");
     setFilterSearch("");
+    setFilterItens("");
     setFilterDateFrom(defaultDateFrom);
     setFilterDateTo(undefined);
     setFilterUf("");
@@ -282,7 +286,7 @@ export default function LicitacoesPage() {
     setAppliedFilters({ orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd"), tab: activeTab });
   };
 
-  const hasActiveFilters = appliedFilters.orgao || appliedFilters.search || appliedFilters.dateFrom || appliedFilters.dateTo || appliedFilters.uf || appliedFilters.situacao || appliedFilters.vencedor;
+  const hasActiveFilters = appliedFilters.orgao || appliedFilters.search || appliedFilters.itens || appliedFilters.dateFrom || appliedFilters.dateTo || appliedFilters.uf || appliedFilters.situacao || appliedFilters.vencedor;
 
   const searchByWinner = (name: string) => {
     activateWinnerMode();
@@ -352,7 +356,7 @@ export default function LicitacoesPage() {
   };
 
   const isAbertas = appliedFilters.vencedor ? false : appliedFilters.tab === "abertas";
-  const useRpc = !!(appliedFilters.vencedor || appliedFilters.search);
+  const useRpc = !!(appliedFilters.vencedor || appliedFilters.search || appliedFilters.itens);
 
   const { data: queryResult, isLoading, isFetching, isError, error: queryError, refetch } = useQuery({
     queryKey: ["licitacoes-all", page, appliedFilters],
