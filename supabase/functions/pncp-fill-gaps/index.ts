@@ -26,6 +26,14 @@ const PNCP_DATA_URL = "https://pncp.gov.br/api/pncp/v1";
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_RETRIES = 3;
 
+// Global counters populated during a run and flushed to ingestao_logs.details
+// so the autoscaler can react to pressure signals.
+const runMetrics = {
+  http_429: 0,
+  http_5xx: 0,
+  fetch_timeouts: 0,
+};
+
 async function fetchWithTimeout(url: string): Promise<Response> {
   let lastErr: unknown = null;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
@@ -37,19 +45,27 @@ async function fetchWithTimeout(url: string): Promise<Response> {
         signal: ctrl.signal,
       });
       clearTimeout(timer);
-      if (resp.status === 429 || resp.status >= 500) {
+      if (resp.status === 429) {
+        runMetrics.http_429++;
+        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+        continue;
+      }
+      if (resp.status >= 500) {
+        runMetrics.http_5xx++;
         await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
         continue;
       }
       return resp;
     } catch (e) {
       clearTimeout(timer);
+      runMetrics.fetch_timeouts++;
       lastErr = e;
       await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
     }
   }
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
+
 
 function mapCompra(c: any) {
   return {
