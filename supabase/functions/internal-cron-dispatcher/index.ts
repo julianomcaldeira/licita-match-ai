@@ -17,8 +17,8 @@ const ALLOWED_TARGETS = new Set([
   "ingest-pncp",
   "ingest-pncp-dadosabertos",
   "ingest-querido-diario",
-  
   "calculate-orgao-score",
+  "pncp-fill-gaps",
 ]);
 
 Deno.serve(async (req) => {
