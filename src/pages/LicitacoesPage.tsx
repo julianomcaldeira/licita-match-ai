@@ -622,6 +622,7 @@ export default function LicitacoesPage() {
     const items: { label: string; value: string }[] = [];
     items.push({ label: "Aba", value: appliedFilters.tab === "abertas" ? "Abertas / Em Andamento" : "Encerradas / Com Resultado" });
     if (appliedFilters.search) items.push({ label: "Palavra-chave", value: appliedFilters.search });
+    if (appliedFilters.itens) items.push({ label: "Itens", value: appliedFilters.itens });
     if (appliedFilters.orgao) items.push({ label: "Órgão", value: appliedFilters.orgao });
     if (appliedFilters.uf) items.push({ label: "UF", value: appliedFilters.uf });
     if (appliedFilters.situacao) items.push({ label: "Situação", value: appliedFilters.situacao });
@@ -718,7 +719,7 @@ export default function LicitacoesPage() {
       const MAX_EXPORT = 10000;
       const batchSize = 1000;
       const hasResultadoStatus = appliedFilters.situacao === "Concluída";
-      const useRpcExport = !!(appliedFilters.vencedor || appliedFilters.search);
+      const useRpcExport = !!(appliedFilters.vencedor || appliedFilters.search || appliedFilters.itens);
 
       // Build a filtered base query (mirrors buildBaseQuery in main fetch, no pagination)
       const buildFilteredQuery = (from: number, to: number) => {
@@ -782,6 +783,7 @@ export default function LicitacoesPage() {
             p_sem_resultado: isAbertas,
             p_limit: batchSize,
             p_offset: offset,
+            p_itens: appliedFilters.itens || null,
           });
           if (error) throw error;
           const rows = (data || []) as any[];
