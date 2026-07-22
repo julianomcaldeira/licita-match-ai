@@ -365,11 +365,17 @@ serve(async (req: Request) => {
       records_inserted: runLog.inserted,
       details: {
         mode,
+        limit,
+        parallel: runtimeParallel,
         winners: runLog.winners,
         not_found: runLog.notFound,
         errors_sample: runLog.errors.slice(0, 20),
         duration_ms: Date.now() - startedAt,
+        http_429: runMetrics.http_429,
+        http_5xx: runMetrics.http_5xx,
+        fetch_timeouts: runMetrics.fetch_timeouts,
       },
+
     });
 
     return new Response(
