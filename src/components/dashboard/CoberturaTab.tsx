@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { AlertTriangle, Clock, Database, Loader2, Trophy, Users } from "lucide-react";
+import { AlertTriangle, Clock, Database, Gauge, Loader2, Trophy, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 const DAILY_CAPACITY = 500; // regra de ouro: 500 registros/dia por job
+
 
 function fmt(n: number | null | undefined) {
   return (n ?? 0).toLocaleString("pt-BR");
