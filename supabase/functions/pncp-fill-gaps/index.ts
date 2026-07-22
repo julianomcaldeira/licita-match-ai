@@ -26,6 +26,16 @@ const PNCP_DATA_URL = "https://pncp.gov.br/api/pncp/v1";
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_RETRIES = 3;
 
+// Global counters populated during a run and flushed to ingestao_logs.details
+// so the autoscaler can react to pressure signals.
+const runMetrics = {
+  http_429: 0,
+  http_5xx: 0,
+  fetch_timeouts: 0,
+};
+let runtimeParallel = 10;
+
+
 async function fetchWithTimeout(url: string): Promise<Response> {
   let lastErr: unknown = null;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
@@ -37,19 +47,27 @@ async function fetchWithTimeout(url: string): Promise<Response> {
         signal: ctrl.signal,
       });
       clearTimeout(timer);
-      if (resp.status === 429 || resp.status >= 500) {
+      if (resp.status === 429) {
+        runMetrics.http_429++;
+        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+        continue;
+      }
+      if (resp.status >= 500) {
+        runMetrics.http_5xx++;
         await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
         continue;
       }
       return resp;
     } catch (e) {
       clearTimeout(timer);
+      runMetrics.fetch_timeouts++;
       lastErr = e;
       await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
     }
   }
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
+
 
 function mapCompra(c: any) {
   return {
@@ -161,7 +179,8 @@ async function processWinners(
   );
 
   let winnersFound = 0;
-  const PARALLEL = 10;
+  const PARALLEL = runtimeParallel;
+
   for (let i = 0; i < withResults.length; i += PARALLEL) {
     const batch = withResults.slice(i, i + PARALLEL);
     const results = await Promise.allSettled(
@@ -255,17 +274,41 @@ serve(async (req: Request) => {
     body = {};
   }
   const mode: string = body.mode || "gaps";
-  const limit: number = Math.max(1, Math.min(Number(body.limit) || 200, 800));
+
+  // Autoscale: if no explicit limit or autoscale=true, read tuned params.
+  let tunedLimit = 200;
+  let tunedParallel = 10;
+  if (body.autoscale || body.limit == null) {
+    const { data: state } = await supabase
+      .rpc("get_autoscale_state", { p_target: mode });
+    const row = Array.isArray(state) ? state[0] : state;
+    if (row) {
+      tunedLimit = Number(row.limit_per_run) || tunedLimit;
+      tunedParallel = Number(row.parallelism) || tunedParallel;
+    }
+  }
+  const limit: number = Math.max(
+    1,
+    Math.min(Number(body.limit) || tunedLimit, 3000),
+  );
+  runtimeParallel = Math.max(1, Math.min(tunedParallel, 40));
+
   const startedAt = Date.now();
+  runMetrics.http_429 = 0;
+  runMetrics.http_5xx = 0;
+  runMetrics.fetch_timeouts = 0;
+
   const runLog = {
     mode,
     limit,
+    parallel: runtimeParallel,
     processed: 0,
     inserted: 0,
     winners: 0,
     notFound: 0,
     errors: [] as string[],
   };
+
 
   try {
     if (mode === "gaps") {
@@ -322,11 +365,17 @@ serve(async (req: Request) => {
       records_inserted: runLog.inserted,
       details: {
         mode,
+        limit,
+        parallel: runtimeParallel,
         winners: runLog.winners,
         not_found: runLog.notFound,
         errors_sample: runLog.errors.slice(0, 20),
         duration_ms: Date.now() - startedAt,
+        http_429: runMetrics.http_429,
+        http_5xx: runMetrics.http_5xx,
+        fetch_timeouts: runMetrics.fetch_timeouts,
       },
+
     });
 
     return new Response(
