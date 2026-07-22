@@ -1510,6 +1510,17 @@ export type Database = {
       }
       cleanup_ai_query_cache: { Args: never; Returns: number }
       cliente_resumo: { Args: { p_empresa_id: string }; Returns: Json }
+      cobertura_por_cliente: {
+        Args: never
+        Returns: {
+          empresa_id: string
+          homologadas: number
+          homologadas_sem_vencedores: number
+          nome: string
+          sem_vencedores: number
+          total_licitacoes: number
+        }[]
+      }
       compute_indice_startgi: {
         Args: { p_force?: boolean; p_mes: string }
         Returns: {
@@ -1947,6 +1958,14 @@ export type Database = {
           seq: number
         }[]
       }
+      pncp_gaps_summary: {
+        Args: { p_min_ano?: number }
+        Returns: {
+          orgaos_com_gap: number
+          top_orgaos: Json
+          total_gaps: number
+        }[]
+      }
       pncp_licitacoes_para_reprocessar: {
         Args: { p_limit?: number }
         Returns: {
@@ -1955,6 +1974,13 @@ export type Database = {
           id: string
           numero_controle_pncp: string
           seq: number
+        }[]
+      }
+      pncp_reprocess_summary: {
+        Args: never
+        Returns: {
+          por_ano: Json
+          total: number
         }[]
       }
       refresh_all_mvs: { Args: never; Returns: undefined }
