@@ -177,7 +177,8 @@ async function processWinners(
   );
 
   let winnersFound = 0;
-  const PARALLEL = 10;
+  const PARALLEL = runtimeParallel;
+
   for (let i = 0; i < withResults.length; i += PARALLEL) {
     const batch = withResults.slice(i, i + PARALLEL);
     const results = await Promise.allSettled(
