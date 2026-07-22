@@ -635,7 +635,7 @@ export default function LicitacoesPage() {
   const computeExportCount = useCallback(async (): Promise<number | null> => {
     const MAX_EXPORT = 10000;
     const hasResultadoStatus = appliedFilters.situacao === "Concluída";
-    const useRpcExport = !!(appliedFilters.vencedor || appliedFilters.search);
+    const useRpcExport = !!(appliedFilters.vencedor || appliedFilters.search || appliedFilters.itens);
     try {
       if (useRpcExport) {
         const rpcSituacao = isAbertas
@@ -659,6 +659,7 @@ export default function LicitacoesPage() {
             p_sem_resultado: isAbertas,
             p_limit: probeBatch,
             p_offset: off,
+            p_itens: appliedFilters.itens || null,
           });
           if (error) throw error;
           const n = (data || []).length;
