@@ -272,17 +272,41 @@ serve(async (req: Request) => {
     body = {};
   }
   const mode: string = body.mode || "gaps";
-  const limit: number = Math.max(1, Math.min(Number(body.limit) || 200, 800));
+
+  // Autoscale: if no explicit limit or autoscale=true, read tuned params.
+  let tunedLimit = 200;
+  let tunedParallel = 10;
+  if (body.autoscale || body.limit == null) {
+    const { data: state } = await supabase
+      .rpc("get_autoscale_state", { p_target: mode });
+    const row = Array.isArray(state) ? state[0] : state;
+    if (row) {
+      tunedLimit = Number(row.limit_per_run) || tunedLimit;
+      tunedParallel = Number(row.parallelism) || tunedParallel;
+    }
+  }
+  const limit: number = Math.max(
+    1,
+    Math.min(Number(body.limit) || tunedLimit, 3000),
+  );
+  runtimeParallel = Math.max(1, Math.min(tunedParallel, 40));
+
   const startedAt = Date.now();
+  runMetrics.http_429 = 0;
+  runMetrics.http_5xx = 0;
+  runMetrics.fetch_timeouts = 0;
+
   const runLog = {
     mode,
     limit,
+    parallel: runtimeParallel,
     processed: 0,
     inserted: 0,
     winners: 0,
     notFound: 0,
     errors: [] as string[],
   };
+
 
   try {
     if (mode === "gaps") {
