@@ -139,7 +139,62 @@ export function CoberturaTab() {
         ))}
       </div>
 
+      {/* Autoescalonamento */}
+      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+        <div className="border-b border-border p-4 flex items-center gap-2">
+          <Gauge className="h-4 w-4 text-primary" />
+          <h3 className="font-display font-semibold text-foreground">Autoescalonamento em tempo real</h3>
+          <span className="ml-auto text-xs text-muted-foreground">reavalia a cada 15 min</span>
+        </div>
+        {autoscale.data?.length ? (
+          <div className="table-scroll">
+            <table className="table-sticky">
+              <thead>
+                <tr className="border-b border-border bg-secondary/50">
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Job</th>
+                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Registros/rodada</th>
+                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Paralelismo</th>
+                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Orçamento</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Última decisão</th>
+                </tr>
+              </thead>
+              <tbody>
+                {autoscale.data.map((a: any) => {
+                  const m = a.last_metrics ?? {};
+                  const decisionColor =
+                    a.last_reason?.startsWith("up") ? "text-success" :
+                    a.last_reason?.startsWith("down") ? "text-destructive" :
+                    "text-muted-foreground";
+                  return (
+                    <tr key={a.target} className="border-b border-border last:border-0 align-top">
+                      <td className="px-4 py-3 font-medium text-foreground">{a.target}</td>
+                      <td className="px-4 py-3 text-right font-bold text-primary">{fmt(a.limit_per_run)}</td>
+                      <td className="px-4 py-3 text-right text-foreground">{a.parallelism}x</td>
+                      <td className="px-4 py-3 text-right text-muted-foreground text-xs">{Math.round((a.budget_ms ?? 0) / 1000)}s</td>
+                      <td className="px-4 py-3 text-xs">
+                        <div className={`font-medium ${decisionColor}`}>{a.last_reason ?? "—"}</div>
+                        <div className="text-muted-foreground mt-1">
+                          {a.last_decision_at ? new Date(a.last_decision_at).toLocaleString("pt-BR") : "—"}
+                          {m?.avg_duration_ms ? ` · duração média ${(m.avg_duration_ms / 1000).toFixed(1)}s` : ""}
+                          {m?.http_429 ? ` · ${m.http_429} rate-limits` : ""}
+                          {m?.error_rate != null ? ` · ${Math.round(m.error_rate * 100)}% erros` : ""}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-6 text-sm text-muted-foreground text-center">
+            Aguardando primeira decisão do autoscaler…
+          </div>
+        )}
+      </div>
+
       {/* Explicação */}
+
       <div className="rounded-xl border border-border bg-card p-4 shadow-sm text-sm text-muted-foreground">
         <div className="flex items-center gap-2 font-medium text-foreground mb-1">
           <Database className="h-4 w-4 text-primary" />
