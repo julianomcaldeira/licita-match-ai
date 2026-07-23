@@ -110,21 +110,8 @@ const TOOLS = [
       },
     },
   },
-  {
-    type: "function",
-    function: {
-      name: "get_orgao_score",
-      description:
-        "Score de bom-pagador (AAA-D) e indicadores fiscais oficiais de um órgão público (cnpj exato preferido). Inclui % pago/empenhado, atraso médio, dívida/RCL. Fontes: Portal da Transparência (execução), SICONFI (fiscal) e dados internos.",
-      parameters: {
-        type: "object",
-        properties: {
-          cnpj: { type: "string", description: "CNPJ do órgão (apenas dígitos)." },
-          orgao_nome: { type: "string", description: "Se não souber o CNPJ, passe parte do nome — buscamos o melhor match." },
-        },
-      },
-    },
-  },
+  // NOTE: get_orgao_score removida — score de órgãos em revisão, indisponível.
+
   {
     type: "function",
     function: {
@@ -237,25 +224,8 @@ const TOOLS = [
       },
     },
   },
-  {
-    type: "function",
-    function: {
-      name: "compare_orgaos_score",
-      description:
-        "Compara o score de bom-pagador (AAA-D) e indicadores fiscais de vários órgãos lado a lado. Use para perguntas como 'compare o histórico de pagamento entre X, Y e Z'. Fontes: Portal da Transparência + SICONFI + dados internos.",
-      parameters: {
-        type: "object",
-        properties: {
-          orgaos: {
-            type: "array",
-            description: "Lista de nomes ou CNPJs (até 5).",
-            items: { type: "string" },
-          },
-        },
-        required: ["orgaos"],
-      },
-    },
-  },
+  // NOTE: compare_orgaos_score removida — score de órgãos em revisão, indisponível.
+
 ];
 
 // ---------- TOOL EXECUTORS ----------
@@ -289,8 +259,8 @@ function pickToolsForQuestion(question: string, allTools: any[]) {
 
   if (/(empres|forneced|cnpj|razão social|razao social|perfil)/.test(q))
     add("lookup_cnpj_receita", "get_empresa_perfil", "search_sancionadas");
-  if (/(órgão|orgao|prefeitura|ministério|ministerio|secretaria|score|comprador)/.test(q))
-    add("get_orgao_score", "compare_orgaos_score", "get_top_buyers", "get_contratos_recentes_orgao");
+  if (/(órgão|orgao|prefeitura|ministério|ministerio|secretaria|comprador)/.test(q))
+    add("get_top_buyers", "get_contratos_recentes_orgao");
   if (/(licitaç|edital|pregão|pregao|homolog)/.test(q))
     add("search_licitacoes");
   if (/(contrato|formaliz|assinatur)/.test(q))
@@ -475,29 +445,8 @@ async function execTool(
           content: JSON.stringify(rows),
         };
       }
-      case "get_orgao_score": {
-        let cnpj = (args.cnpj || "").replace(/\D/g, "");
-        if (!cnpj && args.orgao_nome) {
-          const f = await supabase
-            .from("orgaos_score")
-            .select("cnpj_orgao,nome_orgao")
-            .ilike("nome_orgao", `%${args.orgao_nome}%`)
-            .order("score_numerico", { ascending: false })
-            .limit(1);
-          cnpj = f.data?.[0]?.cnpj_orgao || "";
-        }
-        if (!cnpj) {
-          return { summary: "Órgão não localizado", sources: [], content: JSON.stringify({ erro: "Não foi possível localizar o órgão pelo nome." }) };
-        }
-        const r = await supabase.rpc("get_orgao_score", { p_cnpj: cnpj });
-        sources.push({ label: "Portal da Transparência — execução orçamentária", url: "https://portaldatransparencia.gov.br" });
-        sources.push({ label: "SICONFI — Tesouro Nacional", url: "https://siconfi.tesouro.gov.br" });
-        return {
-          summary: `Score do órgão ${cnpj}`,
-          sources,
-          content: JSON.stringify(r.data?.[0] || { erro: "Sem score calculado." }),
-        };
-      }
+      // case get_orgao_score removido — score em revisão, indisponível.
+
       case "check_vencedores_sancionados": {
         const limit = Math.min(50, args.limit ?? 15);
         const r = await supabase.rpc("check_vencedores_sancionados", { p_limit: limit });
