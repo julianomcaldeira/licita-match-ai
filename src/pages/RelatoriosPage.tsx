@@ -242,6 +242,8 @@ function buildSupabaseQuery(
 }
 
 export default function RelatoriosPage() {
+  usePageView("relatorios");
+  const track = useTracker();
   const [selectedTable, setSelectedTable] = useState("");
   const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
   const [filters, setFilters] = useState<FilterRule[]>([]);
