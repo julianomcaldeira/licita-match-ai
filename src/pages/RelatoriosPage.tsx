@@ -12,6 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { FileDown, FileSpreadsheet, Play, X, Database, Filter, Columns3, Search, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
+import { usePageView, useTracker } from "@/hooks/useTracking";
 
 const EXPORT_BATCH = 1000;
 
