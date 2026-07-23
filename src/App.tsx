@@ -56,6 +56,7 @@ const App = () => (
               <Route path="/usuarios" element={<UsuariosPage />} />
               <Route path="/relatorios" element={<RelatoriosPage />} />
               <Route path="/sancionadas" element={<SancionadasPage />} />
+              <Route path="/clientes" element={<ClientesAdminPage />} />
               
               <Route path="/indice-startgi" element={<IndiceStartGiPage />} />
               <Route path="/api" element={<ApiKeysPage />} />
