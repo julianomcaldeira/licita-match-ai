@@ -577,23 +577,8 @@ async function execTool(
           }),
         };
       }
-      case "compare_orgaos_score": {
-        const inputs: string[] = (args.orgaos || []).slice(0, 5);
-        const results = await Promise.all(inputs.map(async (it: string) => {
-          let cnpj = it.replace(/\D/g, "");
-          if (cnpj.length !== 14) {
-            const f = await supabase.from("orgaos_score").select("cnpj_orgao,nome_orgao")
-              .ilike("nome_orgao", `%${it}%`).order("score_numerico", { ascending: false }).limit(1);
-            cnpj = f.data?.[0]?.cnpj_orgao || "";
-          }
-          if (!cnpj) return { input: it, erro: "não localizado" };
-          const r = await supabase.rpc("get_orgao_score", { p_cnpj: cnpj });
-          return { input: it, score: r.data?.[0] || null };
-        }));
-        sources.push({ label: "Portal da Transparência — execução orçamentária", url: "https://portaldatransparencia.gov.br" });
-        sources.push({ label: "SICONFI — Tesouro Nacional", url: "https://siconfi.tesouro.gov.br" });
-        return { summary: `Comparativo de ${results.length} órgão(s)`, sources, content: JSON.stringify(results) };
-      }
+      // case compare_orgaos_score removido — score em revisão, indisponível.
+
       default:
         return { summary: "tool desconhecida", sources: [], content: JSON.stringify({ erro: `Tool ${name} não existe.` }) };
     }
@@ -610,7 +595,7 @@ REGRA DE OURO: NUNCA invente números, nomes, CNPJs, valores ou datas. Toda afir
 FERRAMENTAS (escolha a mais adequada — não chame todas):
 - Visão de mercado / rankings → get_market_overview, get_top_winners, get_top_buyers, get_contratos_recentes_orgao
 - Empresa específica → lookup_cnpj_receita (cadastro) + get_empresa_perfil (vitórias/contratos/sanções)
-- Órgão específico → get_orgao_score(orgao_nome=...) | comparar vários → compare_orgaos_score
+- Órgão como comprador → get_top_buyers, get_contratos_recentes_orgao (score de órgão está em revisão e indisponível — se o usuário pedir score/rating/bom-pagador, responda literalmente: "A análise de score de órgãos está em revisão e indisponível no momento." e NÃO tente estimar).
 - Licitação por palavra/órgão/vencedor → search_licitacoes
 - Contratos formalizados → search_contratos
 - Sanções (CEIS/CNEP) → search_sancionadas | risco em vencedores recentes → check_vencedores_sancionados
