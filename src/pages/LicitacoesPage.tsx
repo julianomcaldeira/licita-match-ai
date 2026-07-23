@@ -247,7 +247,7 @@ export default function LicitacoesPage() {
     if (hasWinnerFilter) {
       activateWinnerMode();
     }
-    setAppliedFilters({
+    const next = {
       orgao: filterOrgao.trim(),
       search: filterSearch.trim(),
       itens: filterItens.trim() || undefined,
@@ -257,6 +257,18 @@ export default function LicitacoesPage() {
       situacao: nextSituacao || undefined,
       vencedor: filterVencedores.length > 0 ? filterVencedores.join("||") : undefined,
       tab: nextTab,
+    };
+    setAppliedFilters(next);
+    track("busca", {
+      page: "licitacoes",
+      has_search: !!next.search,
+      has_itens: !!next.itens,
+      has_orgao: !!next.orgao,
+      has_uf: !!next.uf,
+      has_situacao: !!next.situacao,
+      has_vencedor: !!next.vencedor,
+      has_date_range: !!(next.dateFrom || next.dateTo),
+      tab: next.tab,
     });
   };
 
