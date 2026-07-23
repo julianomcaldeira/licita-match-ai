@@ -838,6 +838,7 @@ export default function LicitacoesPage() {
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Licitações");
       XLSX.writeFile(wb, `licitacoes_${format(new Date(), "yyyy-MM-dd_HHmm")}.xlsx`);
+      track("export", { page: "licitacoes", format: "xlsx", rows: rows.length });
       toast.success(`${rows.length.toLocaleString("pt-BR")} registros exportados com sucesso!`);
     } catch (err) { console.error("Export error:", err); toast.error("Erro ao exportar dados."); }
     finally { setExporting(false); }
