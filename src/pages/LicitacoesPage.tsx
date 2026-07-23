@@ -356,6 +356,7 @@ export default function LicitacoesPage() {
   const runAiAnalysis = async (objeto: string, items: any[]) => {
     setAiLoading(true);
     setAiAnalysis(null);
+    track("ia_consulta", { page: "licitacoes", tipo: "analyze-objeto", itens_count: items.length });
     try {
       const { data, error } = await supabase.functions.invoke("analyze-objeto", {
         body: { objeto, itens: items.map(i => ({ numero_item: i.numero_item, descricao: i.descricao, quantidade: i.quantidade, unidade: i.unidade, valor_unitario_estimado: i.valor_unitario_estimado })) },
