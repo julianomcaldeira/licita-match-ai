@@ -17,7 +17,7 @@ import PlaceholderPage from "@/components/PlaceholderPage";
 import UsuariosPage from "@/pages/UsuariosPage";
 import RelatoriosPage from "@/pages/RelatoriosPage";
 import SancionadasPage from "@/pages/SancionadasPage";
-import OrgaosScorePage from "@/pages/OrgaosScorePage";
+
 import ApiKeysPage from "@/pages/ApiKeysPage";
 import IndiceStartGiPage from "@/pages/IndiceStartGiPage";
 import AIMonitorPage from "@/pages/AIMonitorPage";
@@ -55,7 +55,7 @@ const App = () => (
               <Route path="/usuarios" element={<UsuariosPage />} />
               <Route path="/relatorios" element={<RelatoriosPage />} />
               <Route path="/sancionadas" element={<SancionadasPage />} />
-              <Route path="/score-orgaos" element={<OrgaosScorePage />} />
+              
               <Route path="/indice-startgi" element={<IndiceStartGiPage />} />
               <Route path="/api" element={<ApiKeysPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />

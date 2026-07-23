@@ -33,7 +33,7 @@ const navigation: NavItem[] = [
   { name: "Licitações", href: "/licitacoes", icon: Search },
   { name: "Empresas", href: "/empresas", icon: Building2 },
   { name: "Sancionadas", href: "/sancionadas", icon: ShieldAlert },
-  { name: "Score Órgãos", href: "/score-orgaos", icon: ShieldCheck },
+  
   { name: "Índice StartGi", href: "/indice-startgi", icon: TrendingUp, roles: ["admin_central", "admin_empresa"] },
   { name: "Relatórios", href: "/relatorios", icon: FileText },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
