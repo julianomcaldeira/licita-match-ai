@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { supabase } from "@/integrations/supabase/client";
+import { useTracker } from "@/hooks/useTracking";
 
 const UFS = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
 const STORAGE_KEY = "ai-market-conversation-v2";
@@ -88,6 +89,7 @@ export default function AIMarketAnalysis() {
   const [conversation, setConversation] = useState<ChatMessage[]>([]);
   const [pendingTools, setPendingTools] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const track = useTracker();
 
   useEffect(() => { setConversation(loadConversation()); }, []);
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [conversation, pendingTools]);
@@ -101,6 +103,7 @@ export default function AIMarketAnalysis() {
     setQuestion("");
     setIsLoading(true);
     setPendingTools(["Consultando dados oficiais..."]);
+    track("ia_consulta", { tipo: "market-analysis", period_months: period, has_uf: !!uf, history_size: conversation.length });
 
     try {
       const { data: session } = await supabase.auth.getSession();

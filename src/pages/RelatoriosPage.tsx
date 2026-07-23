@@ -12,6 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { FileDown, FileSpreadsheet, Play, X, Database, Filter, Columns3, Search, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
+import { useTracker } from "@/hooks/useTracking";
 
 const EXPORT_BATCH = 1000;
 
@@ -241,6 +242,7 @@ function buildSupabaseQuery(
 }
 
 export default function RelatoriosPage() {
+  const track = useTracker();
   const [selectedTable, setSelectedTable] = useState("");
   const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
   const [filters, setFilters] = useState<FilterRule[]>([]);
@@ -445,6 +447,7 @@ export default function RelatoriosPage() {
       const csv = [header, ...lines].join("\n");
       const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
       downloadBlob(blob, `relatorio_${snapTableConfig.name}_${today()}.csv`);
+      track("export", { page: "relatorios", format: "csv", table: snapTableConfig.name, rows: allRows.length });
       toast.success(`CSV exportado com ${allRows.length} registros!`);
     } catch (e: any) {
       toast.error("Erro ao exportar: " + (e.message || e));
@@ -466,6 +469,7 @@ export default function RelatoriosPage() {
       const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
       const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
       downloadBlob(blob, `relatorio_${snapTableConfig.name}_${today()}.xlsx`);
+      track("export", { page: "relatorios", format: "xlsx", table: snapTableConfig.name, rows: allRows.length });
       toast.success(`XLSX exportado com ${allRows.length} registros!`);
     } catch (e: any) {
       toast.error("Erro ao exportar: " + (e.message || e));

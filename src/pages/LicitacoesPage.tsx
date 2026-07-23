@@ -26,6 +26,7 @@ import ComboboxMultiFilter from "@/components/ComboboxMultiFilter";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { IngestaoManualButton } from "@/components/dashboard/IngestaoManualButton";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTracker } from "@/hooks/useTracking";
 
 
 const UFS = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
@@ -130,6 +131,7 @@ export default function LicitacoesPage() {
   const queryClient = useQueryClient();
   const { role } = useAuth();
   const isAdminCentral = role === "admin_central";
+  const track = useTracker();
 
   const statusOptions = activeTab === "abertas" ? STATUS_ABERTAS : STATUS_ENCERRADAS;
 
@@ -244,7 +246,7 @@ export default function LicitacoesPage() {
     if (hasWinnerFilter) {
       activateWinnerMode();
     }
-    setAppliedFilters({
+    const next = {
       orgao: filterOrgao.trim(),
       search: filterSearch.trim(),
       itens: filterItens.trim() || undefined,
@@ -254,6 +256,18 @@ export default function LicitacoesPage() {
       situacao: nextSituacao || undefined,
       vencedor: filterVencedores.length > 0 ? filterVencedores.join("||") : undefined,
       tab: nextTab,
+    };
+    setAppliedFilters(next);
+    track("busca", {
+      page: "licitacoes",
+      has_search: !!next.search,
+      has_itens: !!next.itens,
+      has_orgao: !!next.orgao,
+      has_uf: !!next.uf,
+      has_situacao: !!next.situacao,
+      has_vencedor: !!next.vencedor,
+      has_date_range: !!(next.dateFrom || next.dateTo),
+      tab: next.tab,
     });
   };
 
@@ -341,6 +355,7 @@ export default function LicitacoesPage() {
   const runAiAnalysis = async (objeto: string, items: any[]) => {
     setAiLoading(true);
     setAiAnalysis(null);
+    track("ia_consulta", { page: "licitacoes", tipo: "analyze-objeto", itens_count: items.length });
     try {
       const { data, error } = await supabase.functions.invoke("analyze-objeto", {
         body: { objeto, itens: items.map(i => ({ numero_item: i.numero_item, descricao: i.descricao, quantidade: i.quantidade, unidade: i.unidade, valor_unitario_estimado: i.valor_unitario_estimado })) },
@@ -823,6 +838,7 @@ export default function LicitacoesPage() {
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Licitações");
       XLSX.writeFile(wb, `licitacoes_${format(new Date(), "yyyy-MM-dd_HHmm")}.xlsx`);
+      track("export", { page: "licitacoes", format: "xlsx", rows: rows.length });
       toast.success(`${rows.length.toLocaleString("pt-BR")} registros exportados com sucesso!`);
     } catch (err) { console.error("Export error:", err); toast.error("Erro ao exportar dados."); }
     finally { setExporting(false); }
