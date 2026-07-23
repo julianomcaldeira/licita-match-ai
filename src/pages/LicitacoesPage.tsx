@@ -131,6 +131,8 @@ export default function LicitacoesPage() {
   const queryClient = useQueryClient();
   const { role } = useAuth();
   const isAdminCentral = role === "admin_central";
+  const track = useTracker();
+  usePageView("licitacoes");
 
   const statusOptions = activeTab === "abertas" ? STATUS_ABERTAS : STATUS_ENCERRADAS;
 
