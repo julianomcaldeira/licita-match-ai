@@ -470,6 +470,7 @@ export default function RelatoriosPage() {
       const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
       const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
       downloadBlob(blob, `relatorio_${snapTableConfig.name}_${today()}.xlsx`);
+      track("export", { page: "relatorios", format: "xlsx", table: snapTableConfig.name, rows: allRows.length });
       toast.success(`XLSX exportado com ${allRows.length} registros!`);
     } catch (e: any) {
       toast.error("Erro ao exportar: " + (e.message || e));
