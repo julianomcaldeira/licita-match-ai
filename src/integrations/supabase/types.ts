@@ -142,6 +142,63 @@ export type Database = {
           },
         ]
       }
+      assinaturas: {
+        Row: {
+          cancelar_em: string | null
+          created_at: string
+          empresa_cliente_id: string
+          fim_periodo_atual: string | null
+          id: string
+          inicio: string
+          plano_id: string
+          provedor: string | null
+          provedor_assinatura_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          cancelar_em?: string | null
+          created_at?: string
+          empresa_cliente_id: string
+          fim_periodo_atual?: string | null
+          id?: string
+          inicio?: string
+          plano_id: string
+          provedor?: string | null
+          provedor_assinatura_id?: string | null
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          cancelar_em?: string | null
+          created_at?: string
+          empresa_cliente_id?: string
+          fim_periodo_atual?: string | null
+          id?: string
+          inicio?: string
+          plano_id?: string
+          provedor?: string | null
+          provedor_assinatura_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assinaturas_empresa_cliente_id_fkey"
+            columns: ["empresa_cliente_id"]
+            isOneToOne: false
+            referencedRelation: "empresas_clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assinaturas_plano_id_fkey"
+            columns: ["plano_id"]
+            isOneToOne: false
+            referencedRelation: "planos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       auditoria_ingestao: {
         Row: {
           contratos_sem_licitacao: number
@@ -236,6 +293,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      cliente_exclusoes: {
+        Row: {
+          created_at: string
+          empresa_cliente_id: string
+          licitacao_id: string
+          motivo: string | null
+        }
+        Insert: {
+          created_at?: string
+          empresa_cliente_id: string
+          licitacao_id: string
+          motivo?: string | null
+        }
+        Update: {
+          created_at?: string
+          empresa_cliente_id?: string
+          licitacao_id?: string
+          motivo?: string | null
+        }
+        Relationships: []
+      }
+      cliente_participacoes: {
+        Row: {
+          created_at: string
+          empresa_cliente_id: string
+          id: string
+          licitacao_id: string
+          proposta_centavos: number | null
+          resultado: string | null
+        }
+        Insert: {
+          created_at?: string
+          empresa_cliente_id: string
+          id?: string
+          licitacao_id: string
+          proposta_centavos?: number | null
+          resultado?: string | null
+        }
+        Update: {
+          created_at?: string
+          empresa_cliente_id?: string
+          id?: string
+          licitacao_id?: string
+          proposta_centavos?: number | null
+          resultado?: string | null
+        }
+        Relationships: []
       }
       cliente_vinculos: {
         Row: {
@@ -369,6 +474,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      creditos_movimentos: {
+        Row: {
+          created_at: string
+          creditos: number
+          empresa_cliente_id: string
+          id: string
+          metadados: Json | null
+          referencia: string | null
+          tipo: string
+        }
+        Insert: {
+          created_at?: string
+          creditos: number
+          empresa_cliente_id: string
+          id?: string
+          metadados?: Json | null
+          referencia?: string | null
+          tipo: string
+        }
+        Update: {
+          created_at?: string
+          creditos?: number
+          empresa_cliente_id?: string
+          id?: string
+          metadados?: Json | null
+          referencia?: string | null
+          tipo?: string
+        }
+        Relationships: []
       }
       cron_autoscale_state: {
         Row: {
@@ -1313,6 +1448,54 @@ export type Database = {
         }
         Relationships: []
       }
+      planos: {
+        Row: {
+          ativo: boolean
+          ciclo: string
+          codigo: string
+          created_at: string
+          creditos_ia_mes: number
+          features: string[]
+          id: string
+          max_cnpjs: number
+          max_usuarios: number
+          nome: string
+          preco_centavos: number
+          self_service: boolean
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          ciclo?: string
+          codigo: string
+          created_at?: string
+          creditos_ia_mes?: number
+          features?: string[]
+          id?: string
+          max_cnpjs: number
+          max_usuarios: number
+          nome: string
+          preco_centavos?: number
+          self_service?: boolean
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          ciclo?: string
+          codigo?: string
+          created_at?: string
+          creditos_ia_mes?: number
+          features?: string[]
+          id?: string
+          max_cnpjs?: number
+          max_usuarios?: number
+          nome?: string
+          preco_centavos?: number
+          self_service?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pncp_raw: {
         Row: {
           chave_origem: string
@@ -1428,6 +1611,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      uso_eventos: {
+        Row: {
+          contexto: Json | null
+          created_at: string
+          empresa_cliente_id: string | null
+          evento: string
+          id: number
+          user_id: string | null
+        }
+        Insert: {
+          contexto?: Json | null
+          created_at?: string
+          empresa_cliente_id?: string | null
+          evento: string
+          id?: number
+          user_id?: string | null
+        }
+        Update: {
+          contexto?: Json | null
+          created_at?: string
+          empresa_cliente_id?: string | null
+          evento?: string
+          id?: number
+          user_id?: string | null
+        }
+        Relationships: []
       }
     }
     Views: {
