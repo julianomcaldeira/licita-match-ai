@@ -89,6 +89,7 @@ export default function AIMarketAnalysis() {
   const [conversation, setConversation] = useState<ChatMessage[]>([]);
   const [pendingTools, setPendingTools] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const track = useTracker();
 
   useEffect(() => { setConversation(loadConversation()); }, []);
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [conversation, pendingTools]);
