@@ -103,6 +103,7 @@ export default function AIMarketAnalysis() {
     setQuestion("");
     setIsLoading(true);
     setPendingTools(["Consultando dados oficiais..."]);
+    track("ia_consulta", { tipo: "market-analysis", period_months: period, has_uf: !!uf, history_size: conversation.length });
 
     try {
       const { data: session } = await supabase.auth.getSession();
