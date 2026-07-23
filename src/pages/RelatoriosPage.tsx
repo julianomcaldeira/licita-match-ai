@@ -448,6 +448,7 @@ export default function RelatoriosPage() {
       const csv = [header, ...lines].join("\n");
       const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
       downloadBlob(blob, `relatorio_${snapTableConfig.name}_${today()}.csv`);
+      track("export", { page: "relatorios", format: "csv", table: snapTableConfig.name, rows: allRows.length });
       toast.success(`CSV exportado com ${allRows.length} registros!`);
     } catch (e: any) {
       toast.error("Erro ao exportar: " + (e.message || e));
