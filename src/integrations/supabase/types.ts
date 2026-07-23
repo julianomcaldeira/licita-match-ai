@@ -1665,6 +1665,27 @@ export type Database = {
     }
     Functions: {
       _kw_or_clause: { Args: { p_kw: string[] }; Returns: string }
+      admin_clientes_overview: {
+        Args: never
+        Returns: {
+          acessos_7d: number
+          acessos_7d_anteriores: number
+          assinatura_inicio: string
+          assinatura_status: string
+          cnpj: string
+          cnpjs_monitorados: number
+          criada_em: string
+          empresa_id: string
+          ia_consultas_30d: number
+          nome: string
+          plano_codigo: string
+          plano_nome: string
+          top_paginas_30d: Json
+          ultimo_acesso: string
+          usuarios_ativos_30d: number
+          usuarios_total: number
+        }[]
+      }
       ai_usage_recent: {
         Args: { p_empresa_id?: string; p_limit?: number; p_period?: string }
         Returns: {

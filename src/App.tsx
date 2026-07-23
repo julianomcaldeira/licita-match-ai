@@ -17,6 +17,7 @@ import PlaceholderPage from "@/components/PlaceholderPage";
 import UsuariosPage from "@/pages/UsuariosPage";
 import RelatoriosPage from "@/pages/RelatoriosPage";
 import SancionadasPage from "@/pages/SancionadasPage";
+import ClientesAdminPage from "@/pages/ClientesAdminPage";
 
 import ApiKeysPage from "@/pages/ApiKeysPage";
 import IndiceStartGiPage from "@/pages/IndiceStartGiPage";
@@ -55,6 +56,7 @@ const App = () => (
               <Route path="/usuarios" element={<UsuariosPage />} />
               <Route path="/relatorios" element={<RelatoriosPage />} />
               <Route path="/sancionadas" element={<SancionadasPage />} />
+              <Route path="/clientes" element={<ClientesAdminPage />} />
               
               <Route path="/indice-startgi" element={<IndiceStartGiPage />} />
               <Route path="/api" element={<ApiKeysPage />} />
