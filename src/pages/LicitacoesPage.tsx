@@ -129,7 +129,7 @@ export default function LicitacoesPage() {
   const [progress, setProgress] = useState<IngestProgress | null>(null);
   const abortRef = useRef(false);
   const queryClient = useQueryClient();
-  const { role } = useAuth();
+  const { role, empresaId } = useAuth();
   const isAdminCentral = role === "admin_central";
   const track = useTracker();
 
@@ -171,6 +171,23 @@ export default function LicitacoesPage() {
   const [filterUf, setFilterUf] = useState("");
   const [filterSituacao, setFilterSituacao] = useState("");
   const [filterVencedores, setFilterVencedores] = useState<string[]>([]);
+  const [filterApenasParticipei, setFilterApenasParticipei] = useState(false);
+
+  // IDs de licitações onde a empresa do usuário registrou participação
+  const { data: minhasParticipacaoIds } = useQuery({
+    queryKey: ["minhas-participacoes-ids", empresaId],
+    enabled: !!empresaId,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("cliente_participacoes")
+        .select("licitacao_id")
+        .eq("empresa_cliente_id", empresaId!)
+        .eq("participou", true);
+      if (error) throw error;
+      return (data ?? []).map((r) => r.licitacao_id).filter(Boolean) as string[];
+    },
+  });
 
   // Server-side search for orgão options
   const [orgaoSearch, setOrgaoSearch] = useState("");
@@ -223,7 +240,7 @@ export default function LicitacoesPage() {
 
 
   const [appliedFilters, setAppliedFilters] = useState<{
-    orgao: string; search: string; itens?: string; dateFrom?: string; dateTo?: string; uf?: string; situacao?: string; vencedor?: string; tab: "abertas" | "encerradas";
+    orgao: string; search: string; itens?: string; dateFrom?: string; dateTo?: string; uf?: string; situacao?: string; vencedor?: string; apenasParticipei?: boolean; tab: "abertas" | "encerradas";
   }>({ orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd"), tab: "abertas" });
 
   const hasWinnerFilter = filterVencedores.length > 0;
@@ -255,6 +272,7 @@ export default function LicitacoesPage() {
       uf: filterUf || undefined,
       situacao: nextSituacao || undefined,
       vencedor: filterVencedores.length > 0 ? filterVencedores.join("||") : undefined,
+      apenasParticipei: filterApenasParticipei || undefined,
       tab: nextTab,
     };
     setAppliedFilters(next);
@@ -296,11 +314,12 @@ export default function LicitacoesPage() {
     setFilterUf("");
     setFilterSituacao("");
     setFilterVencedores([]);
+    setFilterApenasParticipei(false);
     setPage(0);
     setAppliedFilters({ orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd"), tab: activeTab });
   };
 
-  const hasActiveFilters = appliedFilters.orgao || appliedFilters.search || appliedFilters.itens || appliedFilters.dateFrom || appliedFilters.dateTo || appliedFilters.uf || appliedFilters.situacao || appliedFilters.vencedor;
+  const hasActiveFilters = appliedFilters.orgao || appliedFilters.search || appliedFilters.itens || appliedFilters.dateFrom || appliedFilters.dateTo || appliedFilters.uf || appliedFilters.situacao || appliedFilters.vencedor || appliedFilters.apenasParticipei;
 
   const searchByWinner = (name: string) => {
     activateWinnerMode();
@@ -371,10 +390,10 @@ export default function LicitacoesPage() {
   };
 
   const isAbertas = appliedFilters.vencedor ? false : appliedFilters.tab === "abertas";
-  const useRpc = !!(appliedFilters.vencedor || appliedFilters.search || appliedFilters.itens);
+  const useRpc = !appliedFilters.apenasParticipei && !!(appliedFilters.vencedor || appliedFilters.search || appliedFilters.itens);
 
   const { data: queryResult, isLoading, isFetching, isError, error: queryError, refetch } = useQuery({
-    queryKey: ["licitacoes-all", page, appliedFilters],
+    queryKey: ["licitacoes-all", page, appliedFilters, appliedFilters.apenasParticipei ? (minhasParticipacaoIds ?? []).length : 0],
     queryFn: async () => {
       const hasResultadoStatus = appliedFilters.situacao === "Concluída";
 
@@ -419,6 +438,16 @@ export default function LicitacoesPage() {
 
         if (appliedFilters.orgao) {
           query = query.ilike("orgao", `%${appliedFilters.orgao}%`);
+        }
+
+        if (appliedFilters.apenasParticipei) {
+          const ids = minhasParticipacaoIds ?? [];
+          if (ids.length === 0) {
+            // força zero resultados sem gerar erro
+            query = query.eq("id", "00000000-0000-0000-0000-000000000000");
+          } else {
+            query = query.in("id", ids);
+          }
         }
 
         return query;
@@ -1091,6 +1120,27 @@ export default function LicitacoesPage() {
             )}
           </AnimatePresence>
         </div>
+
+        {empresaId && (
+          <div className="flex items-center gap-2 pt-2">
+            <input
+              id="apenas-participei"
+              type="checkbox"
+              className="h-4 w-4 rounded border-border accent-primary cursor-pointer"
+              checked={filterApenasParticipei}
+              onChange={(e) => setFilterApenasParticipei(e.target.checked)}
+            />
+            <label htmlFor="apenas-participei" className="text-sm cursor-pointer">
+              Apenas onde participei
+              {minhasParticipacaoIds && (
+                <span className="ml-1 text-xs text-muted-foreground">
+                  ({minhasParticipacaoIds.length})
+                </span>
+              )}
+            </label>
+          </div>
+        )}
+
 
         {/* Search + Clear buttons */}
         <div className="flex flex-col-reverse gap-2 pt-3 border-t border-border sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:pt-1">

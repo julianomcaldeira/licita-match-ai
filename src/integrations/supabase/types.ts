@@ -321,24 +321,30 @@ export type Database = {
           empresa_cliente_id: string
           id: string
           licitacao_id: string
+          participou: boolean
           proposta_centavos: number | null
           resultado: string | null
+          updated_at: string
         }
         Insert: {
           created_at?: string
           empresa_cliente_id: string
           id?: string
           licitacao_id: string
+          participou?: boolean
           proposta_centavos?: number | null
           resultado?: string | null
+          updated_at?: string
         }
         Update: {
           created_at?: string
           empresa_cliente_id?: string
           id?: string
           licitacao_id?: string
+          participou?: boolean
           proposta_centavos?: number | null
           resultado?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
