@@ -1,28 +1,24 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { useState } from "react";
 import {
   ArrowRight,
   Database,
-  ShieldCheck,
-  Trophy,
-  Target,
-  Users,
-  Bell,
+  Wallet,
+  Gavel,
+  FileSignature,
+  Banknote,
+  TrendingDown,
+  Tag,
+  Clock,
   Layers,
-  Gauge,
-  Cpu,
-  Sparkles,
   Check,
-  CalendarCheck,
 } from "lucide-react";
 import logoImg from "@/assets/logo-ipesquisei-indigo.png";
 
 /**
  * Landing pública — i-pesquisei
- * Posicionamento: inteligência em compras governamentais.
- * Objetivo: captação de leads para venda consultiva (sem autoatendimento).
- * Paleta: Midnight Indigo | Tipografia: Space Grotesk + DM Sans
+ * Posicionamento: inteligência sobre todo o ciclo do dinheiro público.
+ * Modelo: 100% self-service, assinatura online, sem "fale com vendedor".
  */
 
 const palette = {
@@ -33,114 +29,121 @@ const palette = {
 };
 
 const nav = [
-  { label: "O que você enxerga", href: "#recorte" },
-  { label: "Diferenciais", href: "#diferenciais" },
+  { label: "O ciclo", href: "#ciclo" },
+  { label: "O que você descobre", href: "#descobre" },
   { label: "Planos", href: "#planos" },
-  { label: "Contato", href: "#contato" },
 ];
 
-const recortes = [
+const ciclo = [
   {
-    icon: Trophy,
-    tag: "Minhas Vitórias",
-    title: "Tudo que sua empresa já ganhou.",
-    desc: "Consolidamos, por CNPJ, todos os contratos e homologações da sua empresa e das coligadas — com valores, órgãos, prazos e itens. Nunca mais monte planilha para saber o próprio histórico.",
+    icon: Wallet,
+    fase: "Antes",
+    title: "Orçamento e emendas",
+    desc: "Verba que ainda vai virar licitação. Você enxerga onde há dinheiro alocado no seu segmento antes do edital sair.",
   },
   {
-    icon: Target,
-    tag: "Minhas Oportunidades",
-    title: "Licitações abertas com a sua cara.",
-    desc: "Editais abertos são pontuados pelo fit com o perfil da sua empresa: aderência ao objeto, faixa de valor, região de atuação e histórico de vencedores. Você vê primeiro o que faz sentido disputar.",
+    icon: Gavel,
+    fase: "A disputa",
+    title: "Licitações e concorrentes",
+    desc: "Editais abertos, preços praticados no mercado e mapeamento de quem disputa contra você — por objeto, órgão e região.",
   },
   {
-    icon: Users,
-    tag: "Meus Concorrentes",
-    title: "Quem mais ganha no seu segmento.",
-    desc: "Mapeamento dos concorrentes ativos por objeto, região e órgão. Descubra quem venceu, com que preço, com que frequência — e onde há espaço para você entrar.",
+    icon: FileSignature,
+    fase: "O contrato",
+    title: "Quem ganhou, por quanto",
+    desc: "Contratos homologados, valores, prazos e itens. O histórico completo de quem vende o quê para cada órgão.",
   },
   {
-    icon: Bell,
-    tag: "Meu Radar",
-    title: "Alertas proativos de novos editais.",
-    desc: "Radar diário que avisa quando surge um edital aderente ao seu perfil ou publicado por um órgão que você acompanha. Você recebe antes de precisar procurar.",
+    icon: Banknote,
+    fase: "Depois",
+    title: "Empenho e pagamento",
+    desc: "Esse órgão paga? Em quanto tempo? Score de bom pagador com base em empenho, liquidação e pagamento reais.",
   },
 ];
 
-const diferenciais = [
+const descobre = [
+  {
+    icon: TrendingDown,
+    title: "Dinheiro deixado na mesa",
+    desc: "Quanto do seu segmento foi para concorrentes nos últimos meses — por região, por órgão e por faixa de valor.",
+  },
+  {
+    icon: Tag,
+    title: "Preço de referência real",
+    desc: "O preço praticado do que você vende ao governo, com base em contratos homologados — não em pesquisa de mercado inventada.",
+  },
+  {
+    icon: Clock,
+    title: "Órgãos que pagam melhor",
+    desc: "Ranking de órgãos por prazo médio de pagamento e taxa de inadimplência, cruzando empenho, liquidação e pagamento.",
+  },
   {
     icon: Layers,
-    title: "Consolidação de fontes",
-    desc: "PNCP, Portal da Transparência, empenhos e base de empresas sancionadas em um só lugar — cruzados por CNPJ, órgão e contrato. O PNCP mostra editais; nós mostramos o ciclo completo.",
-  },
-  {
-    icon: Gauge,
-    title: "Score de órgãos",
-    desc: "Cada órgão recebe uma nota AAA–D de bom pagador, calculada com Portal da Transparência, SICONFI e histórico de contratos. Você entra na disputa sabendo se vai receber.",
-  },
-  {
-    icon: Cpu,
-    title: "Análise de mercado por IA",
-    desc: "Leitura automática do edital, tabela de itens e recomendações. Cruzamento com histórico do órgão, dos vencedores e do próprio mercado — sem depender de leitura humana do PDF.",
-  },
-  {
-    icon: Sparkles,
-    title: "Índice StartGi de Compras Governamentais",
-    desc: "Índice proprietário que sintetiza volume, dispersão de fornecedores, ticket médio e velocidade de contratação por segmento e região. Uma leitura de mercado que o portal público não entrega.",
+    title: "Verba alocada e não comprometida",
+    desc: "Onde ainda há orçamento no seu segmento que não virou compra — para você se posicionar antes do edital.",
   },
 ];
 
 const planos = [
   {
-    name: "Essencial",
-    desc: "Para times que estão estruturando a operação de vendas para o governo.",
+    code: "inteligencia",
+    name: "Inteligência",
+    price: "R$ 297",
+    price_suffix: "/mês",
+    tagline: "Para quem já vende ao governo",
     features: [
-      "Minhas Vitórias e Minhas Oportunidades",
-      "Score de órgãos",
-      "Consolidação PNCP + Portal da Transparência",
-      "Até 3 usuários",
+      "Busca completa de licitações",
+      "Preço de referência real",
+      "Potencial de compra por órgão",
+      "Atas de registro de preço vigentes",
+      "Dinheiro na mesa (segmento)",
+      "Concorrentes ativos",
+      "Empresas sancionadas",
+      "Radar diário de novos editais",
+      "3 CNPJs · 5 usuários",
     ],
+    cta: "Assinar",
     highlight: false,
   },
   {
-    name: "Profissional",
-    desc: "Para operações recorrentes que precisam de inteligência competitiva e IA por edital.",
+    code: "execucao",
+    name: "Execução",
+    price: "R$ 897",
+    price_suffix: "/mês",
+    tagline: "Para quem tem contratos públicos",
     features: [
-      "Tudo do Essencial",
-      "Meus Concorrentes e Meu Radar",
-      "Análise IA por licitação",
-      "Índice StartGi de Compras Governamentais",
-      "Relatórios exportáveis e usuários adicionais",
+      "Tudo do Inteligência",
+      "Ficha completa do órgão",
+      "Empenho detalhado (empenho, liquidação, pagamento)",
+      "Emendas parlamentares",
+      "Sazonalidade de compras",
+      "Janela de recompra",
+      "API para integração com CRM/BI",
+      "15 CNPJs · 15 usuários",
     ],
+    cta: "Assinar",
     highlight: true,
+    badge: "Mais completo",
   },
   {
-    name: "Enterprise / Canal",
-    desc: "Para consultorias, escritórios e canais que atendem múltiplos clientes.",
+    code: "canal",
+    name: "Canal",
+    price: "A partir de R$ 1.997",
+    price_suffix: "/mês",
+    tagline: "Para consultorias e escritórios",
     features: [
-      "Tudo do Profissional",
       "Ambiente white-label com sua marca",
-      "API para integração com CRM e BI",
-      "Múltiplos CNPJs e workspaces",
-      "SLA dedicado e onboarding assistido",
+      "Painel multi-cliente",
+      "API completa",
+      "Suporte dedicado",
+      "Preço por faixa de clientes finais atendidos",
     ],
+    cta: "Assinar",
     highlight: false,
   },
 ];
 
 export default function LandingPage() {
-  const [form, setForm] = useState({ nome: "", empresa: "", email: "", telefone: "" });
-  const [enviado, setEnviado] = useState(false);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const assunto = encodeURIComponent("Demonstração i-pesquisei");
-    const corpo = encodeURIComponent(
-      `Nome: ${form.nome}\nEmpresa: ${form.empresa}\nE-mail: ${form.email}\nTelefone: ${form.telefone}\n\nGostaria de agendar uma demonstração do i-pesquisei.`,
-    );
-    window.location.href = `mailto:contato@ipesquisei.com.br?subject=${assunto}&body=${corpo}`;
-    setEnviado(true);
-  };
-
   return (
     <div
       className="min-h-screen font-sans text-slate-700 antialiased"
@@ -190,14 +193,14 @@ export default function LandingPage() {
             >
               Entrar
             </Link>
-            <a
-              href="#contato"
+            <Link
+              to="/auth"
               className="group inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-white transition"
               style={{ background: palette.accent, boxShadow: `0 8px 30px ${palette.accent}55` }}
             >
-              Agende uma demonstração
+              Começar teste grátis
               <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
-            </a>
+            </Link>
           </div>
         </div>
       </header>
@@ -211,63 +214,119 @@ export default function LandingPage() {
         >
           <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-indigo-300 bg-indigo-100 px-3 py-1 text-xs text-indigo-600">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-400" />
-            Inteligência em compras governamentais
+            Do orçamento ao pagamento — o ciclo completo do dinheiro público
           </div>
           <h1 className="font-display mx-auto mt-6 max-w-4xl text-5xl font-semibold leading-[1.05] tracking-tight text-slate-900 sm:text-6xl lg:text-7xl">
-            O que sua empresa já ganhou —{" "}
+            Enxergue onde está o dinheiro público{" "}
             <span
               className="bg-clip-text text-transparent"
               style={{
                 backgroundImage: `linear-gradient(120deg, #0f172a 0%, ${palette.accent} 70%, #6366f1 100%)`,
               }}
             >
-              e o que está aberto pra ela agora.
+              antes, durante e depois.
             </span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-slate-600">
-            O i-pesquisei mostra, no mesmo lugar, todo o histórico de contratos da sua empresa
-            com o governo e as oportunidades abertas que combinam com o seu perfil. Sem
-            navegar em portais públicos, sem montar planilha, sem depender de sorte.
+            Sua empresa descobre oportunidades antes do edital, sabe quais órgãos pagam bem
+            e em quanto tempo, e enxerga onde há verba alocada que ainda vai virar compra —
+            tudo no mesmo lugar.
           </p>
 
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <a
-              href="#contato"
+              href="#planos"
               className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-medium text-white transition"
               style={{ background: palette.accent, boxShadow: `0 10px 40px ${palette.accent}66` }}
             >
-              Agende uma demonstração
+              Ver planos
               <ArrowRight className="h-4 w-4" />
             </a>
-            <a
-              href="#recorte"
+            <Link
+              to="/auth"
               className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
             >
-              Ver o que você enxerga
-            </a>
+              Começar teste grátis
+            </Link>
           </div>
+          <p className="mt-4 text-xs text-slate-500">
+            7 dias grátis · cancele quando quiser · sem cartão para começar
+          </p>
         </motion.div>
       </section>
 
-      {/* O QUE VOCÊ ENXERGA */}
-      <section id="recorte" className="relative z-10 mx-auto max-w-7xl px-6 py-20">
+      {/* CICLO DO DINHEIRO PÚBLICO */}
+      <section id="ciclo" className="relative z-10 mx-auto max-w-7xl px-6 py-20">
         <div className="mb-14 max-w-3xl">
           <span className="font-mono text-xs uppercase tracking-widest text-indigo-600">
-            / o que você enxerga
+            / o ciclo do dinheiro público
           </span>
           <h2 className="font-display mt-3 text-4xl font-semibold leading-tight text-slate-900 sm:text-5xl">
-            Quatro visões da sua operação com o governo.
+            Quatro etapas. Uma única plataforma.
           </h2>
           <p className="mt-4 text-base leading-relaxed text-slate-600">
-            O produto é organizado a partir do seu ponto de vista — a sua empresa, o seu
-            segmento, os seus concorrentes — e não a partir do organograma do Estado.
+            A maioria das ferramentas só olha para o edital. O i-pesquisei acompanha o
+            dinheiro público desde o orçamento até o pagamento final ao fornecedor.
+          </p>
+        </div>
+
+        {/* Timeline */}
+        <div className="relative">
+          <div
+            className="absolute left-0 right-0 top-6 hidden h-px md:block"
+            style={{
+              background: `linear-gradient(90deg, transparent, ${palette.accentSoft}, ${palette.accent}, ${palette.accentSoft}, transparent)`,
+            }}
+          />
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-4">
+            {ciclo.map((c, i) => (
+              <motion.div
+                key={c.title}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-80px" }}
+                transition={{ duration: 0.5, delay: i * 0.08 }}
+                className="relative"
+              >
+                <div
+                  className="relative z-10 mx-auto grid h-12 w-12 place-items-center rounded-full border border-indigo-300 bg-white"
+                  style={{ boxShadow: `0 6px 20px ${palette.accent}22` }}
+                >
+                  <c.icon className="h-5 w-5 text-indigo-600" />
+                </div>
+                <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-6">
+                  <span className="font-mono text-[11px] uppercase tracking-widest text-indigo-600">
+                    {c.fase}
+                  </span>
+                  <h3 className="font-display mt-2 text-lg font-semibold text-slate-900">
+                    {c.title}
+                  </h3>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-600">{c.desc}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* O QUE VOCÊ DESCOBRE */}
+      <section id="descobre" className="relative z-10 mx-auto max-w-7xl px-6 py-20">
+        <div className="mb-14 max-w-3xl">
+          <span className="font-mono text-xs uppercase tracking-widest text-indigo-600">
+            / o que você descobre
+          </span>
+          <h2 className="font-display mt-3 text-4xl font-semibold leading-tight text-slate-900 sm:text-5xl">
+            Respostas que hoje você não tem.
+          </h2>
+          <p className="mt-4 text-base leading-relaxed text-slate-600">
+            Não são gráficos genéricos. São as perguntas que decidem se vale a pena disputar.
           </p>
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {recortes.map((r, i) => (
+          {descobre.map((d, i) => (
             <motion.div
-              key={r.tag}
+              key={d.title}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-80px" }}
@@ -280,52 +339,6 @@ export default function LandingPage() {
                   background: `linear-gradient(90deg, transparent, ${palette.accent}, transparent)`,
                 }}
               />
-              <div className="flex items-start justify-between">
-                <div
-                  className="grid h-12 w-12 place-items-center rounded-xl border border-indigo-300"
-                  style={{ background: `${palette.accent}18` }}
-                >
-                  <r.icon className="h-5 w-5 text-indigo-600" />
-                </div>
-                <span className="font-mono text-[11px] uppercase tracking-widest text-indigo-600">
-                  {r.tag}
-                </span>
-              </div>
-              <h3 className="font-display mt-6 text-xl font-semibold text-slate-900">
-                {r.title}
-              </h3>
-              <p className="mt-3 text-sm leading-relaxed text-slate-600">{r.desc}</p>
-            </motion.div>
-          ))}
-        </div>
-      </section>
-
-      {/* DIFERENCIAIS — Por que não é só o PNCP */}
-      <section id="diferenciais" className="relative z-10 mx-auto max-w-7xl px-6 py-20">
-        <div className="mb-14 max-w-3xl">
-          <span className="font-mono text-xs uppercase tracking-widest text-indigo-600">
-            / por que não é só o PNCP
-          </span>
-          <h2 className="font-display mt-3 text-4xl font-semibold leading-tight text-slate-900 sm:text-5xl">
-            O portal público mostra o edital. Nós mostramos o mercado.
-          </h2>
-          <p className="mt-4 text-base leading-relaxed text-slate-600">
-            O PNCP entrega documentos. O i-pesquisei entrega leitura de mercado: fontes
-            cruzadas, órgãos avaliados, análise por IA e um índice próprio de compras
-            governamentais.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {diferenciais.map((d, i) => (
-            <motion.div
-              key={d.title}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-80px" }}
-              transition={{ duration: 0.5, delay: i * 0.05 }}
-              className="relative rounded-2xl border border-slate-200 bg-white p-8"
-            >
               <div
                 className="mb-5 grid h-11 w-11 place-items-center rounded-xl border border-indigo-300"
                 style={{ background: `${palette.accent}18` }}
@@ -346,34 +359,39 @@ export default function LandingPage() {
             / planos
           </span>
           <h2 className="font-display mt-3 text-4xl font-semibold leading-tight text-slate-900 sm:text-5xl">
-            Três formatos, adaptados ao tamanho da operação.
+            Escolha o plano e comece a usar hoje.
           </h2>
           <p className="mt-4 text-base leading-relaxed text-slate-600">
-            Trabalhamos em modelo consultivo. O time avalia o seu contexto, dimensiona o
-            plano ideal e conduz o onboarding.
+            100% online. Sem reunião, sem proposta, sem espera. Assinou, está usando.
           </p>
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {planos.map((p) => (
             <div
-              key={p.name}
+              key={p.code}
               className={`relative flex flex-col rounded-2xl border p-8 transition ${
                 p.highlight
                   ? "border-indigo-400 bg-white shadow-[0_30px_80px_-30px_rgba(79,70,229,0.45)]"
                   : "border-slate-200 bg-white/70"
               }`}
             >
-              {p.highlight && (
+              {p.highlight && p.badge && (
                 <span
                   className="absolute -top-3 left-8 rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-white"
                   style={{ background: palette.accent }}
                 >
-                  Mais adotado
+                  {p.badge}
                 </span>
               )}
               <div className="font-display text-xl font-semibold text-slate-900">{p.name}</div>
-              <p className="mt-3 text-sm leading-relaxed text-slate-600">{p.desc}</p>
+              <p className="mt-1 text-sm text-slate-500">{p.tagline}</p>
+              <div className="mt-5 flex items-baseline gap-1">
+                <span className="font-display text-4xl font-semibold text-slate-900">
+                  {p.price}
+                </span>
+                <span className="text-sm text-slate-500">{p.price_suffix}</span>
+              </div>
               <ul className="mt-6 flex-1 space-y-3 text-sm text-slate-700">
                 {p.features.map((f) => (
                   <li key={f} className="flex items-start gap-2">
@@ -382,8 +400,8 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <a
-                href="#contato"
+              <Link
+                to="/auth"
                 className={`mt-8 inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-medium transition ${
                   p.highlight
                     ? "text-white"
@@ -395,124 +413,51 @@ export default function LandingPage() {
                     : undefined
                 }
               >
-                Fale com o time
+                {p.cta}
                 <ArrowRight className="h-4 w-4" />
-              </a>
+              </Link>
             </div>
           ))}
         </div>
+
+        <div className="mt-8 flex flex-col items-center gap-1 text-center text-xs text-slate-500">
+          <p>Planos anuais têm 2 meses grátis.</p>
+          <p>Teste grátis de 7 dias, com cancelamento a qualquer momento.</p>
+        </div>
       </section>
 
-      {/* CTA final + Formulário */}
-      <section id="contato" className="relative z-10 mx-auto max-w-6xl px-6 py-24">
+      {/* CHAMADA FINAL */}
+      <section className="relative z-10 mx-auto max-w-5xl px-6 py-24">
         <div
-          className="grid grid-cols-1 gap-10 overflow-hidden rounded-3xl border border-indigo-300 p-10 lg:grid-cols-2 lg:p-14"
+          className="overflow-hidden rounded-3xl border border-indigo-300 p-10 text-center lg:p-16"
           style={{
             background: `linear-gradient(140deg, ${palette.accentSoft}, ${palette.bg2})`,
             boxShadow: `0 40px 120px -20px ${palette.accent}55`,
           }}
         >
-          <div>
-            <CalendarCheck className="h-8 w-8 text-indigo-600" />
-            <h2 className="font-display mt-6 text-4xl font-semibold leading-tight text-slate-900 sm:text-5xl">
-              Agende uma demonstração.
-            </h2>
-            <p className="mt-4 max-w-md text-sm leading-relaxed text-slate-700">
-              Em 30 minutos, o time do i-pesquisei apresenta o produto com dados reais do seu
-              CNPJ e do seu segmento — e responde se faz sentido para a sua operação.
-            </p>
-            <ul className="mt-6 space-y-2 text-sm text-slate-700">
-              <li className="flex items-start gap-2">
-                <Check className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" />
-                Demonstração personalizada com o seu histórico
-              </li>
-              <li className="flex items-start gap-2">
-                <Check className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" />
-                Diagnóstico do seu mercado governamental
-              </li>
-              <li className="flex items-start gap-2">
-                <Check className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" />
-                Proposta comercial no formato certo para você
-              </li>
-            </ul>
+          <h2 className="font-display mx-auto max-w-3xl text-4xl font-semibold leading-tight text-slate-900 sm:text-5xl">
+            Um único contrato público vale muito mais que a assinatura anual.
+          </h2>
+          <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-slate-700">
+            Comece com 7 dias grátis. Se em uma semana o i-pesquisei não te mostrar uma
+            oportunidade que valha a assinatura, você cancela sem custo.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <Link
+              to="/auth"
+              className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-medium text-white transition"
+              style={{ background: palette.accent, boxShadow: `0 10px 40px ${palette.accent}66` }}
+            >
+              Começar teste grátis
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            <a
+              href="#planos"
+              className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-6 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+            >
+              Ver planos
+            </a>
           </div>
-
-          <form
-            onSubmit={handleSubmit}
-            className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8"
-          >
-            <h3 className="font-display text-lg font-semibold text-slate-900">
-              Fale com o time
-            </h3>
-            <p className="mt-1 text-xs text-slate-500">
-              Retornamos em até 1 dia útil.
-            </p>
-
-            <div className="mt-6 space-y-4">
-              <div>
-                <label className="text-xs font-medium text-slate-600">Nome</label>
-                <input
-                  required
-                  value={form.nome}
-                  onChange={(e) => setForm({ ...form, nome: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-                  placeholder="Seu nome completo"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-600">Empresa</label>
-                <input
-                  required
-                  value={form.empresa}
-                  onChange={(e) => setForm({ ...form, empresa: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-                  placeholder="Razão social ou fantasia"
-                />
-              </div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="text-xs font-medium text-slate-600">E-mail</label>
-                  <input
-                    required
-                    type="email"
-                    value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-                    placeholder="voce@empresa.com"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-600">Telefone</label>
-                  <input
-                    required
-                    value={form.telefone}
-                    onChange={(e) => setForm({ ...form, telefone: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-                    placeholder="(11) 99999-0000"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-medium text-white transition"
-                style={{
-                  background: palette.accent,
-                  boxShadow: `0 10px 30px ${palette.accent}55`,
-                }}
-              >
-                Agendar demonstração
-                <ArrowRight className="h-4 w-4" />
-              </button>
-
-              {enviado && (
-                <p className="text-center text-xs text-emerald-700">
-                  Abrimos seu cliente de e-mail com a mensagem pronta. Se preferir, escreva
-                  direto para contato@ipesquisei.com.br.
-                </p>
-              )}
-            </div>
-          </form>
         </div>
       </section>
 
@@ -522,14 +467,13 @@ export default function LandingPage() {
           <div className="flex items-center gap-2">
             <Database className="h-4 w-4 text-indigo-600" />
             <span className="font-mono text-xs text-slate-500">
-              i-pesquisei · inteligência em compras governamentais
+              i-pesquisei · inteligência sobre o ciclo do dinheiro público
             </span>
           </div>
           <div className="flex items-center gap-6 text-xs text-slate-500">
-            <a href="#recorte" className="hover:text-slate-900">O produto</a>
-            <a href="#diferenciais" className="hover:text-slate-900">Diferenciais</a>
+            <a href="#ciclo" className="hover:text-slate-900">O ciclo</a>
+            <a href="#descobre" className="hover:text-slate-900">O que você descobre</a>
             <a href="#planos" className="hover:text-slate-900">Planos</a>
-            <a href="#contato" className="hover:text-slate-900">Contato</a>
             <Link to="/auth" className="hover:text-slate-900">Entrar</Link>
           </div>
         </div>
