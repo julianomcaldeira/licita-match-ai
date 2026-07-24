@@ -314,11 +314,12 @@ export default function LicitacoesPage() {
     setFilterUf("");
     setFilterSituacao("");
     setFilterVencedores([]);
+    setFilterApenasParticipei(false);
     setPage(0);
     setAppliedFilters({ orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd"), tab: activeTab });
   };
 
-  const hasActiveFilters = appliedFilters.orgao || appliedFilters.search || appliedFilters.itens || appliedFilters.dateFrom || appliedFilters.dateTo || appliedFilters.uf || appliedFilters.situacao || appliedFilters.vencedor;
+  const hasActiveFilters = appliedFilters.orgao || appliedFilters.search || appliedFilters.itens || appliedFilters.dateFrom || appliedFilters.dateTo || appliedFilters.uf || appliedFilters.situacao || appliedFilters.vencedor || appliedFilters.apenasParticipei;
 
   const searchByWinner = (name: string) => {
     activateWinnerMode();
