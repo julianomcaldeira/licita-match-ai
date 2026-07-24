@@ -440,6 +440,16 @@ export default function LicitacoesPage() {
           query = query.ilike("orgao", `%${appliedFilters.orgao}%`);
         }
 
+        if (appliedFilters.apenasParticipei) {
+          const ids = minhasParticipacaoIds ?? [];
+          if (ids.length === 0) {
+            // força zero resultados sem gerar erro
+            query = query.eq("id", "00000000-0000-0000-0000-000000000000");
+          } else {
+            query = query.in("id", ids);
+          }
+        }
+
         return query;
       };
 
