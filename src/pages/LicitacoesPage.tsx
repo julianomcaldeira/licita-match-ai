@@ -129,7 +129,7 @@ export default function LicitacoesPage() {
   const [progress, setProgress] = useState<IngestProgress | null>(null);
   const abortRef = useRef(false);
   const queryClient = useQueryClient();
-  const { role } = useAuth();
+  const { role, empresaId } = useAuth();
   const isAdminCentral = role === "admin_central";
   const track = useTracker();
 
