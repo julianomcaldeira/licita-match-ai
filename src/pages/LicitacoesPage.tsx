@@ -272,6 +272,7 @@ export default function LicitacoesPage() {
       uf: filterUf || undefined,
       situacao: nextSituacao || undefined,
       vencedor: filterVencedores.length > 0 ? filterVencedores.join("||") : undefined,
+      apenasParticipei: filterApenasParticipei || undefined,
       tab: nextTab,
     };
     setAppliedFilters(next);
