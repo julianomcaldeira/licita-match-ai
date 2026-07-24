@@ -390,10 +390,10 @@ export default function LicitacoesPage() {
   };
 
   const isAbertas = appliedFilters.vencedor ? false : appliedFilters.tab === "abertas";
-  const useRpc = !!(appliedFilters.vencedor || appliedFilters.search || appliedFilters.itens);
+  const useRpc = !appliedFilters.apenasParticipei && !!(appliedFilters.vencedor || appliedFilters.search || appliedFilters.itens);
 
   const { data: queryResult, isLoading, isFetching, isError, error: queryError, refetch } = useQuery({
-    queryKey: ["licitacoes-all", page, appliedFilters],
+    queryKey: ["licitacoes-all", page, appliedFilters, appliedFilters.apenasParticipei ? (minhasParticipacaoIds ?? []).length : 0],
     queryFn: async () => {
       const hasResultadoStatus = appliedFilters.situacao === "Concluída";
 
