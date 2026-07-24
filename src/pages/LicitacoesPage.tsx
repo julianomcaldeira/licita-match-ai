@@ -240,7 +240,7 @@ export default function LicitacoesPage() {
 
 
   const [appliedFilters, setAppliedFilters] = useState<{
-    orgao: string; search: string; itens?: string; dateFrom?: string; dateTo?: string; uf?: string; situacao?: string; vencedor?: string; tab: "abertas" | "encerradas";
+    orgao: string; search: string; itens?: string; dateFrom?: string; dateTo?: string; uf?: string; situacao?: string; vencedor?: string; apenasParticipei?: boolean; tab: "abertas" | "encerradas";
   }>({ orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd"), tab: "abertas" });
 
   const hasWinnerFilter = filterVencedores.length > 0;
