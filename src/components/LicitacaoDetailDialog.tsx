@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2, ExternalLink, Building2, MapPin, Calendar, Tag, FileText, Trophy } from "lucide-react";
+import MinhaParticipacaoBlock from "@/components/MinhaParticipacaoBlock";
 
 function fmtMoney(v: any) {
   const n = Number(v ?? 0);
