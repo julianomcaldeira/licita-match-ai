@@ -171,6 +171,23 @@ export default function LicitacoesPage() {
   const [filterUf, setFilterUf] = useState("");
   const [filterSituacao, setFilterSituacao] = useState("");
   const [filterVencedores, setFilterVencedores] = useState<string[]>([]);
+  const [filterApenasParticipei, setFilterApenasParticipei] = useState(false);
+
+  // IDs de licitações onde a empresa do usuário registrou participação
+  const { data: minhasParticipacaoIds } = useQuery({
+    queryKey: ["minhas-participacoes-ids", empresaId],
+    enabled: !!empresaId,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("cliente_participacoes")
+        .select("licitacao_id")
+        .eq("empresa_cliente_id", empresaId!)
+        .eq("participou", true);
+      if (error) throw error;
+      return (data ?? []).map((r) => r.licitacao_id).filter(Boolean) as string[];
+    },
+  });
 
   // Server-side search for orgão options
   const [orgaoSearch, setOrgaoSearch] = useState("");
