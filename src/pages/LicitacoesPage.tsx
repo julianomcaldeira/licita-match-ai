@@ -1121,6 +1121,27 @@ export default function LicitacoesPage() {
           </AnimatePresence>
         </div>
 
+        {empresaId && (
+          <div className="flex items-center gap-2 pt-2">
+            <input
+              id="apenas-participei"
+              type="checkbox"
+              className="h-4 w-4 rounded border-border accent-primary cursor-pointer"
+              checked={filterApenasParticipei}
+              onChange={(e) => setFilterApenasParticipei(e.target.checked)}
+            />
+            <label htmlFor="apenas-participei" className="text-sm cursor-pointer">
+              Apenas onde participei
+              {minhasParticipacaoIds && (
+                <span className="ml-1 text-xs text-muted-foreground">
+                  ({minhasParticipacaoIds.length})
+                </span>
+              )}
+            </label>
+          </div>
+        )}
+
+
         {/* Search + Clear buttons */}
         <div className="flex flex-col-reverse gap-2 pt-3 border-t border-border sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:pt-1">
           {hasActiveFilters ? (
