@@ -121,6 +121,9 @@ export default function LicitacaoDetailDialog({ licitacaoId, open, onOpenChange 
               )}
             </div>
 
+            {licitacaoId && <MinhaParticipacaoBlock licitacaoId={licitacaoId} />}
+
+
             {itens.length > 0 && (
               <div>
                 <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold">
