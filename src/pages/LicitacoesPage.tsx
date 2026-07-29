@@ -943,16 +943,14 @@ export default function LicitacoesPage() {
 
       {/* Filters */}
       <div className="rounded-xl border border-border bg-card p-4 space-y-4">
-        {/* Row 1: Objeto + Itens + Status */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_auto] gap-4 items-end">
-          <div className="space-y-1">
-            <div className="flex items-center gap-1">
+        {/* Row 1: Objeto + Itens + Status — grid 12 col, tudo h-9 */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-end">
+          <div className="space-y-1.5 lg:col-span-5">
+            <div className="flex h-4 items-center gap-1">
               <label className="text-xs font-medium text-muted-foreground">Palavra-chave (objeto)</label>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-4 w-4 p-0 hover:bg-transparent">
-                    <span className="text-[10px] text-muted-foreground cursor-help">ⓘ</span>
-                  </Button>
+                  <span className="cursor-help text-[10px] text-muted-foreground">ⓘ</span>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="max-w-xs">
                   <p className="text-xs">Busca no <strong>objeto</strong> (título) da licitação. Ex: "aquisição medicamentos".</p>
@@ -967,14 +965,12 @@ export default function LicitacoesPage() {
               className="h-9"
             />
           </div>
-          <div className="space-y-1">
-            <div className="flex items-center gap-1">
+          <div className="space-y-1.5 lg:col-span-4">
+            <div className="flex h-4 items-center gap-1">
               <label className="text-xs font-medium text-muted-foreground">Itens</label>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-4 w-4 p-0 hover:bg-transparent">
-                    <span className="text-[10px] text-muted-foreground cursor-help">ⓘ</span>
-                  </Button>
+                  <span className="cursor-help text-[10px] text-muted-foreground">ⓘ</span>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="max-w-xs">
                   <p className="text-xs">Busca na <strong>descrição dos itens</strong> da licitação. Use espaços para exigir todas as palavras (AND). Ex: "seringa descartável 5ml".</p>
@@ -992,18 +988,20 @@ export default function LicitacoesPage() {
               />
             </div>
           </div>
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Status</label>
-            <div className="flex flex-wrap gap-1.5">
+          <div className="space-y-1.5 lg:col-span-3">
+            <div className="flex h-4 items-center">
+              <label className="text-xs font-medium text-muted-foreground">Status</label>
+            </div>
+            <div className="flex h-9 items-center gap-1 rounded-lg border border-border bg-secondary/50 p-1">
               {statusOptions.map((opt) => (
                 <button
                   key={opt.value}
                   onClick={() => setFilterSituacao(opt.value)}
                   className={cn(
-                    "rounded-full px-3 py-1.5 text-xs font-medium border transition-colors",
+                    "flex-1 rounded-md px-2 text-xs font-medium leading-7 transition-colors",
                     filterSituacao === opt.value
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-card text-muted-foreground border-border hover:bg-secondary hover:text-foreground"
+                      ? "bg-card text-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
                   )}
                 >
                   {opt.label}
@@ -1012,6 +1010,7 @@ export default function LicitacoesPage() {
             </div>
           </div>
         </div>
+
 
 
 
