@@ -147,11 +147,13 @@
     @apply w-full text-sm border-separate border-spacing-0;
   }
   .table-sticky thead tr {
-    @apply bg-secondary/95 backdrop-blur supports-[backdrop-filter]:bg-secondary/80;
+    @apply bg-secondary;
   }
   .table-sticky thead th {
-    @apply sticky top-0 z-10 border-b border-border px-4 py-3 text-left font-semibold text-muted-foreground;
+    /* fundo opaco no próprio TH: com border-separate o bg do TR não pinta a célula sticky */
+    @apply sticky top-0 z-20 bg-secondary border-b border-border px-4 py-3 text-left font-semibold text-muted-foreground;
   }
+
   .table-sticky tbody tr {
     @apply transition-colors hover:bg-secondary/40;
   }
