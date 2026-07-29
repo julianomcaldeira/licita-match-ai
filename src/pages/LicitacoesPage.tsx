@@ -1034,9 +1034,9 @@ export default function LicitacoesPage() {
                 transition={{ duration: 0.2 }}
                 className="overflow-hidden"
               >
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-3 pt-3">
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Órgão</label>
+                <div className="mt-3 grid grid-cols-1 items-start gap-4 border-t border-border pt-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-medium text-muted-foreground">Órgão</label>
                     <ComboboxFilter
                       value={filterOrgao}
                       onChange={setFilterOrgao}
@@ -1047,8 +1047,30 @@ export default function LicitacoesPage() {
                       onServerSearch={setOrgaoSearch}
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Data Início</label>
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-medium text-muted-foreground">Vencedor(es)</label>
+                    <ComboboxMultiFilter
+                      values={filterVencedores}
+                      onChange={handleWinnerFilterChange}
+                      options={vencedorOptions}
+                      placeholder="Selecionar vencedores..."
+                      searchPlaceholder="Buscar vencedor..."
+                      isLoading={vencedoresLoading}
+                      onServerSearch={setVencedorSearch}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-medium text-muted-foreground">Estado (UF)</label>
+                    <Select value={filterUf} onValueChange={(v) => setFilterUf(v === "__all__" ? "" : v)}>
+                      <SelectTrigger className="h-9"><SelectValue placeholder="Todos" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all__">Todos</SelectItem>
+                        {UFS.map(uf => <SelectItem key={uf} value={uf}>{uf}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-medium text-muted-foreground">Data Início</label>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button variant="outline" className={cn("h-9 w-full justify-start text-left font-normal", !filterDateFrom && "text-muted-foreground")}>
@@ -1061,8 +1083,8 @@ export default function LicitacoesPage() {
                       </PopoverContent>
                     </Popover>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Data Fim</label>
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-medium text-muted-foreground">Data Fim</label>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button variant="outline" className={cn("h-9 w-full justify-start text-left font-normal", !filterDateTo && "text-muted-foreground")}>
@@ -1075,46 +1097,51 @@ export default function LicitacoesPage() {
                       </PopoverContent>
                     </Popover>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Estado (UF)</label>
-                    <Select value={filterUf} onValueChange={(v) => setFilterUf(v === "__all__" ? "" : v)}>
-                      <SelectTrigger className="h-9"><SelectValue placeholder="Todos" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__all__">Todos</SelectItem>
-                        {UFS.map(uf => <SelectItem key={uf} value={uf}>{uf}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Vencedor(es)</label>
-                    <ComboboxMultiFilter
-                      values={filterVencedores}
-                      onChange={handleWinnerFilterChange}
-                      options={vencedorOptions}
-                      placeholder="Selecionar vencedores..."
-                      searchPlaceholder="Buscar vencedor..."
-                      isLoading={vencedoresLoading}
-                      onServerSearch={setVencedorSearch}
-                    />
-                    {filterVencedores.length > 0 && vencedorStats && (
-                      <div className="flex items-center gap-2 flex-wrap mt-1">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                  {empresaId && (
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-medium text-muted-foreground">Minha atuação</label>
+                      <label
+                        htmlFor="apenas-participei"
+                        className="flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm"
+                      >
+                        <input
+                          id="apenas-participei"
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-border accent-primary cursor-pointer"
+                          checked={filterApenasParticipei}
+                          onChange={(e) => setFilterApenasParticipei(e.target.checked)}
+                        />
+                        <span className="truncate">
+                          Apenas onde participei
+                          {minhasParticipacaoIds && (
+                            <span className="ml-1 text-xs text-muted-foreground">({minhasParticipacaoIds.length})</span>
+                          )}
+                        </span>
+                      </label>
+                    </div>
+                  )}
+                </div>
+
+                {filterVencedores.length > 0 && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {vencedorStats && (
+                      <>
+                        <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
                           <Trophy className="h-3 w-3" />
                           {vencedorStats.totalSum} vitória{vencedorStats.totalSum !== 1 ? "s" : ""} ({filterVencedores.length} empresa{filterVencedores.length > 1 ? "s" : ""})
                         </span>
-                        <span className="inline-flex items-center gap-1 rounded-full bg-success/10 border border-success/20 px-2 py-0.5 text-[10px] font-semibold text-success">
+                        <span className="inline-flex items-center gap-1 rounded-full border border-success/20 bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success">
                           <Award className="h-3 w-3" />
                           Busca em Encerradas / Com Resultado
                         </span>
-                      </div>
+                      </>
                     )}
-                    {filterVencedores.length > 0 && (
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        Ao pesquisar por vencedor, o sistema consulta automaticamente licitações encerradas com resultado.
-                      </p>
-                    )}
+                    <span className="text-[11px] text-muted-foreground">
+                      Ao pesquisar por vencedor, o sistema consulta automaticamente licitações encerradas com resultado.
+                    </span>
                   </div>
-                </div>
+                )}
+
               </motion.div>
             )}
           </AnimatePresence>
