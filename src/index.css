@@ -42,15 +42,17 @@
 
     --radius: 0.85rem;
 
-    /* Sidebar — superfície clara, indigo apenas no estado ativo */
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 222 20% 38%;
-    --sidebar-primary: 222 47% 12%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 234 85% 96%;
-    --sidebar-accent-foreground: 234 85% 45%;
-    --sidebar-border: 220 18% 93%;
-    --sidebar-ring: 234 85% 55%;
+    /* Sidebar — superfície índigo profunda (navy), contraste alto */
+    --sidebar-background: 234 42% 13%;
+    --sidebar-foreground: 226 22% 72%;
+    --sidebar-primary: 0 0% 100%;
+    --sidebar-primary-foreground: 234 45% 12%;
+    --sidebar-accent: 234 60% 22%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 234 32% 22%;
+    --sidebar-ring: 234 85% 65%;
+    --sidebar-muted: 226 18% 58%;
+
 
     /* Custom tokens */
     --success: 152 60% 38%;
