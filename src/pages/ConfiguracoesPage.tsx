@@ -1,5 +1,6 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Settings, Users, Brain } from "lucide-react";
+import PageHeader from "@/components/layout/PageHeader";
 import AIMonitorPage from "./AIMonitorPage";
 import UsuariosPage from "./UsuariosPage";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,14 +14,12 @@ export default function ConfiguracoesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-display text-2xl font-bold text-foreground flex items-center gap-2">
-          <Settings className="h-6 w-6 text-primary" /> Configurações
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Gerencie usuários, perfis de acesso e monitoramento do consumo de IA.
-        </p>
-      </div>
+      <PageHeader
+        title="Configurações"
+        description="Gerencie usuários, perfis de acesso e monitoramento do consumo de IA."
+        icon={<Settings className="h-5 w-5" />}
+      />
+
 
       <Tabs value={tab} onValueChange={(v) => setParams({ tab: v })} className="space-y-4">
         <TabsList>
