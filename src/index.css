@@ -172,7 +172,8 @@
     @apply sticky left-0 z-[5] bg-card;
   }
   .table-sticky thead .table-sticky-col {
-    @apply z-20 bg-secondary;
+    @apply z-30 bg-secondary;
   }
+
 }
 
