@@ -66,7 +66,9 @@ export default {
           accent: "hsl(var(--sidebar-accent))",
           "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
           border: "hsl(var(--sidebar-border))",
+          muted: "hsl(var(--sidebar-muted))",
           ring: "hsl(var(--sidebar-ring))",
+
         },
         success: {
           DEFAULT: "hsl(var(--success))",
