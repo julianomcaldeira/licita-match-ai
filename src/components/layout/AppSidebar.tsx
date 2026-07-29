@@ -116,13 +116,13 @@ export default function AppSidebar({
             <div className="flex flex-1 items-center justify-between animate-fade-in">
               <div>
                 <h1 className="font-display text-[15px] font-bold leading-none text-sidebar-primary">i-pesquisei</h1>
-                <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.12em] text-sidebar-muted">
                   Inteligência B2G
                 </p>
               </div>
               <button
                 onClick={onMobileClose}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-secondary lg:hidden"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-sidebar-muted transition hover:bg-sidebar-accent hover:text-sidebar-accent-foreground lg:hidden"
                 aria-label="Fechar menu"
               >
                 <X className="h-4 w-4" />
@@ -138,7 +138,7 @@ export default function AppSidebar({
               {collapsed ? (
                 <div className="mx-auto mb-2 h-px w-6 bg-sidebar-border" />
               ) : (
-                <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">
+                <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-muted">
                   {group.label}
                 </p>
               )}
@@ -152,14 +152,14 @@ export default function AppSidebar({
                       "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
                       collapsed && "justify-center px-0",
                       isActive
-                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                        : "text-sidebar-foreground hover:bg-secondary hover:text-foreground"
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-[inset_0_1px_0_hsl(0_0%_100%/0.06)]"
+                        : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
                     )}
                   >
                     {isActive && (
-                      <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-primary" />
+                      <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-sidebar-accent-foreground" />
                     )}
-                    <item.icon className={cn("h-[18px] w-[18px] shrink-0", isActive && "text-primary")} />
+                    <item.icon className={cn("h-[18px] w-[18px] shrink-0", isActive && "text-sidebar-accent-foreground")} />
                     {!collapsed && <span className="truncate">{item.name}</span>}
                   </NavLink>
                 );
@@ -182,7 +182,7 @@ export default function AppSidebar({
           <button
             onClick={onToggleCollapse}
             className={cn(
-              "hidden w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-muted-foreground transition hover:bg-secondary hover:text-foreground lg:flex",
+              "hidden w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-sidebar-muted transition hover:bg-sidebar-accent hover:text-sidebar-accent-foreground lg:flex",
               collapsed && "justify-center px-0"
             )}
             aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
@@ -191,8 +191,8 @@ export default function AppSidebar({
             {!collapsed && <span>Recolher</span>}
           </button>
           {!collapsed && (
-            <p className="mt-2 text-center text-[10px] font-medium text-muted-foreground/60">
-              by <span className="font-semibold text-muted-foreground">StartGi</span>
+            <p className="mt-2 text-center text-[10px] font-medium text-sidebar-muted/70">
+              by <span className="font-semibold text-sidebar-foreground">StartGi</span>
             </p>
           )}
         </div>

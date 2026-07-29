@@ -943,16 +943,14 @@ export default function LicitacoesPage() {
 
       {/* Filters */}
       <div className="rounded-xl border border-border bg-card p-4 space-y-4">
-        {/* Row 1: Objeto + Itens + Status */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_auto] gap-4 items-end">
-          <div className="space-y-1">
-            <div className="flex items-center gap-1">
+        {/* Row 1: Objeto + Itens + Status — grid 12 col, tudo h-9 */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-end">
+          <div className="space-y-1.5 lg:col-span-5">
+            <div className="flex h-4 items-center gap-1">
               <label className="text-xs font-medium text-muted-foreground">Palavra-chave (objeto)</label>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-4 w-4 p-0 hover:bg-transparent">
-                    <span className="text-[10px] text-muted-foreground cursor-help">ⓘ</span>
-                  </Button>
+                  <span className="cursor-help text-[10px] text-muted-foreground">ⓘ</span>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="max-w-xs">
                   <p className="text-xs">Busca no <strong>objeto</strong> (título) da licitação. Ex: "aquisição medicamentos".</p>
@@ -967,14 +965,12 @@ export default function LicitacoesPage() {
               className="h-9"
             />
           </div>
-          <div className="space-y-1">
-            <div className="flex items-center gap-1">
+          <div className="space-y-1.5 lg:col-span-4">
+            <div className="flex h-4 items-center gap-1">
               <label className="text-xs font-medium text-muted-foreground">Itens</label>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-4 w-4 p-0 hover:bg-transparent">
-                    <span className="text-[10px] text-muted-foreground cursor-help">ⓘ</span>
-                  </Button>
+                  <span className="cursor-help text-[10px] text-muted-foreground">ⓘ</span>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="max-w-xs">
                   <p className="text-xs">Busca na <strong>descrição dos itens</strong> da licitação. Use espaços para exigir todas as palavras (AND). Ex: "seringa descartável 5ml".</p>
@@ -992,18 +988,20 @@ export default function LicitacoesPage() {
               />
             </div>
           </div>
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Status</label>
-            <div className="flex flex-wrap gap-1.5">
+          <div className="space-y-1.5 lg:col-span-3">
+            <div className="flex h-4 items-center">
+              <label className="text-xs font-medium text-muted-foreground">Status</label>
+            </div>
+            <div className="flex h-9 items-center gap-1 rounded-lg border border-border bg-secondary/50 p-1">
               {statusOptions.map((opt) => (
                 <button
                   key={opt.value}
                   onClick={() => setFilterSituacao(opt.value)}
                   className={cn(
-                    "rounded-full px-3 py-1.5 text-xs font-medium border transition-colors",
+                    "flex-1 rounded-md px-2 text-xs font-medium leading-7 transition-colors",
                     filterSituacao === opt.value
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-card text-muted-foreground border-border hover:bg-secondary hover:text-foreground"
+                      ? "bg-card text-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
                   )}
                 >
                   {opt.label}
@@ -1012,6 +1010,7 @@ export default function LicitacoesPage() {
             </div>
           </div>
         </div>
+
 
 
 
@@ -1035,9 +1034,9 @@ export default function LicitacoesPage() {
                 transition={{ duration: 0.2 }}
                 className="overflow-hidden"
               >
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-3 pt-3">
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Órgão</label>
+                <div className="mt-3 grid grid-cols-1 items-start gap-4 border-t border-border pt-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-medium text-muted-foreground">Órgão</label>
                     <ComboboxFilter
                       value={filterOrgao}
                       onChange={setFilterOrgao}
@@ -1048,8 +1047,30 @@ export default function LicitacoesPage() {
                       onServerSearch={setOrgaoSearch}
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Data Início</label>
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-medium text-muted-foreground">Vencedor(es)</label>
+                    <ComboboxMultiFilter
+                      values={filterVencedores}
+                      onChange={handleWinnerFilterChange}
+                      options={vencedorOptions}
+                      placeholder="Selecionar vencedores..."
+                      searchPlaceholder="Buscar vencedor..."
+                      isLoading={vencedoresLoading}
+                      onServerSearch={setVencedorSearch}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-medium text-muted-foreground">Estado (UF)</label>
+                    <Select value={filterUf} onValueChange={(v) => setFilterUf(v === "__all__" ? "" : v)}>
+                      <SelectTrigger className="h-9"><SelectValue placeholder="Todos" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all__">Todos</SelectItem>
+                        {UFS.map(uf => <SelectItem key={uf} value={uf}>{uf}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-medium text-muted-foreground">Data Início</label>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button variant="outline" className={cn("h-9 w-full justify-start text-left font-normal", !filterDateFrom && "text-muted-foreground")}>
@@ -1062,8 +1083,8 @@ export default function LicitacoesPage() {
                       </PopoverContent>
                     </Popover>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Data Fim</label>
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-medium text-muted-foreground">Data Fim</label>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button variant="outline" className={cn("h-9 w-full justify-start text-left font-normal", !filterDateTo && "text-muted-foreground")}>
@@ -1076,80 +1097,60 @@ export default function LicitacoesPage() {
                       </PopoverContent>
                     </Popover>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Estado (UF)</label>
-                    <Select value={filterUf} onValueChange={(v) => setFilterUf(v === "__all__" ? "" : v)}>
-                      <SelectTrigger className="h-9"><SelectValue placeholder="Todos" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__all__">Todos</SelectItem>
-                        {UFS.map(uf => <SelectItem key={uf} value={uf}>{uf}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Vencedor(es)</label>
-                    <ComboboxMultiFilter
-                      values={filterVencedores}
-                      onChange={handleWinnerFilterChange}
-                      options={vencedorOptions}
-                      placeholder="Selecionar vencedores..."
-                      searchPlaceholder="Buscar vencedor..."
-                      isLoading={vencedoresLoading}
-                      onServerSearch={setVencedorSearch}
-                    />
-                    {filterVencedores.length > 0 && vencedorStats && (
-                      <div className="flex items-center gap-2 flex-wrap mt-1">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                  {empresaId && (
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-medium text-muted-foreground">Minha atuação</label>
+                      <label
+                        htmlFor="apenas-participei"
+                        className="flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm"
+                      >
+                        <input
+                          id="apenas-participei"
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-border accent-primary cursor-pointer"
+                          checked={filterApenasParticipei}
+                          onChange={(e) => setFilterApenasParticipei(e.target.checked)}
+                        />
+                        <span className="truncate">
+                          Apenas onde participei
+                          {minhasParticipacaoIds && (
+                            <span className="ml-1 text-xs text-muted-foreground">({minhasParticipacaoIds.length})</span>
+                          )}
+                        </span>
+                      </label>
+                    </div>
+                  )}
+                </div>
+
+                {filterVencedores.length > 0 && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {vencedorStats && (
+                      <>
+                        <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
                           <Trophy className="h-3 w-3" />
                           {vencedorStats.totalSum} vitória{vencedorStats.totalSum !== 1 ? "s" : ""} ({filterVencedores.length} empresa{filterVencedores.length > 1 ? "s" : ""})
                         </span>
-                        <span className="inline-flex items-center gap-1 rounded-full bg-success/10 border border-success/20 px-2 py-0.5 text-[10px] font-semibold text-success">
+                        <span className="inline-flex items-center gap-1 rounded-full border border-success/20 bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success">
                           <Award className="h-3 w-3" />
                           Busca em Encerradas / Com Resultado
                         </span>
-                      </div>
+                      </>
                     )}
-                    {filterVencedores.length > 0 && (
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        Ao pesquisar por vencedor, o sistema consulta automaticamente licitações encerradas com resultado.
-                      </p>
-                    )}
+                    <span className="text-[11px] text-muted-foreground">
+                      Ao pesquisar por vencedor, o sistema consulta automaticamente licitações encerradas com resultado.
+                    </span>
                   </div>
-                </div>
+                )}
+
               </motion.div>
             )}
           </AnimatePresence>
         </div>
 
-        {empresaId && (
-          <div className="flex items-center gap-2 pt-2">
-            <input
-              id="apenas-participei"
-              type="checkbox"
-              className="h-4 w-4 rounded border-border accent-primary cursor-pointer"
-              checked={filterApenasParticipei}
-              onChange={(e) => setFilterApenasParticipei(e.target.checked)}
-            />
-            <label htmlFor="apenas-participei" className="text-sm cursor-pointer">
-              Apenas onde participei
-              {minhasParticipacaoIds && (
-                <span className="ml-1 text-xs text-muted-foreground">
-                  ({minhasParticipacaoIds.length})
-                </span>
-              )}
-            </label>
-          </div>
-        )}
-
-
-        {/* Search + Clear buttons */}
-        <div className="flex flex-col-reverse gap-2 pt-3 border-t border-border sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:pt-1">
+        {/* Ações */}
+        <div className="flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
           {hasActiveFilters ? (
-            <Button
-              variant="outline"
-              onClick={handleClearFilters}
-              className="h-10 w-full gap-2 sm:h-9 sm:w-auto"
-            >
+            <Button variant="outline" onClick={handleClearFilters} className="h-9 w-full gap-2 sm:w-auto">
               <X className="h-3.5 w-3.5" />
               Limpar filtros
             </Button>
@@ -1159,12 +1160,13 @@ export default function LicitacoesPage() {
           <Button
             onClick={handleSearch}
             disabled={isFetching}
-            className="h-11 w-full gap-2 px-6 text-sm font-semibold sm:h-9 sm:w-auto sm:text-sm"
+            className="h-9 w-full gap-2 px-6 text-sm font-semibold sm:w-auto"
           >
             {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
             {isFetching ? "Pesquisando..." : "Pesquisar"}
           </Button>
         </div>
+
       </div>
 
       {/* Search loading bar */}
