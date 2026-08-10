@@ -313,11 +313,12 @@ serve(async (req: Request) => {
 
 
   // Hard deadline so we always flush the run log before the platform kills us.
-  const DEADLINE_MS = Number(body.deadlineMs) || 240_000;
+  const DEADLINE_MS = Number(body.deadlineMs) ||
+    (mode === "gaps" ? 110_000 : 240_000);
   const outOfTime = () => Date.now() - startedAt > DEADLINE_MS;
 
   async function runPool<T>(items: T[], worker: (item: T) => Promise<void>) {
-    const size = Math.max(1, Math.min(runtimeParallel, 24));
+    const size = Math.max(1, Math.min(runtimeParallel, 40));
     let cursor = 0;
     const workers = Array.from({ length: size }, async () => {
       while (true) {
