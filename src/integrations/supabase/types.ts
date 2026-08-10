@@ -1006,6 +1006,60 @@ export type Database = {
         }
         Relationships: []
       }
+      ingestao_health_daily: {
+        Row: {
+          created_at: string
+          dia: string
+          email_enviado: boolean
+          erros_24h: number
+          eta_dias: number | null
+          faltando_total: number
+          fila_parada: boolean
+          id: string
+          ingeridas_24h: number
+          pct_cobertura: number
+          problemas: Json
+          severidade: string
+          total_no_sistema: number
+          updated_at: string
+          velocidade_dia: number
+        }
+        Insert: {
+          created_at?: string
+          dia: string
+          email_enviado?: boolean
+          erros_24h?: number
+          eta_dias?: number | null
+          faltando_total?: number
+          fila_parada?: boolean
+          id?: string
+          ingeridas_24h?: number
+          pct_cobertura?: number
+          problemas?: Json
+          severidade?: string
+          total_no_sistema?: number
+          updated_at?: string
+          velocidade_dia?: number
+        }
+        Update: {
+          created_at?: string
+          dia?: string
+          email_enviado?: boolean
+          erros_24h?: number
+          eta_dias?: number | null
+          faltando_total?: number
+          fila_parada?: boolean
+          id?: string
+          ingeridas_24h?: number
+          pct_cobertura?: number
+          problemas?: Json
+          severidade?: string
+          total_no_sistema?: number
+          updated_at?: string
+          velocidade_dia?: number
+        }
+        Relationships: []
+      }
       ingestao_logs: {
         Row: {
           created_at: string
@@ -2046,6 +2100,21 @@ export type Database = {
       increment_siafi_cache_hit: {
         Args: { p_cnpj: string }
         Returns: undefined
+      }
+      ingestao_health_snapshot: {
+        Args: never
+        Returns: {
+          erros_24h: number
+          eta_dias: number
+          faltando_total: number
+          fila_parada: boolean
+          ingeridas_24h: number
+          pct_cobertura: number
+          problemas: Json
+          severidade: string
+          total_no_sistema: number
+          velocidade_dia: number
+        }[]
       }
       ingestion_watchdog: { Args: never; Returns: Json }
       licitacoes_pendentes_winners_count: {
