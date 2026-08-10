@@ -179,7 +179,7 @@ async function processWinners(
   );
 
   let winnersFound = 0;
-  const PARALLEL = runtimeParallel;
+  const PARALLEL = Math.max(2, Math.min(runtimeParallel, 6));
 
   for (let i = 0; i < withResults.length; i += PARALLEL) {
     const batch = withResults.slice(i, i + PARALLEL);
@@ -310,6 +310,24 @@ serve(async (req: Request) => {
   };
 
 
+  // Hard deadline so we always flush the run log before the platform kills us.
+  const DEADLINE_MS = Number(body.deadlineMs) || 240_000;
+  const outOfTime = () => Date.now() - startedAt > DEADLINE_MS;
+
+  async function runPool<T>(items: T[], worker: (item: T) => Promise<void>) {
+    const size = Math.max(1, Math.min(runtimeParallel, 24));
+    let cursor = 0;
+    const workers = Array.from({ length: size }, async () => {
+      while (true) {
+        if (outOfTime()) return;
+        const idx = cursor++;
+        if (idx >= items.length) return;
+        await worker(items[idx]);
+      }
+    });
+    await Promise.all(workers);
+  }
+
   try {
     if (mode === "gaps") {
       const { data: gaps, error } = await supabase.rpc("pncp_gaps_por_orgao_ano", {
@@ -317,7 +335,7 @@ serve(async (req: Request) => {
         p_min_ano: body.minAno ?? 2024,
       });
       if (error) throw new Error(`rpc_gaps: ${error.message}`);
-      for (const g of gaps || []) {
+      await runPool(gaps || [], async (g: any) => {
         runLog.processed++;
         try {
           const r = await ingestCompra(supabase, g.cnpj, g.ano, g.seq);
@@ -334,14 +352,14 @@ serve(async (req: Request) => {
             `${g.cnpj}/${g.ano}/${g.seq}: ${(e as Error).message}`
           );
         }
-      }
+      });
     } else if (mode === "reprocess-winners") {
       const { data: rows, error } = await supabase.rpc(
         "pncp_licitacoes_para_reprocessar",
         { p_limit: limit }
       );
       if (error) throw new Error(`rpc_reprocess: ${error.message}`);
-      for (const r of rows || []) {
+      await runPool(rows || [], async (r: any) => {
         runLog.processed++;
         try {
           const w = await processWinners(supabase, r.id, r.cnpj, r.ano, r.seq);
@@ -349,7 +367,7 @@ serve(async (req: Request) => {
         } catch (e) {
           runLog.errors.push(`${r.numero_controle_pncp}: ${(e as Error).message}`);
         }
-      }
+      });
     } else {
       return new Response(JSON.stringify({ error: "invalid_mode" }), {
         status: 400,
@@ -359,14 +377,15 @@ serve(async (req: Request) => {
 
     // best-effort log
     await supabase.from("ingestao_logs").insert({
-      source: "pncp-fill-gaps",
-      status: runLog.errors.length > 0 ? "partial" : "success",
-      records_processed: runLog.processed,
-      records_inserted: runLog.inserted,
-      details: {
+      fonte: "pncp-fill-gaps",
+      endpoint: `mode=${mode}`,
+      status: runLog.errors.length > 0 ? "partial" : "sucesso",
+      registros_processados: runLog.processed,
+      detalhes: {
         mode,
         limit,
         parallel: runtimeParallel,
+        inserted: runLog.inserted,
         winners: runLog.winners,
         not_found: runLog.notFound,
         errors_sample: runLog.errors.slice(0, 20),
@@ -375,7 +394,6 @@ serve(async (req: Request) => {
         http_5xx: runMetrics.http_5xx,
         fetch_timeouts: runMetrics.fetch_timeouts,
       },
-
     });
 
     return new Response(
