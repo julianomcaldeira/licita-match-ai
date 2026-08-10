@@ -180,6 +180,7 @@ export default function IngestaoMonitorPage() {
         <TabsList>
           <TabsTrigger value="ingestao" className="gap-1.5"><Database className="h-3.5 w-3.5" /> Ingestão</TabsTrigger>
           <TabsTrigger value="cobertura" className="gap-1.5"><Target className="h-3.5 w-3.5" /> Cobertura</TabsTrigger>
+          <TabsTrigger value="varredura" className="gap-1.5"><Radar className="h-3.5 w-3.5" /> Varredura Órgão</TabsTrigger>
           <TabsTrigger value="contratos" className="gap-1.5"><FileText className="h-3.5 w-3.5" /> Contratos</TabsTrigger>
           <TabsTrigger value="analise" className="gap-1.5"><Brain className="h-3.5 w-3.5" /> Auto-Análise IA</TabsTrigger>
           <TabsTrigger value="auditoria" className="gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" /> Auditoria</TabsTrigger>
@@ -189,6 +190,11 @@ export default function IngestaoMonitorPage() {
         <TabsContent value="cobertura">
           <CoberturaTab />
         </TabsContent>
+
+        <TabsContent value="varredura">
+          <VarreduraOrgaoTab />
+        </TabsContent>
+
 
         <TabsContent value="contratos">
           <ContratosIngestaoTab />
