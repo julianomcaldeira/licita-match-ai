@@ -16,7 +16,32 @@ function etaDias(qtd: number) {
   return `${dias} dia${dias > 1 ? "s" : ""}`;
 }
 
+type Resumo = {
+  total_no_sistema: number;
+  gaps: number;
+  orgaos_com_gap: number;
+  homologadas_sem_vencedores: number;
+  faltando_total: number;
+  pct_cobertura: number;
+  ingeridas_24h: number;
+  ingeridas_7d: number;
+  velocidade_dia: number;
+  eta_dias: number | null;
+  ultima_ingestao: string | null;
+};
+
 export function CoberturaTab() {
+  const resumo = useQuery({
+    queryKey: ["cobertura-resumo"],
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)("cobertura_resumo");
+      if (error) throw error;
+      return (data?.[0] ?? null) as Resumo | null;
+    },
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  });
+
   const gaps = useQuery({
     queryKey: ["cobertura-gaps"],
     queryFn: async () => {
