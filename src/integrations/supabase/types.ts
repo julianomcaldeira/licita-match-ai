@@ -1815,6 +1815,22 @@ export type Database = {
           total_licitacoes: number
         }[]
       }
+      cobertura_resumo: {
+        Args: never
+        Returns: {
+          eta_dias: number
+          faltando_total: number
+          gaps: number
+          homologadas_sem_vencedores: number
+          ingeridas_24h: number
+          ingeridas_7d: number
+          orgaos_com_gap: number
+          pct_cobertura: number
+          total_no_sistema: number
+          ultima_ingestao: string
+          velocidade_dia: number
+        }[]
+      }
       compute_indice_startgi: {
         Args: { p_force?: boolean; p_mes: string }
         Returns: {
