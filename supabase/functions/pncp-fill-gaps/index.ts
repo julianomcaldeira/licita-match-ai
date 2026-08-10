@@ -368,6 +368,56 @@ serve(async (req: Request) => {
           runLog.errors.push(`${r.numero_controle_pncp}: ${(e as Error).message}`);
         }
       });
+    } else if (mode === "orgao") {
+      // Varredura direcionada: força um CNPJ/ano na frente da fila.
+      const cnpj = String(body.cnpj || "").replace(/\D/g, "");
+      if (cnpj.length !== 14) throw new Error("cnpj_invalido");
+      const anos: number[] = Array.isArray(body.anos) && body.anos.length
+        ? body.anos.map((a: any) => Number(a)).filter((a: number) => a >= 2021 && a <= 2100)
+        : [Number(body.ano) || new Date().getFullYear()];
+      const seqFrom = Math.max(1, Number(body.seqFrom) || 1);
+      const seqTo = Number(body.seqTo) || 0; // 0 = auto (para em N 404s seguidos)
+      const MAX_MISSES = Math.max(10, Number(body.maxMisses) || 60);
+      const HARD_CAP = Math.min(Number(body.maxSeq) || 3000, 10000);
+
+      for (const ano of anos) {
+        let seq = seqFrom;
+        let consecutiveMisses = 0;
+        while (!outOfTime()) {
+          const batchSize = Math.max(1, Math.min(runtimeParallel, 12));
+          const batch: number[] = [];
+          for (let k = 0; k < batchSize; k++) {
+            const s = seq + k;
+            if (seqTo && s > seqTo) break;
+            if (s > HARD_CAP) break;
+            batch.push(s);
+          }
+          if (batch.length === 0) break;
+          seq += batch.length;
+
+          const results = await Promise.allSettled(
+            batch.map(async (s) => {
+              runLog.processed++;
+              const r = await ingestCompra(supabase, cnpj, ano, s);
+              if (r.ok) {
+                runLog.inserted++;
+                runLog.winners += r.winners;
+                return true;
+              }
+              if (r.note === "not_found_in_pncp") {
+                runLog.notFound++;
+                return false;
+              }
+              if (r.note) runLog.errors.push(`${cnpj}/${ano}/${s}: ${r.note}`);
+              return false;
+            })
+          );
+
+          const anyHit = results.some((r) => r.status === "fulfilled" && r.value === true);
+          consecutiveMisses = anyHit ? 0 : consecutiveMisses + batch.length;
+          if (!seqTo && consecutiveMisses >= MAX_MISSES) break;
+        }
+      }
     } else {
       return new Response(JSON.stringify({ error: "invalid_mode" }), {
         status: 400,
