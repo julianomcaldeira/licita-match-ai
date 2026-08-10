@@ -94,7 +94,8 @@ async function ingestCompra(
   supabase: any,
   cnpj: string,
   ano: number,
-  seq: number
+  seq: number,
+  withWinners = true
 ): Promise<{ ok: boolean; winners: number; note?: string; licitacaoId?: string }> {
   // 1) fetch compra metadata
   const compraUrl = `${PNCP_CONSULTA_URL}/orgaos/${cnpj}/compras/${ano}/${seq}`;
@@ -123,6 +124,7 @@ async function ingestCompra(
   }
 
   const licitacaoId = upserted.id;
+  if (!withWinners) return { ok: true, winners: 0, licitacaoId };
   const winners = await processWinners(supabase, licitacaoId, cnpj, ano, seq);
   return { ok: true, winners, licitacaoId };
 }
