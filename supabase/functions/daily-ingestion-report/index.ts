@@ -60,22 +60,27 @@ serve(async (req) => {
       );
     if (upsertError) throw upsertError;
 
-    // Destinatários: admins centrais com e-mail cadastrado
+    // Destinatário fixo + admins centrais com e-mail cadastrado
+    const DESTINATARIO_PRINCIPAL = "juliano@startgi.com.br";
+
     const { data: roles } = await supabase
       .from("user_roles")
       .select("user_id")
       .eq("role", "admin_central");
 
     const ids = (roles ?? []).map((r: any) => r.user_id);
-    let destinatarios: string[] = [];
+    let destinatarios: string[] = [DESTINATARIO_PRINCIPAL];
     if (ids.length) {
       const { data: perfis } = await supabase
         .from("profiles")
         .select("email")
         .in("user_id", ids);
-      destinatarios = (perfis ?? [])
-        .map((p: any) => p.email)
-        .filter((e: string | null) => !!e);
+      destinatarios = Array.from(
+        new Set([
+          DESTINATARIO_PRINCIPAL,
+          ...(perfis ?? []).map((p: any) => p.email).filter((e: string | null) => !!e),
+        ]),
+      );
     }
 
     const etaTexto =
