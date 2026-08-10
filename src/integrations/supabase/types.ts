@@ -1864,6 +1864,7 @@ export type Database = {
         Returns: {
           eta_dias: number
           faltando_total: number
+          fila_atualizada_em: string
           gaps: number
           homologadas_sem_vencedores: number
           ingeridas_24h: number
