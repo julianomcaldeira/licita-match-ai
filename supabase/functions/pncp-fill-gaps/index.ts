@@ -335,16 +335,32 @@ serve(async (req: Request) => {
     if (mode === "gaps") {
       // Fila persistente: claim rápido por índice (a detecção de lacunas roda
       // em cron separado, fora do caminho crítico).
+      // Nesta fase só gravamos a licitação (1 request por registro) — os
+      // vencedores são resolvidos pelo cron reprocess-winners, o que multiplica
+      // a velocidade de cobertura sem perder a regra de ouro.
+      const withWinners = body.withWinners === true;
       const { data: gaps, error } = await supabase.rpc("claim_gap_batch", {
         p_limit: limit,
       });
       if (error) throw new Error(`claim_gap_batch: ${error.message}`);
+
+      const pendingMarks: any[] = [];
+      const flushMarks = async (force = false) => {
+        if (pendingMarks.length === 0) return;
+        if (!force && pendingMarks.length < 100) return;
+        const batch = pendingMarks.splice(0, pendingMarks.length);
+        const { error: mErr } = await supabase.rpc("mark_gap_results", {
+          p_results: batch,
+        });
+        if (mErr) runLog.errors.push(`mark_gap_results: ${mErr.message}`);
+      };
+
       await runPool(gaps || [], async (g: any) => {
         runLog.processed++;
         let status = "error";
         let errMsg: string | null = null;
         try {
-          const r = await ingestCompra(supabase, g.cnpj, g.ano, g.seq);
+          const r = await ingestCompra(supabase, g.cnpj, g.ano, g.seq, withWinners);
           if (r.ok) {
             runLog.inserted++;
             runLog.winners += r.winners;
@@ -360,14 +376,16 @@ serve(async (req: Request) => {
           errMsg = (e as Error).message;
           runLog.errors.push(`${g.cnpj}/${g.ano}/${g.seq}: ${errMsg}`);
         }
-        await supabase.rpc("mark_gap_result", {
-          p_cnpj: g.cnpj,
-          p_ano: g.ano,
-          p_seq: g.seq,
-          p_status: status,
-          p_error: errMsg,
+        pendingMarks.push({
+          cnpj: g.cnpj,
+          ano: g.ano,
+          seq: g.seq,
+          status,
+          error: errMsg,
         });
+        await flushMarks();
       });
+      await flushMarks(true);
     } else if (mode === "refresh-queue") {
       const { data, error } = await supabase.rpc("refresh_pncp_gap_queue", {
         p_min_ano: body.minAno ?? 2023,
