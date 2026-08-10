@@ -210,6 +210,16 @@ export function CoberturaTab() {
           {fmt(r?.orgaos_com_gap)} órgãos com dados faltando · última licitação gravada:{" "}
           {r?.ultima_ingestao ? new Date(r.ultima_ingestao).toLocaleString("pt-BR") : "—"}
         </p>
+        {!r?.fila_atualizada_em && (
+          <div className="mt-3 flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/10 p-3 text-xs text-foreground">
+            <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-primary" />
+            <span>
+              Mapeamento da fila em andamento (roda a cada 30 min). Os números de lacunas
+              aparecem assim que o primeiro cálculo terminar.
+            </span>
+          </div>
+        )}
+
         {(r?.velocidade_dia ?? 0) < 1000 && (
           <div className="mt-3 flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs text-foreground">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
