@@ -2325,6 +2325,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      mark_gap_results: { Args: { p_results: Json }; Returns: number }
       match_licitacoes_por_keywords: {
         Args: { p_empresa_id: string; p_limit?: number }
         Returns: {
