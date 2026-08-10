@@ -28,6 +28,7 @@ type Resumo = {
   velocidade_dia: number;
   eta_dias: number | null;
   ultima_ingestao: string | null;
+  fila_atualizada_em: string | null;
 };
 
 export function CoberturaTab() {
@@ -45,16 +46,28 @@ export function CoberturaTab() {
   const gaps = useQuery({
     queryKey: ["cobertura-gaps"],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("pncp_gaps_summary", { p_min_ano: 2023 });
-      if (error) throw error;
-      return (data?.[0] ?? { total_gaps: 0, orgaos_com_gap: 0, top_orgaos: [] }) as {
-        total_gaps: number;
-        orgaos_com_gap: number;
-        top_orgaos: Array<{ cnpj: string; ano: number; gaps: number; max_seq: number }>;
+      const [{ data: sum, error: e1 }, { data: top, error: e2 }] = await Promise.all([
+        (supabase.rpc as any)("gap_queue_summary"),
+        (supabase.rpc as any)("gap_queue_top_orgaos", { p_limit: 10 }),
+      ]);
+      if (e1) throw e1;
+      if (e2) throw e2;
+      const s = sum?.[0] ?? { pending: 0, processing: 0, orgaos: 0 };
+      return {
+        total_gaps: Number(s.pending ?? 0) + Number(s.processing ?? 0),
+        orgaos_com_gap: Number(s.orgaos ?? 0),
+        top_orgaos: (top ?? []) as Array<{
+          cnpj: string;
+          ano: number;
+          gaps: number;
+          max_seq: number;
+        }>,
       };
     },
-    staleTime: 5 * 60_000,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
   });
+
 
   const reprocess = useQuery({
     queryKey: ["cobertura-reprocess"],
@@ -197,6 +210,16 @@ export function CoberturaTab() {
           {fmt(r?.orgaos_com_gap)} órgãos com dados faltando · última licitação gravada:{" "}
           {r?.ultima_ingestao ? new Date(r.ultima_ingestao).toLocaleString("pt-BR") : "—"}
         </p>
+        {!r?.fila_atualizada_em && (
+          <div className="mt-3 flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/10 p-3 text-xs text-foreground">
+            <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-primary" />
+            <span>
+              Mapeamento da fila em andamento (roda a cada 30 min). Os números de lacunas
+              aparecem assim que o primeiro cálculo terminar.
+            </span>
+          </div>
+        )}
+
         {(r?.velocidade_dia ?? 0) < 1000 && (
           <div className="mt-3 flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs text-foreground">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />

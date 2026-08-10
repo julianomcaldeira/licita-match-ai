@@ -330,30 +330,51 @@ serve(async (req: Request) => {
 
   try {
     if (mode === "gaps") {
-      const { data: gaps, error } = await supabase.rpc("pncp_gaps_por_orgao_ano", {
+      // Fila persistente: claim rápido por índice (a detecção de lacunas roda
+      // em cron separado, fora do caminho crítico).
+      const { data: gaps, error } = await supabase.rpc("claim_gap_batch", {
         p_limit: limit,
-        p_min_ano: body.minAno ?? 2024,
       });
-      if (error) throw new Error(`rpc_gaps: ${error.message}`);
+      if (error) throw new Error(`claim_gap_batch: ${error.message}`);
       await runPool(gaps || [], async (g: any) => {
         runLog.processed++;
+        let status = "error";
+        let errMsg: string | null = null;
         try {
           const r = await ingestCompra(supabase, g.cnpj, g.ano, g.seq);
           if (r.ok) {
             runLog.inserted++;
             runLog.winners += r.winners;
+            status = "done";
           } else if (r.note === "not_found_in_pncp") {
             runLog.notFound++;
-          } else if (r.note) {
-            runLog.errors.push(`${g.cnpj}/${g.ano}/${g.seq}: ${r.note}`);
+            status = "not_found";
+          } else {
+            errMsg = r.note ?? "unknown";
+            runLog.errors.push(`${g.cnpj}/${g.ano}/${g.seq}: ${errMsg}`);
           }
         } catch (e) {
-          runLog.errors.push(
-            `${g.cnpj}/${g.ano}/${g.seq}: ${(e as Error).message}`
-          );
+          errMsg = (e as Error).message;
+          runLog.errors.push(`${g.cnpj}/${g.ano}/${g.seq}: ${errMsg}`);
         }
+        await supabase.rpc("mark_gap_result", {
+          p_cnpj: g.cnpj,
+          p_ano: g.ano,
+          p_seq: g.seq,
+          p_status: status,
+          p_error: errMsg,
+        });
       });
+    } else if (mode === "refresh-queue") {
+      const { data, error } = await supabase.rpc("refresh_pncp_gap_queue", {
+        p_min_ano: body.minAno ?? 2023,
+      });
+      if (error) throw new Error(`refresh_pncp_gap_queue: ${error.message}`);
+      const row = Array.isArray(data) ? data[0] : data;
+      runLog.processed = Number(row?.inserted ?? 0);
+      runLog.inserted = Number(row?.inserted ?? 0);
     } else if (mode === "reprocess-winners") {
+
       const { data: rows, error } = await supabase.rpc(
         "pncp_licitacoes_para_reprocessar",
         { p_limit: limit }

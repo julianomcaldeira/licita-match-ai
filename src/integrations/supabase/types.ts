@@ -1505,6 +1505,42 @@ export type Database = {
         }
         Relationships: []
       }
+      pncp_gap_queue: {
+        Row: {
+          ano: number
+          attempts: number
+          claimed_at: string | null
+          cnpj: string
+          created_at: string
+          last_error: string | null
+          seq: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          ano: number
+          attempts?: number
+          claimed_at?: string | null
+          cnpj: string
+          created_at?: string
+          last_error?: string | null
+          seq: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          ano?: number
+          attempts?: number
+          claimed_at?: string | null
+          cnpj?: string
+          created_at?: string
+          last_error?: string | null
+          seq?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pncp_raw: {
         Row: {
           chave_origem: string
@@ -1793,6 +1829,14 @@ export type Database = {
           total_vitorias: number
         }[]
       }
+      claim_gap_batch: {
+        Args: { p_limit?: number }
+        Returns: {
+          ano: number
+          cnpj: string
+          seq: number
+        }[]
+      }
       claim_winners_batch: {
         Args: { p_limit?: number }
         Returns: {
@@ -1820,6 +1864,7 @@ export type Database = {
         Returns: {
           eta_dias: number
           faltando_total: number
+          fila_atualizada_em: string
           gaps: number
           homologadas_sem_vencedores: number
           ingeridas_24h: number
@@ -1919,6 +1964,25 @@ export type Database = {
         }[]
       }
       f_unaccent: { Args: { "": string }; Returns: string }
+      gap_queue_summary: {
+        Args: never
+        Returns: {
+          failed: number
+          not_found: number
+          orgaos: number
+          pending: number
+          processing: number
+        }[]
+      }
+      gap_queue_top_orgaos: {
+        Args: { p_limit?: number }
+        Returns: {
+          ano: number
+          cnpj: string
+          gaps: number
+          max_seq: number
+        }[]
+      }
       get_autoscale_state: {
         Args: { p_target: string }
         Returns: {
@@ -2251,6 +2315,16 @@ export type Database = {
           uf: string
         }[]
       }
+      mark_gap_result: {
+        Args: {
+          p_ano: number
+          p_cnpj: string
+          p_error?: string
+          p_seq: number
+          p_status: string
+        }
+        Returns: undefined
+      }
       match_licitacoes_por_keywords: {
         Args: { p_empresa_id: string; p_limit?: number }
         Returns: {
@@ -2304,6 +2378,13 @@ export type Database = {
       refresh_cliente_vinculos: {
         Args: { p_empresa_id?: string }
         Returns: Json
+      }
+      refresh_pncp_gap_queue: {
+        Args: { p_min_ano?: number }
+        Returns: {
+          cleaned: number
+          inserted: number
+        }[]
       }
       refresh_summary_mvs_if_dirty: { Args: never; Returns: Json }
       run_ingestion_audit: { Args: never; Returns: string }
