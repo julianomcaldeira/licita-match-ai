@@ -1011,6 +1011,7 @@ export type Database = {
           created_at: string
           data_fim: string | null
           data_inicio: string | null
+          detalhes: Json
           endpoint: string
           erro: string | null
           fonte: string
@@ -1023,6 +1024,7 @@ export type Database = {
           created_at?: string
           data_fim?: string | null
           data_inicio?: string | null
+          detalhes?: Json
           endpoint: string
           erro?: string | null
           fonte: string
@@ -1035,6 +1037,7 @@ export type Database = {
           created_at?: string
           data_fim?: string | null
           data_inicio?: string | null
+          detalhes?: Json
           endpoint?: string
           erro?: string | null
           fonte?: string

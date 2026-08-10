@@ -55,8 +55,6 @@ Deno.serve(async (req) => {
   const url = `${supabaseUrl}/functions/v1/${target}`;
 
   try {
-    // Fire-and-forget: pg_cron is short-lived; don't block on long ingestions.
-    // We start the request but only wait briefly for the upstream to begin.
     const fetchPromise = fetch(url, {
       method: "POST",
       headers: {
@@ -65,11 +63,21 @@ Deno.serve(async (req) => {
         apikey: serviceKey,
       },
       body: JSON.stringify(payload),
+    }).catch((e) => {
+      console.error(`dispatch ${target} failed:`, e);
+      return null;
     });
 
-    // Wait up to 5s for the request to be accepted, then return.
+    // Keep this isolate alive until the target finishes, otherwise the
+    // in-flight request is killed as soon as we return a response.
+    // deno-lint-ignore no-explicit-any
+    const rt = (globalThis as any).EdgeRuntime;
+    if (rt?.waitUntil) {
+      rt.waitUntil(fetchPromise);
+    }
+
     const result = await Promise.race([
-      fetchPromise.then((r) => ({ status: r.status })),
+      fetchPromise.then((r) => ({ status: r ? r.status : "failed" })),
       new Promise<{ status: string }>((resolve) =>
         setTimeout(() => resolve({ status: "dispatched" }), 5000)
       ),
