@@ -143,10 +143,74 @@ export function CoberturaTab() {
     );
   }
 
+  const r = resumo.data;
+  const pct = r?.pct_cobertura ?? 0;
+  const eta = r?.eta_dias ?? null;
+  const etaTexto =
+    eta == null
+      ? "sem ingestão medida — fila parada"
+      : eta > 730
+        ? `${(eta / 365).toFixed(1)} anos no ritmo atual`
+        : `${fmt(Math.round(eta))} dias no ritmo atual`;
+
   return (
     <div className="space-y-6">
+      {/* Hero: quanto falta */}
+      <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+        <div className="flex flex-wrap items-end justify-between gap-6">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Cobertura da base (PNCP 2023+)
+            </p>
+            <p className="mt-1 font-display text-5xl font-bold text-foreground">
+              {pct.toFixed(1)}%
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {fmt(r?.total_no_sistema)} licitações no sistema ·{" "}
+              <span className="font-semibold text-warning">{fmt(r?.faltando_total)} ainda faltam</span>
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
+            {[
+              ["Faltam buscar", fmt(r?.gaps), "compras não ingeridas"],
+              ["Sem vencedor", fmt(r?.homologadas_sem_vencedores), "homologadas pendentes"],
+              ["Velocidade real", `${fmt(Math.round(r?.velocidade_dia ?? 0))}/dia`, `${fmt(r?.ingeridas_24h)} nas últimas 24h`],
+              ["Previsão", etaTexto, "para zerar a fila"],
+            ].map(([label, value, hint]) => (
+              <div key={String(label)}>
+                <p className="text-xs text-muted-foreground">{label}</p>
+                <p className="font-display text-lg font-bold text-foreground">{value}</p>
+                <p className="text-[11px] text-muted-foreground">{hint}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="mt-5 h-3 w-full overflow-hidden rounded-full bg-secondary">
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${Math.min(pct, 100)}%` }}
+            transition={{ duration: 0.8 }}
+            className="h-full rounded-full bg-primary"
+          />
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {fmt(r?.orgaos_com_gap)} órgãos com dados faltando · última licitação gravada:{" "}
+          {r?.ultima_ingestao ? new Date(r.ultima_ingestao).toLocaleString("pt-BR") : "—"}
+        </p>
+        {(r?.velocidade_dia ?? 0) < 1000 && (
+          <div className="mt-3 flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs text-foreground">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+            <span>
+              Ritmo atual insuficiente para o backlog. Use a aba <strong>Varredura Órgão</strong> para
+              priorizar CNPJs específicos enquanto a fila geral avança.
+            </span>
+          </div>
+        )}
+      </div>
+
       {/* Cards resumo */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+
         {summary.map((c) => (
           <motion.div
             key={c.label}
