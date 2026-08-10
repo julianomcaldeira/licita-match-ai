@@ -4,8 +4,9 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   CheckCircle2, XCircle, AlertTriangle, Clock, Database, Activity,
-  RefreshCw, Loader2, Brain, Building2, Search, ChevronLeft, ChevronRight, FileText, Target,
+  RefreshCw, Loader2, Brain, Building2, Search, ChevronLeft, ChevronRight, FileText, Target, Radar,
 } from "lucide-react";
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
