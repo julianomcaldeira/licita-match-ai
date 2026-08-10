@@ -4,8 +4,9 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   CheckCircle2, XCircle, AlertTriangle, Clock, Database, Activity,
-  RefreshCw, Loader2, Brain, Building2, Search, ChevronLeft, ChevronRight, FileText, Target,
+  RefreshCw, Loader2, Brain, Building2, Search, ChevronLeft, ChevronRight, FileText, Target, Radar,
 } from "lucide-react";
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,6 +16,8 @@ import { IngestaoManualButton } from "@/components/dashboard/IngestaoManualButto
 import { AuditoriaTab } from "@/components/dashboard/AuditoriaTab";
 import { DashboardValidationTab } from "@/components/dashboard/DashboardValidationTab";
 import { CoberturaTab } from "@/components/dashboard/CoberturaTab";
+import { VarreduraOrgaoTab } from "@/components/dashboard/VarreduraOrgaoTab";
+
 
 const LOG_PAGE_SIZE = 20;
 
@@ -180,6 +183,7 @@ export default function IngestaoMonitorPage() {
         <TabsList>
           <TabsTrigger value="ingestao" className="gap-1.5"><Database className="h-3.5 w-3.5" /> Ingestão</TabsTrigger>
           <TabsTrigger value="cobertura" className="gap-1.5"><Target className="h-3.5 w-3.5" /> Cobertura</TabsTrigger>
+          <TabsTrigger value="varredura" className="gap-1.5"><Radar className="h-3.5 w-3.5" /> Varredura Órgão</TabsTrigger>
           <TabsTrigger value="contratos" className="gap-1.5"><FileText className="h-3.5 w-3.5" /> Contratos</TabsTrigger>
           <TabsTrigger value="analise" className="gap-1.5"><Brain className="h-3.5 w-3.5" /> Auto-Análise IA</TabsTrigger>
           <TabsTrigger value="auditoria" className="gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" /> Auditoria</TabsTrigger>
@@ -189,6 +193,11 @@ export default function IngestaoMonitorPage() {
         <TabsContent value="cobertura">
           <CoberturaTab />
         </TabsContent>
+
+        <TabsContent value="varredura">
+          <VarreduraOrgaoTab />
+        </TabsContent>
+
 
         <TabsContent value="contratos">
           <ContratosIngestaoTab />
