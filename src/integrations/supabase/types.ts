@@ -1974,6 +1974,15 @@ export type Database = {
           processing: number
         }[]
       }
+      gap_queue_top_orgaos: {
+        Args: { p_limit?: number }
+        Returns: {
+          ano: number
+          cnpj: string
+          gaps: number
+          max_seq: number
+        }[]
+      }
       get_autoscale_state: {
         Args: { p_target: string }
         Returns: {
