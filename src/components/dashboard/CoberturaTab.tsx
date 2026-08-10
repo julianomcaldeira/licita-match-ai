@@ -28,6 +28,7 @@ type Resumo = {
   velocidade_dia: number;
   eta_dias: number | null;
   ultima_ingestao: string | null;
+  fila_atualizada_em: string | null;
 };
 
 export function CoberturaTab() {
@@ -45,16 +46,28 @@ export function CoberturaTab() {
   const gaps = useQuery({
     queryKey: ["cobertura-gaps"],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("pncp_gaps_summary", { p_min_ano: 2023 });
-      if (error) throw error;
-      return (data?.[0] ?? { total_gaps: 0, orgaos_com_gap: 0, top_orgaos: [] }) as {
-        total_gaps: number;
-        orgaos_com_gap: number;
-        top_orgaos: Array<{ cnpj: string; ano: number; gaps: number; max_seq: number }>;
+      const [{ data: sum, error: e1 }, { data: top, error: e2 }] = await Promise.all([
+        (supabase.rpc as any)("gap_queue_summary"),
+        (supabase.rpc as any)("gap_queue_top_orgaos", { p_limit: 10 }),
+      ]);
+      if (e1) throw e1;
+      if (e2) throw e2;
+      const s = sum?.[0] ?? { pending: 0, processing: 0, orgaos: 0 };
+      return {
+        total_gaps: Number(s.pending ?? 0) + Number(s.processing ?? 0),
+        orgaos_com_gap: Number(s.orgaos ?? 0),
+        top_orgaos: (top ?? []) as Array<{
+          cnpj: string;
+          ano: number;
+          gaps: number;
+          max_seq: number;
+        }>,
       };
     },
-    staleTime: 5 * 60_000,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
   });
+
 
   const reprocess = useQuery({
     queryKey: ["cobertura-reprocess"],
