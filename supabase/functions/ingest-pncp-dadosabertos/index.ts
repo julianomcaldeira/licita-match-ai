@@ -30,8 +30,8 @@ const corsHeaders = {
 const PNCP_CONSULTA = "https://pncp.gov.br/api/consulta/v1";
 const PNCP_DATA = "https://pncp.gov.br/api/pncp/v1";
 const PAGE_SIZE = 500;
-const FETCH_TIMEOUT_MS = 20_000;
-const MAX_RETRIES = 4;
+const FETCH_TIMEOUT_MS = 45_000;
+const MAX_RETRIES = 6;
 const COMPRA_CONCURRENCY = 8;
 const ITEM_CONCURRENCY = 5;
 
@@ -68,7 +68,7 @@ async function fetchJson(url: string): Promise<any> {
     } catch (e) {
       clearTimeout(t);
       lastErr = e;
-      await new Promise((res) => setTimeout(res, 600 * (attempt + 1)));
+      await new Promise((res) => setTimeout(res, 1500 * (attempt + 1)));
     }
   }
   throw lastErr ?? new Error("fetch failed");
