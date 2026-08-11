@@ -2018,6 +2018,10 @@ export type Database = {
         }[]
       }
       f_unaccent: { Args: { "": string }; Returns: string }
+      gap_classify_status: {
+        Args: { p_error: string; p_status: string }
+        Returns: string
+      }
       gap_queue_summary: {
         Args: never
         Returns: {
@@ -2457,6 +2461,13 @@ export type Database = {
         }[]
       }
       refresh_summary_mvs_if_dirty: { Args: never; Returns: Json }
+      requeue_stalled_gaps: {
+        Args: { p_limit?: number; p_stale_minutes?: number }
+        Returns: {
+          requeued_failed: number
+          requeued_processing: number
+        }[]
+      }
       run_ingestion_audit: { Args: never; Returns: string }
       sanitize_keywords: { Args: { p_kw: string[] }; Returns: string[] }
       schedule_auto_ingestion: { Args: { p_force?: boolean }; Returns: Json }
