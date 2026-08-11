@@ -23,7 +23,7 @@ const corsHeaders = {
 
 const PNCP_CONSULTA_URL = "https://pncp.gov.br/api/consulta/v1";
 const PNCP_DATA_URL = "https://pncp.gov.br/api/pncp/v1";
-const FETCH_TIMEOUT_MS = 15_000;
+const FETCH_TIMEOUT_MS = 20_000;
 const MAX_RETRIES = 3;
 
 // Global counters populated during a run and flushed to ingestao_logs.details
@@ -36,11 +36,18 @@ const runMetrics = {
 let runtimeParallel = 10;
 
 
+function backoff(attempt: number, base: number) {
+  const jitter = Math.floor(Math.random() * 400);
+  return base * Math.pow(2, attempt) + jitter;
+}
+
 async function fetchWithTimeout(url: string): Promise<Response> {
   let lastErr: unknown = null;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+    // timeout adaptativo: cada retentativa espera um pouco mais
+    const timeoutMs = FETCH_TIMEOUT_MS + attempt * 10_000;
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
       const resp = await fetch(url, {
         headers: { Accept: "application/json" },
@@ -49,12 +56,14 @@ async function fetchWithTimeout(url: string): Promise<Response> {
       clearTimeout(timer);
       if (resp.status === 429) {
         runMetrics.http_429++;
-        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+        // pressão da fonte: reduz o paralelismo em tempo real
+        runtimeParallel = Math.max(2, Math.floor(runtimeParallel * 0.7));
+        await new Promise((r) => setTimeout(r, backoff(attempt, 1500)));
         continue;
       }
       if (resp.status >= 500) {
         runMetrics.http_5xx++;
-        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+        await new Promise((r) => setTimeout(r, backoff(attempt, 1200)));
         continue;
       }
       return resp;
@@ -62,11 +71,16 @@ async function fetchWithTimeout(url: string): Promise<Response> {
       clearTimeout(timer);
       runMetrics.fetch_timeouts++;
       lastErr = e;
-      await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+      await new Promise((r) => setTimeout(r, backoff(attempt, 800)));
     }
   }
-  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+  throw new Error(
+    lastErr instanceof Error
+      ? `fetch_failed:${lastErr.message || "timeout"}`
+      : `fetch_failed:${String(lastErr ?? "timeout")}`,
+  );
 }
+
 
 
 function mapCompra(c: any) {
