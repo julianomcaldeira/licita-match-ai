@@ -2018,6 +2018,19 @@ export type Database = {
         }[]
       }
       f_unaccent: { Args: { "": string }; Returns: string }
+      fontes_health: {
+        Args: never
+        Returns: {
+          erros_24h: number
+          execucoes_24h: number
+          fonte: string
+          horas_desde_sucesso: number
+          registros_24h: number
+          severidade: string
+          ultima_execucao: string
+          ultimo_sucesso: string
+        }[]
+      }
       gap_classify_status: {
         Args: { p_error: string; p_status: string }
         Returns: string
@@ -2468,6 +2481,15 @@ export type Database = {
         Returns: {
           cleaned: number
           inserted: number
+        }[]
+      }
+      refresh_pncp_gap_queue_adaptive: {
+        Args: { p_max_pending?: number }
+        Returns: {
+          cleaned: number
+          inserted: number
+          pending_before: number
+          ran: boolean
         }[]
       }
       refresh_summary_mvs_if_dirty: { Args: never; Returns: Json }
