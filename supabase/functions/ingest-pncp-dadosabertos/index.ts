@@ -472,6 +472,51 @@ Deno.serve(async (req) => {
       );
     }
 
+    // mode "dia": ingere UM único dia de contratos e marca a fila diária.
+    // Janela curta = nunca estoura CPU/tempo, garantindo cobertura dia a dia.
+    if (mode === "dia") {
+      const dia = String(body.dia || "");
+      if (!/^\d{8}$/.test(dia)) {
+        return new Response(JSON.stringify({ error: "dia YYYYMMDD required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const diaIso = `${dia.slice(0, 4)}-${dia.slice(4, 6)}-${dia.slice(6, 8)}`;
+      try {
+        const win = await ingestContratosWindow(supabase, dia, dia);
+        const ok = win.errors.length === 0;
+        await supabase.rpc("mark_contratos_dia", {
+          p_dia: diaIso,
+          p_status: ok ? "done" : "pending",
+          p_contratos: win.contratos,
+          p_error: win.errors.slice(0, 2).join(" | ") || null,
+        });
+        await logRun(
+          supabase,
+          `contratos/dia`,
+          ok ? "sucesso" : "parcial",
+          win.contratos,
+          dia,
+          dia,
+          win.errors.slice(0, 2).join(" | ") || undefined,
+        );
+        return new Response(JSON.stringify({ ok, mode, dia, ...win }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        await supabase.rpc("mark_contratos_dia", {
+          p_dia: diaIso,
+          p_status: "pending",
+          p_contratos: 0,
+          p_error: msg,
+        });
+        throw e;
+      }
+    }
+
+
     let dataInicial: string;
     let dataFinal: string;
 

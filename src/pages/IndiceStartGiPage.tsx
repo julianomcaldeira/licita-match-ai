@@ -68,6 +68,21 @@ export default function IndiceStartGiPage() {
     [data, mes]
   );
 
+  // Cobertura real de contratos do mês (fila diária de ingestão)
+  const [cobertura, setCobertura] = useState<{
+    dias_total: number; dias_ok: number; dias_pendentes: number;
+    pct_cobertura: number; contratos_mes: number; confiavel: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const { data: cov } = await (supabase as any).rpc("indice_cobertura_mes", { p_mes: mes });
+      if (alive) setCobertura((cov as any)?.[0] ?? null);
+    })();
+    return () => { alive = false; };
+  }, [mes]);
+
   const handleGerar = async () => {
     setGenerating(true);
     const { data: row, error } = await supabase.rpc("compute_indice_startgi", {
@@ -78,7 +93,13 @@ export default function IndiceStartGiPage() {
       toast.error("Falha ao gerar índice", { description: error.message });
       return;
     }
-    toast.success("Índice atualizado", { description: mesLabel(mes) });
+    if (cobertura && !cobertura.confiavel) {
+      toast.warning("Mês com ingestão incompleta", {
+        description: `Cobertura de ${cobertura.pct_cobertura}% dos dias — o valor tende a subir conforme a ingestão avança.`,
+      });
+    } else {
+      toast.success("Índice atualizado", { description: mesLabel(mes) });
+    }
     setData((prev) => {
       const r = row as any as IndiceData;
       const idx = prev.findIndex((p) => p.mes_referencia === r.mes_referencia);
@@ -86,6 +107,7 @@ export default function IndiceStartGiPage() {
       const next = [...prev]; next[idx] = r; return next;
     });
   };
+
 
   const exportPng = async (variant: "feed" | "story") => {
     const node = (variant === "feed" ? feedRef : storyRef).current;
@@ -232,8 +254,28 @@ export default function IndiceStartGiPage() {
               )}
             </div>
           )}
+          {cobertura && (
+            <div className="w-full">
+              {cobertura.confiavel ? (
+                <p className="text-xs text-muted-foreground">
+                  Cobertura de ingestão do mês: 100% dos dias ({cobertura.contratos_mes.toLocaleString("pt-BR")} contratos).
+                </p>
+              ) : (
+                <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                  <span>
+                    <strong>Mês ainda incompleto na base.</strong>{" "}
+                    {cobertura.pct_cobertura}% dos dias ingeridos ({cobertura.dias_ok}/{cobertura.dias_total}) —
+                    {" "}{cobertura.contratos_mes.toLocaleString("pt-BR")} contratos até agora. O índice gerado agora
+                    ficará subestimado; aguarde a fila de ingestão concluir os {cobertura.dias_pendentes} dia(s) restantes.
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
+
 
       {/* Seção 2 — Preview e Exportação */}
       <div className="grid lg:grid-cols-[1fr_360px] gap-6">
