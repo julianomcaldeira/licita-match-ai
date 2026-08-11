@@ -2441,6 +2441,16 @@ export type Database = {
           seq: number
         }[]
       }
+      pncp_licitacoes_sem_itens_para_ingestao: {
+        Args: { p_limit?: number }
+        Returns: {
+          ano: number
+          cnpj: string
+          id: string
+          numero_controle_pncp: string
+          seq: number
+        }[]
+      }
       pncp_reprocess_summary: {
         Args: never
         Returns: {

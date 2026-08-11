@@ -428,6 +428,27 @@ serve(async (req: Request) => {
           runLog.errors.push(`${r.numero_controle_pncp}: ${(e as Error).message}`);
         }
       });
+    } else if (mode === "backfill-itens") {
+      // Preenche itens de licitações que não têm nenhum item cadastrado
+      // (inclusive as não homologadas), garantindo cobertura do filtro por item.
+      const { data: rows, error } = await supabase.rpc(
+        "pncp_licitacoes_sem_itens_para_ingestao",
+        { p_limit: limit },
+      );
+      if (error) throw new Error(`rpc_backfill_itens: ${error.message}`);
+      await runPool(rows || [], async (r: any) => {
+        runLog.processed++;
+        try {
+          const w = await processWinners(supabase, r.id, r.cnpj, r.ano, r.seq);
+          runLog.winners += w;
+          runLog.inserted++;
+        } catch (e) {
+          const raw = e instanceof Error ? e.message : String(e);
+          runLog.errors.push(
+            `${r.numero_controle_pncp}: ${raw || "erro_desconhecido"}`,
+          );
+        }
+      });
     } else if (mode === "orgao") {
       // Varredura direcionada: força um CNPJ/ano na frente da fila.
       const cnpj = String(body.cnpj || "").replace(/\D/g, "");
