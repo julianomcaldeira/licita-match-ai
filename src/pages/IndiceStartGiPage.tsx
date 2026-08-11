@@ -273,6 +273,14 @@ export default function IndiceStartGiPage() {
               )}
             </div>
           )}
+          {selected && Number((selected as any).outliers_excluidos ?? 0) > 0 && (
+            <p className="w-full text-xs text-muted-foreground">
+              {Number((selected as any).outliers_excluidos)} contrato(s) com valor
+              inconsistente na fonte oficial foram descartados do cálculo (acima de{" "}
+              {formatBRL(Number((selected as any).teto_outlier ?? 0))}), somando{" "}
+              {formatBRL(Number((selected as any).valor_outliers ?? 0))}.
+            </p>
+          )}
         </CardContent>
       </Card>
 
