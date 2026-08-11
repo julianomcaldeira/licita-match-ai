@@ -481,6 +481,36 @@ export type Database = {
           },
         ]
       }
+      contratos_dia_queue: {
+        Row: {
+          attempts: number
+          claimed_at: string | null
+          contratos: number
+          dia: string
+          last_error: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          claimed_at?: string | null
+          contratos?: number
+          dia: string
+          last_error?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          claimed_at?: string | null
+          contratos?: number
+          dia?: string
+          last_error?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       creditos_movimentos: {
         Row: {
           created_at: string
@@ -1969,6 +1999,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      contratos_dia_tick: { Args: { p_limit?: number }; Returns: Json }
       contratos_para_ingestao_empenhos: {
         Args: { p_limit?: number; p_only_clientes?: boolean }
         Returns: {
@@ -1986,6 +2017,14 @@ export type Database = {
         Returns: {
           dia: string
           total: number
+        }[]
+      }
+      contratos_queue_summary: {
+        Args: never
+        Returns: {
+          contratos: number
+          dias: number
+          status: string
         }[]
       }
       contratos_stats: {
@@ -2117,6 +2156,17 @@ export type Database = {
       increment_siafi_cache_hit: {
         Args: { p_cnpj: string }
         Returns: undefined
+      }
+      indice_cobertura_mes: {
+        Args: { p_mes: string }
+        Returns: {
+          confiavel: boolean
+          contratos_mes: number
+          dias_ok: number
+          dias_pendentes: number
+          dias_total: number
+          pct_cobertura: number
+        }[]
       }
       ingestao_health_snapshot: {
         Args: never
@@ -2401,6 +2451,15 @@ export type Database = {
           uf: string
         }[]
       }
+      mark_contratos_dia: {
+        Args: {
+          p_contratos?: number
+          p_dia: string
+          p_error?: string
+          p_status: string
+        }
+        Returns: undefined
+      }
       mark_gap_result: {
         Args: {
           p_ano: number
@@ -2474,6 +2533,10 @@ export type Database = {
       refresh_all_mvs: { Args: never; Returns: undefined }
       refresh_cliente_vinculos: {
         Args: { p_empresa_id?: string }
+        Returns: Json
+      }
+      refresh_contratos_dia_queue: {
+        Args: { p_recent_days?: number }
         Returns: Json
       }
       refresh_pncp_gap_queue: {
