@@ -958,7 +958,9 @@ export type Database = {
           maior_contrato_valor: number | null
           mes_referencia: string
           orgaos_unicos: number | null
+          outliers_excluidos: number
           segmentos_detalhe: Json
+          teto_outlier: number | null
           ticket_medio: number | null
           top_fornecedor_nome: string | null
           top_fornecedor_valor: number | null
@@ -968,6 +970,7 @@ export type Database = {
           top_orgao_valor: number | null
           ultima_atualizacao: string
           updated_at: string
+          valor_outliers: number
           valor_total_brl: number
           valor_total_brl_anterior: number | null
           variacao_mom: number | null
@@ -988,7 +991,9 @@ export type Database = {
           maior_contrato_valor?: number | null
           mes_referencia: string
           orgaos_unicos?: number | null
+          outliers_excluidos?: number
           segmentos_detalhe?: Json
+          teto_outlier?: number | null
           ticket_medio?: number | null
           top_fornecedor_nome?: string | null
           top_fornecedor_valor?: number | null
@@ -998,6 +1003,7 @@ export type Database = {
           top_orgao_valor?: number | null
           ultima_atualizacao?: string
           updated_at?: string
+          valor_outliers?: number
           valor_total_brl?: number
           valor_total_brl_anterior?: number | null
           variacao_mom?: number | null
@@ -1018,7 +1024,9 @@ export type Database = {
           maior_contrato_valor?: number | null
           mes_referencia?: string
           orgaos_unicos?: number | null
+          outliers_excluidos?: number
           segmentos_detalhe?: Json
+          teto_outlier?: number | null
           ticket_medio?: number | null
           top_fornecedor_nome?: string | null
           top_fornecedor_valor?: number | null
@@ -1028,6 +1036,7 @@ export type Database = {
           top_orgao_valor?: number | null
           ultima_atualizacao?: string
           updated_at?: string
+          valor_outliers?: number
           valor_total_brl?: number
           valor_total_brl_anterior?: number | null
           variacao_mom?: number | null
@@ -1976,7 +1985,9 @@ export type Database = {
           maior_contrato_valor: number | null
           mes_referencia: string
           orgaos_unicos: number | null
+          outliers_excluidos: number
           segmentos_detalhe: Json
+          teto_outlier: number | null
           ticket_medio: number | null
           top_fornecedor_nome: string | null
           top_fornecedor_valor: number | null
@@ -1986,6 +1997,7 @@ export type Database = {
           top_orgao_valor: number | null
           ultima_atualizacao: string
           updated_at: string
+          valor_outliers: number
           valor_total_brl: number
           valor_total_brl_anterior: number | null
           variacao_mom: number | null
@@ -2338,7 +2350,9 @@ export type Database = {
           maior_contrato_valor: number | null
           mes_referencia: string
           orgaos_unicos: number | null
+          outliers_excluidos: number
           segmentos_detalhe: Json
+          teto_outlier: number | null
           ticket_medio: number | null
           top_fornecedor_nome: string | null
           top_fornecedor_valor: number | null
@@ -2348,6 +2362,7 @@ export type Database = {
           top_orgao_valor: number | null
           ultima_atualizacao: string
           updated_at: string
+          valor_outliers: number
           valor_total_brl: number
           valor_total_brl_anterior: number | null
           variacao_mom: number | null
