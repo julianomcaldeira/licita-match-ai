@@ -41,9 +41,18 @@ function backoff(attempt: number, base: number) {
   return base * Math.pow(2, attempt) + jitter;
 }
 
+// Cooldown global: quando o PNCP responde 429, todas as tarefas do run
+// esperam até este timestamp antes de disparar novas requisições.
+let throttleUntil = 0;
+async function waitForThrottle() {
+  const wait = throttleUntil - Date.now();
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+}
+
 async function fetchWithTimeout(url: string): Promise<Response> {
   let lastErr: unknown = null;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    await waitForThrottle();
     const ctrl = new AbortController();
     // timeout adaptativo: cada retentativa espera um pouco mais
     const timeoutMs = FETCH_TIMEOUT_MS + attempt * 10_000;
@@ -56,9 +65,14 @@ async function fetchWithTimeout(url: string): Promise<Response> {
       clearTimeout(timer);
       if (resp.status === 429) {
         runMetrics.http_429++;
-        // pressão da fonte: reduz o paralelismo em tempo real
-        runtimeParallel = Math.max(2, Math.floor(runtimeParallel * 0.7));
-        await new Promise((r) => setTimeout(r, backoff(attempt, 1500)));
+        // pressão da fonte: reduz o paralelismo e aplica cooldown global
+        runtimeParallel = Math.max(2, Math.floor(runtimeParallel * 0.6));
+        const retryAfter = Number(resp.headers.get("retry-after"));
+        const waitMs = Number.isFinite(retryAfter) && retryAfter > 0
+          ? Math.min(retryAfter * 1000, 20_000)
+          : backoff(attempt, 2500);
+        throttleUntil = Math.max(throttleUntil, Date.now() + waitMs);
+        await waitForThrottle();
         continue;
       }
       if (resp.status >= 500) {
@@ -80,6 +94,7 @@ async function fetchWithTimeout(url: string): Promise<Response> {
       : `fetch_failed:${String(lastErr ?? "timeout")}`,
   );
 }
+
 
 
 
