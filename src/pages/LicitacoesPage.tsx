@@ -1380,7 +1380,7 @@ export default function LicitacoesPage() {
                         <th className="px-4 py-3 text-right font-medium text-muted-foreground">
                           <Tooltip>
                             <TooltipTrigger asChild><span className="cursor-help border-b border-dotted border-muted-foreground/40">Empenhado</span></TooltipTrigger>
-                            <TooltipContent side="bottom" className="max-w-xs"><p className="text-xs">Valor já comprometido pelo órgão via empenho (Portal da Transparência — federal). Só populado para contratos de fornecedores cadastrados como clientes.</p></TooltipContent>
+                            <TooltipContent side="bottom" className="max-w-xs"><p className="text-xs">Valor já comprometido pelo órgão via empenho. Fonte oficial disponível apenas para órgãos federais; estaduais e municipais aparecem como <strong>n/d</strong> (sem fonte pública), não como ausência de execução.</p></TooltipContent>
                           </Tooltip>
                         </th>
                         <th className="px-4 py-3 text-left font-medium text-muted-foreground">Vencedor</th>
@@ -1461,7 +1461,20 @@ export default function LicitacoesPage() {
                                   </TooltipContent>
                                 </Tooltip>
                               ) : (
-                                <span className="text-muted-foreground">—</span>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="text-muted-foreground text-xs cursor-help border-b border-dotted border-muted-foreground/40">
+                                      n/d
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="left" className="max-w-xs">
+                                    <p className="text-xs">
+                                      Empenho não disponível. A execução orçamentária só é publicada de forma
+                                      aberta para órgãos federais (SIAFE/União). Órgãos estaduais e municipais
+                                      não expõem esse dado — ausência aqui não significa que não houve empenho.
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
                               )}
                             </td>
                             <td className="px-4 py-3 max-w-[200px]" onClick={(e) => e.stopPropagation()}>
