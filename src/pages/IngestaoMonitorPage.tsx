@@ -17,6 +17,7 @@ import { AuditoriaTab } from "@/components/dashboard/AuditoriaTab";
 import { DashboardValidationTab } from "@/components/dashboard/DashboardValidationTab";
 import { CoberturaTab } from "@/components/dashboard/CoberturaTab";
 import { VarreduraOrgaoTab } from "@/components/dashboard/VarreduraOrgaoTab";
+import { FontesHealthTab } from "@/components/dashboard/FontesHealthTab";
 
 
 const LOG_PAGE_SIZE = 20;
