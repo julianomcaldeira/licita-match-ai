@@ -382,12 +382,16 @@ serve(async (req: Request) => {
           } else if (r.note === "not_found_in_pncp") {
             runLog.notFound++;
             status = "not_found";
+            errMsg = "not_found_in_pncp";
           } else {
-            errMsg = r.note ?? "unknown";
+            errMsg = String(r.note ?? "erro_desconhecido");
             runLog.errors.push(`${g.cnpj}/${g.ano}/${g.seq}: ${errMsg}`);
           }
         } catch (e) {
-          errMsg = (e as Error).message;
+          const raw = e instanceof Error ? e.message : String(e);
+          errMsg = raw && raw !== "null" && raw !== "undefined"
+            ? raw
+            : "erro_desconhecido";
           runLog.errors.push(`${g.cnpj}/${g.ano}/${g.seq}: ${errMsg}`);
         }
         pendingMarks.push({
