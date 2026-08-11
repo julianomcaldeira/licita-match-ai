@@ -2464,6 +2464,7 @@ export type Database = {
       requeue_stalled_gaps: {
         Args: { p_limit?: number; p_stale_minutes?: number }
         Returns: {
+          closed_terminal: number
           requeued_failed: number
           requeued_processing: number
         }[]
