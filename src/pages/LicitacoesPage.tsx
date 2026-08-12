@@ -127,7 +127,7 @@ function StatusBadge({ situacao, hasWinner, valorHomologado }: { situacao: strin
     ? "bg-destructive/10 text-destructive border-destructive/20"
     : "bg-muted text-muted-foreground border-border";
   return (
-    <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${color}`}>
+    <span className={`inline-flex items-center whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-medium ${color}`}>
       {displayStatus || "—"}
     </span>
   );
@@ -1245,29 +1245,29 @@ export default function LicitacoesPage() {
               <table className="table-sticky">
                 <thead>
                   <tr className="border-b border-border bg-secondary/50">
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground w-16"></th>
-                    <th className="table-sticky-col px-4 py-3 text-left font-medium text-muted-foreground">Órgão</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Objeto</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Modalidade</th>
-                    <th className="px-4 py-3 text-right font-medium text-muted-foreground">Valor Est.</th>
+                    <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-16"></th>
+                    <th className="table-sticky-col px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Órgão</th>
+                    <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Objeto</th>
+                    <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Modalidade</th>
+                    <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Valor Est.</th>
                     {activeTab === "encerradas" && (
                       <>
-                        <th className="px-4 py-3 text-right font-medium text-muted-foreground">Val. Homologado</th>
-                        <th className="px-4 py-3 text-right font-medium text-muted-foreground">Economia</th>
-                        <th className="px-4 py-3 text-right font-medium text-muted-foreground">
+                        <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Val. Homologado</th>
+                        <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Economia</th>
+                        <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                           <Tooltip>
                             <TooltipTrigger asChild><span className="cursor-help border-b border-dotted border-muted-foreground/40">Empenhado</span></TooltipTrigger>
                             <TooltipContent side="bottom" className="max-w-xs"><p className="text-xs">Valor já comprometido pelo órgão via empenho. Fonte oficial disponível apenas para órgãos federais; estaduais e municipais aparecem como <strong>n/d</strong> (sem fonte pública), não como ausência de execução.</p></TooltipContent>
                           </Tooltip>
                         </th>
-                        <th className="px-4 py-3 text-left font-medium text-muted-foreground">Vencedor</th>
+                        <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Vencedor</th>
                       </>
                     )}
                     {activeTab === "abertas" && (
-                      <th className="px-4 py-3 text-center font-medium text-muted-foreground">Situação</th>
+                      <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Situação</th>
                     )}
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Data</th>
-                    <th className="px-4 py-3 text-center font-medium text-muted-foreground">UF</th>
+                    <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Data</th>
+                    <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-muted-foreground">UF</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1291,12 +1291,13 @@ export default function LicitacoesPage() {
                         <td className="table-sticky-col px-4 py-3 font-medium text-foreground max-w-[220px]">
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <span className="block truncate">
+                              <span className="flex min-w-0 items-center gap-1">
                                 {pncpLink ? (
-                                  <a href={pncpLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="flex items-center gap-1 text-primary hover:underline">
-                                    {row.orgao} <ExternalLink className="h-3 w-3 shrink-0" />
+                                  <a href={pncpLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="flex min-w-0 items-center gap-1 text-primary hover:underline">
+                                    <span className="truncate">{row.orgao}</span>
+                                    <ExternalLink className="h-3 w-3 shrink-0" />
                                   </a>
-                                ) : row.orgao}
+                                ) : <span className="truncate">{row.orgao}</span>}
                               </span>
                             </TooltipTrigger>
                             <TooltipContent side="bottom" className="max-w-sm"><p>{row.orgao}</p></TooltipContent>
@@ -1308,8 +1309,8 @@ export default function LicitacoesPage() {
                             <TooltipContent side="bottom" className="max-w-md"><p className="text-xs leading-relaxed">{row.objeto}</p></TooltipContent>
                           </Tooltip>
                         </td>
-                        <td className="px-4 py-3 text-muted-foreground text-xs">{row.modalidade || "—"}</td>
-                        <td className="px-4 py-3 text-right font-medium text-foreground tabular-nums">{formatCurrency(row.valor_estimado)}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-muted-foreground text-xs">{row.modalidade || "—"}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-foreground tabular-nums">{formatCurrency(row.valor_estimado)}</td>
                         {activeTab === "encerradas" && (
                           <>
                             <td className="px-4 py-3 text-right font-medium text-success tabular-nums">{row.valor_homologado ? formatCurrency(row.valor_homologado) : "—"}</td>
@@ -1374,7 +1375,7 @@ export default function LicitacoesPage() {
                             <StatusBadge situacao={row.situacao} valorHomologado={row.valor_homologado} />
                           </td>
                         )}
-                        <td className="px-4 py-3 text-muted-foreground text-xs">{formattedDate}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-muted-foreground text-xs">{formattedDate}</td>
                         <td className="px-4 py-3 text-center text-muted-foreground text-xs font-medium">{row.uf || "—"}</td>
                       </tr>
                     );
