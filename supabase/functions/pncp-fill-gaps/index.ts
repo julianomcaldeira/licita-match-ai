@@ -284,7 +284,7 @@ async function authenticateRequest(req: Request, supabase: any): Promise<
   return { ok: true };
 }
 
-serve(async (req: Request) => {
+const handler = async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
