@@ -81,6 +81,49 @@ async function fetchJson(url: string, opts: { deadline?: number } = {}): Promise
   throw lastErr ?? new Error("fetch failed");
 }
 
+// ---- Circuit breaker (fonte PNCP /consulta/v1/contratos) -------------------
+// Falhas 503/504/timeout/abort abrem o circuito; retomada automatica com
+// backoff progressivo controlado no banco (public.pncp_circuit).
+const CIRCUIT_SOURCE = "contratos";
+
+function isSourceOutage(msg: string): boolean {
+  const m = (msg || "").toLowerCase();
+  return (
+    m.includes("abort") ||
+    m.includes("timeout") ||
+    m.includes("timed out") ||
+    m.includes("http 429") ||
+    /http 5\d\d/.test(m) ||
+    m.includes("error sending request") ||
+    m.includes("connection")
+  );
+}
+
+async function circuitAllow(supabase: any): Promise<{ allowed: boolean; retryAt: string | null }> {
+  const { data, error } = await supabase.rpc("pncp_circuit_allow", { p_source: CIRCUIT_SOURCE });
+  if (error) return { allowed: true, retryAt: null };
+  if (data === false) {
+    const { data: st } = await supabase
+      .from("pncp_circuit")
+      .select("open_until")
+      .eq("source", CIRCUIT_SOURCE)
+      .maybeSingle();
+    return { allowed: false, retryAt: st?.open_until ?? null };
+  }
+  return { allowed: true, retryAt: null };
+}
+
+async function circuitReport(supabase: any, ok: boolean, reason?: string | null) {
+  try {
+    await supabase.rpc("pncp_circuit_report", {
+      p_source: CIRCUIT_SOURCE,
+      p_ok: ok,
+      p_reason: reason ? String(reason).slice(0, 300) : null,
+    });
+  } catch (_) { /* best-effort */ }
+}
+
+
 
 interface ContratoApi {
   numeroControlePNCP: string;
@@ -520,6 +563,24 @@ Deno.serve(async (req) => {
       }
       const startPage = Math.max(1, Number(body.paginaInicial) || 1);
       const diaIso = `${dia.slice(0, 4)}-${dia.slice(4, 6)}-${dia.slice(6, 8)}`;
+
+      // circuit breaker: se o PNCP esta fora, nem tentamos
+      const gate = await circuitAllow(supabase);
+      if (!gate.allowed) {
+        await supabase.rpc("mark_contratos_dia", {
+          p_dia: diaIso,
+          p_status: "pending",
+          p_contratos: 0,
+          p_error: "circuit_open",
+          p_pagina: startPage,
+          p_acumula: false,
+        });
+        return new Response(
+          JSON.stringify({ ok: false, mode, dia, skipped: "circuit_open", retryAt: gate.retryAt }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
       let reportado = 0;
       try {
         const win = await ingestContratosWindow(supabase, dia, dia, {
@@ -541,6 +602,14 @@ Deno.serve(async (req) => {
         });
         const finished = win.nextPage === null;
         const ok = finished && win.errors.length === 0;
+
+        const outage = win.errors.some((e) => isSourceOutage(e));
+        if (outage) {
+          await circuitReport(supabase, false, win.errors[0]);
+        } else if (win.pages > 0 || finished) {
+          await circuitReport(supabase, true);
+        }
+
         await supabase.rpc("mark_contratos_dia", {
           p_dia: diaIso,
           p_status: ok ? "done" : "pending",
@@ -564,6 +633,7 @@ Deno.serve(async (req) => {
         });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
+        if (isSourceOutage(msg)) await circuitReport(supabase, false, msg);
         await supabase.rpc("mark_contratos_dia", {
           p_dia: diaIso,
           p_status: "pending",
@@ -574,6 +644,7 @@ Deno.serve(async (req) => {
         });
         throw e;
       }
+
     }
 
 
@@ -610,7 +681,19 @@ Deno.serve(async (req) => {
     }
 
     // 1) Walk contratos for window
+    const gateWin = await circuitAllow(supabase);
+    if (!gateWin.allowed) {
+      return new Response(
+        JSON.stringify({ ok: false, mode, skipped: "circuit_open", retryAt: gateWin.retryAt }),
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
     const win = await ingestContratosWindow(supabase, dataInicial, dataFinal);
+    if (win.errors.some((e) => isSourceOutage(e))) {
+      await circuitReport(supabase, false, win.errors[0]);
+    } else {
+      await circuitReport(supabase, true);
+    }
 
     // 2) For each unique compra discovered, fetch items + resultados
     // (We re-extract from pncp_raw rows just inserted)

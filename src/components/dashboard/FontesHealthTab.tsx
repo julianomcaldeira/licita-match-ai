@@ -28,6 +28,55 @@ const SEV = {
   critico: { label: "Crítico", icon: XCircle, cls: "bg-destructive/10 text-destructive border-destructive/30" },
 } as const;
 
+function CircuitCard() {
+  const { data } = useQuery({
+    queryKey: ["pncp-circuit"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("pncp_circuit_status");
+      if (error) throw error;
+      return (data || []) as {
+        source: string; state: string; failures: number; trips: number;
+        open_until: string | null; last_reason: string | null;
+      }[];
+    },
+    refetchInterval: 30000,
+  });
+
+  if (!data?.length) return null;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm">Circuit breaker do PNCP</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {data.map((c) => (
+          <div key={c.source} className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="font-medium">{c.source}</span>
+            <Badge
+              variant="outline"
+              className={
+                c.state === "open"
+                  ? SEV.critico.cls
+                  : c.state === "half_open"
+                  ? SEV.atencao.cls
+                  : SEV.ok.cls
+              }
+            >
+              {c.state === "open" ? "Pausado" : c.state === "half_open" ? "Sondando" : "Ativo"}
+            </Badge>
+            <span className="text-muted-foreground">
+              falhas: {c.failures} · pausas seguidas: {c.trips}
+              {c.state === "open" && c.open_until ? ` · retoma ${fmt(c.open_until)}` : ""}
+              {c.last_reason ? ` · ${c.last_reason}` : ""}
+            </span>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function FontesHealthTab() {
   const { data, isLoading } = useQuery({
     queryKey: ["fontes-health"],
@@ -52,6 +101,8 @@ export function FontesHealthTab() {
 
   return (
     <div className="space-y-4">
+      <CircuitCard />
+
       {problemas.length > 0 && (
         <div className="rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-sm">
           <strong>{problemas.length}</strong> fonte{problemas.length > 1 ? "s" : ""} precisa
