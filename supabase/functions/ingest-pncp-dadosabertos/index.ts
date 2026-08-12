@@ -21,6 +21,8 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PncpMetrics } from "../_shared/pncp-metrics.ts";
+import { PncpBudgets } from "../_shared/pncp-budget.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
