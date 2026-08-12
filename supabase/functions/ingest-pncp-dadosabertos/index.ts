@@ -81,6 +81,49 @@ async function fetchJson(url: string, opts: { deadline?: number } = {}): Promise
   throw lastErr ?? new Error("fetch failed");
 }
 
+// ---- Circuit breaker (fonte PNCP /consulta/v1/contratos) -------------------
+// Falhas 503/504/timeout/abort abrem o circuito; retomada automatica com
+// backoff progressivo controlado no banco (public.pncp_circuit).
+const CIRCUIT_SOURCE = "contratos";
+
+function isSourceOutage(msg: string): boolean {
+  const m = (msg || "").toLowerCase();
+  return (
+    m.includes("abort") ||
+    m.includes("timeout") ||
+    m.includes("timed out") ||
+    m.includes("http 429") ||
+    /http 5\d\d/.test(m) ||
+    m.includes("error sending request") ||
+    m.includes("connection")
+  );
+}
+
+async function circuitAllow(supabase: any): Promise<{ allowed: boolean; retryAt: string | null }> {
+  const { data, error } = await supabase.rpc("pncp_circuit_allow", { p_source: CIRCUIT_SOURCE });
+  if (error) return { allowed: true, retryAt: null };
+  if (data === false) {
+    const { data: st } = await supabase
+      .from("pncp_circuit")
+      .select("open_until")
+      .eq("source", CIRCUIT_SOURCE)
+      .maybeSingle();
+    return { allowed: false, retryAt: st?.open_until ?? null };
+  }
+  return { allowed: true, retryAt: null };
+}
+
+async function circuitReport(supabase: any, ok: boolean, reason?: string | null) {
+  try {
+    await supabase.rpc("pncp_circuit_report", {
+      p_source: CIRCUIT_SOURCE,
+      p_ok: ok,
+      p_reason: reason ? String(reason).slice(0, 300) : null,
+    });
+  } catch (_) { /* best-effort */ }
+}
+
+
 
 interface ContratoApi {
   numeroControlePNCP: string;
