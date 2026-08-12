@@ -211,7 +211,17 @@ async function ingestContratosWindow(
     if (data.data.length < PAGE_SIZE) break;
     if (data.totalPaginas && pagina >= data.totalPaginas) break;
     pagina++;
+
+    // persiste o progresso a cada pagina concluida (nada se perde se a execucao morrer)
+    if (opts.onPage) {
+      if (rawBatch.length) await flushRaw(supabase, rawBatch.splice(0));
+      if (normBatch.length) await flushContratos(supabase, normBatch.splice(0));
+      try {
+        await opts.onPage({ nextPage: pagina, contratos: totalContratos });
+      } catch (_) { /* progresso e best-effort */ }
+    }
   }
+
 
   if (rawBatch.length) await flushRaw(supabase, rawBatch);
   if (normBatch.length) await flushContratos(supabase, normBatch);
