@@ -132,7 +132,12 @@ async function ingestContratosWindow(
   supabase: any,
   dataInicial: string,
   dataFinal: string,
-  opts: { startPage?: number; deadline?: number; skipRaw?: boolean } = {},
+  opts: {
+    startPage?: number;
+    deadline?: number;
+    skipRaw?: boolean;
+    onPage?: (info: { nextPage: number; contratos: number }) => Promise<void>;
+  } = {},
 ): Promise<{ pages: number; contratos: number; comprasUnicas: number; errors: string[]; nextPage: number | null }> {
   const errors: string[] = [];
   let totalContratos = 0;
@@ -145,15 +150,17 @@ async function ingestContratosWindow(
 
   let pagina = Math.max(1, opts.startPage ?? 1);
   while (true) {
-    if (Date.now() > deadline) {
+    // precisa de folga para buscar + gravar a pagina
+    if (Date.now() > deadline - 8_000) {
       nextPage = pagina;
       break;
     }
     const url = `${PNCP_CONSULTA}/contratos?dataInicial=${dataInicial}&dataFinal=${dataFinal}&pagina=${pagina}&tamanhoPagina=${PAGE_SIZE}`;
     let data: any;
     try {
-      data = await fetchJson(url);
+      data = await fetchJson(url, { deadline });
     } catch (e) {
+
       errors.push(`page ${pagina}: ${e instanceof Error ? e.message : String(e)}`);
       nextPage = pagina;
       break;
