@@ -54,6 +54,9 @@ async function waitForThrottle() {
 async function fetchWithTimeout(url: string): Promise<Response> {
   let lastErr: unknown = null;
   const maxRetries = budgets.retriesFor(url);
+  // circuit breaker por endpoint: se essa família de endpoints está pausada,
+  // nem tentamos (evita desperdício e prolonga a recuperação da fonte)
+  if (circuits) await circuits.ensure(url);
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     await waitForThrottle();
     const ctrl = new AbortController();
@@ -78,13 +81,16 @@ async function fetchWithTimeout(url: string): Promise<Response> {
           : budgets.backoffFor(url, attempt) * 2;
         throttleUntil = Math.max(throttleUntil, Date.now() + waitMs);
         await waitForThrottle();
+        lastErr = new Error("HTTP 429");
         continue;
       }
       if (resp.status >= 500) {
         runMetrics.http_5xx++;
+        lastErr = new Error(`HTTP ${resp.status}`);
         await new Promise((r) => setTimeout(r, budgets.backoffFor(url, attempt)));
         continue;
       }
+      if (circuits) await circuits.reportOutcome(url, true);
       return resp;
     } catch (e) {
       clearTimeout(timer);
@@ -94,8 +100,14 @@ async function fetchWithTimeout(url: string): Promise<Response> {
     }
   }
 
+  const failMsg = lastErr instanceof Error
+    ? (lastErr.message || "timeout")
+    : String(lastErr ?? "timeout");
+  if (circuits) await circuits.reportOutcome(url, false, failMsg);
+
   throw new Error(
     lastErr instanceof Error
+
       ? `fetch_failed:${lastErr.message || "timeout"}`
       : `fetch_failed:${String(lastErr ?? "timeout")}`,
   );
