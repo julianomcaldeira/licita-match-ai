@@ -1,0 +1,1 @@
+UPDATE public.ingestion_jobs SET status = 'cancelled', finished_at = now(), error_message = COALESCE(error_message, 'Cancelado manualmente (job travado)') WHERE status IN ('pending','running');
