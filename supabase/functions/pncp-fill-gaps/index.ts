@@ -16,9 +16,12 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PncpMetrics } from "../_shared/pncp-metrics.ts";
 import { PncpBudgets } from "../_shared/pncp-budget.ts";
+import { PncpCircuits, CircuitOpenError } from "../_shared/pncp-circuit.ts";
 
 const metrics = new PncpMetrics("pncp-fill-gaps");
 const budgets = new PncpBudgets(30);
+let circuits: PncpCircuits | null = null;
+
 
 
 const corsHeaders = {
