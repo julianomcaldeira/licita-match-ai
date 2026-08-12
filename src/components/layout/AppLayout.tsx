@@ -41,7 +41,7 @@ export default function AppLayout() {
       />
       <div
         className={cn(
-          "flex flex-1 flex-col transition-[margin] duration-300 ease-out",
+          "flex min-w-0 flex-1 flex-col transition-[margin] duration-300 ease-out",
           collapsed ? "lg:ml-[76px]" : "lg:ml-[248px]"
         )}
       >
