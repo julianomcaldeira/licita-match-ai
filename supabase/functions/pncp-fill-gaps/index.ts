@@ -560,4 +560,18 @@ const handler = async (req: Request) => {
       }
     );
   }
+};
+
+serve(async (req: Request) => {
+  try {
+    return await handler(req);
+  } finally {
+    try {
+      const sb = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      );
+      await metrics.flush(sb);
+    } catch (_) { /* best-effort */ }
+  }
 });
