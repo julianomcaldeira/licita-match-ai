@@ -488,6 +488,7 @@ export type Database = {
           contratos: number
           dia: string
           last_error: string | null
+          next_attempt_at: string
           pagina: number
           status: string
           updated_at: string
@@ -498,6 +499,7 @@ export type Database = {
           contratos?: number
           dia: string
           last_error?: string | null
+          next_attempt_at?: string
           pagina?: number
           status?: string
           updated_at?: string
@@ -508,6 +510,7 @@ export type Database = {
           contratos?: number
           dia?: string
           last_error?: string | null
+          next_attempt_at?: string
           pagina?: number
           status?: string
           updated_at?: string
@@ -2469,27 +2472,17 @@ export type Database = {
           uf: string
         }[]
       }
-      mark_contratos_dia:
-        | {
-            Args: {
-              p_contratos?: number
-              p_dia: string
-              p_error?: string
-              p_status: string
-            }
-            Returns: undefined
-          }
-        | {
-            Args: {
-              p_acumula?: boolean
-              p_contratos?: number
-              p_dia: string
-              p_error?: string
-              p_pagina?: number
-              p_status: string
-            }
-            Returns: undefined
-          }
+      mark_contratos_dia: {
+        Args: {
+          p_acumula?: boolean
+          p_contratos?: number
+          p_dia: string
+          p_error?: string
+          p_pagina?: number
+          p_status: string
+        }
+        Returns: undefined
+      }
       mark_gap_result: {
         Args: {
           p_ano: number
