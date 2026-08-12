@@ -38,8 +38,7 @@ const runMetrics = {
   fetch_timeouts: 0,
 };
 let runtimeParallel = 10;
-  return base * Math.pow(2, attempt) + jitter;
-}
+
 
 // Cooldown global: quando o PNCP responde 429, todas as tarefas do run
 // esperam até este timestamp antes de disparar novas requisições.
