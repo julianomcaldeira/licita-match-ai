@@ -74,17 +74,23 @@ async function fetchJson(url: string, opts: { deadline?: number } = {}): Promise
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
+      if (circuits && attempt === 0) await circuits.ensure(url);
       const r = await metrics.timed(
         url,
         () => fetch(url, { signal: ctrl.signal, headers: { accept: "application/json" } }),
         { retry: attempt > 0 },
       );
       clearTimeout(t);
-      if (r.status === 204 || r.status === 404) return null;
+      if (r.status === 204 || r.status === 404) {
+        if (circuits) await circuits.reportOutcome(url, true);
+        return null;
+      }
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      if (circuits) await circuits.reportOutcome(url, true);
       return await r.json();
     } catch (e) {
       clearTimeout(t);
+      if (e instanceof CircuitOpenError) throw e;
       lastErr = e;
       const backoff = budgets.backoffFor(url, attempt);
       if (Date.now() + backoff > deadline - 6_000) break;
@@ -92,27 +98,19 @@ async function fetchJson(url: string, opts: { deadline?: number } = {}): Promise
     }
   }
 
+  const failMsg = lastErr instanceof Error ? lastErr.message : String(lastErr ?? "fetch failed");
+  if (circuits) await circuits.reportOutcome(url, false, failMsg);
   throw lastErr ?? new Error("fetch failed");
 }
 
 
-// ---- Circuit breaker (fonte PNCP /consulta/v1/contratos) -------------------
-// Falhas 503/504/timeout/abort abrem o circuito; retomada automatica com
-// backoff progressivo controlado no banco (public.pncp_circuit).
+// ---- Circuit breaker por endpoint do PNCP ----------------------------------
+// Cada família de endpoints (contratos, itens de contrato, atas, compras...)
+// tem seu proprio circuito no banco (public.pncp_circuit). Falhas
+// 503/504/timeout/abort abrem o circuito daquele endpoint, com retomada
+// automatica em backoff progressivo, sem afetar os demais.
 const CIRCUIT_SOURCE = "contratos";
-
-function isSourceOutage(msg: string): boolean {
-  const m = (msg || "").toLowerCase();
-  return (
-    m.includes("abort") ||
-    m.includes("timeout") ||
-    m.includes("timed out") ||
-    m.includes("http 429") ||
-    /http 5\d\d/.test(m) ||
-    m.includes("error sending request") ||
-    m.includes("connection")
-  );
-}
+let circuits: PncpCircuits | null = null;
 
 async function circuitAllow(supabase: any): Promise<{ allowed: boolean; retryAt: string | null }> {
   const { data, error } = await supabase.rpc("pncp_circuit_allow", { p_source: CIRCUIT_SOURCE });
@@ -137,6 +135,7 @@ async function circuitReport(supabase: any, ok: boolean, reason?: string | null)
     });
   } catch (_) { /* best-effort */ }
 }
+
 
 
 
