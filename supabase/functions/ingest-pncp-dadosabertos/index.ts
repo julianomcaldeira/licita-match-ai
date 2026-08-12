@@ -768,4 +768,15 @@ const handler = async (req: Request) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
+};
+
+Deno.serve(async (req) => {
+  try {
+    return await handler(req);
+  } finally {
+    // métricas por endpoint (latência, erros, aborts, retries) em tempo real
+    try {
+      await metrics.flush(createClient(SUPABASE_URL, SERVICE_KEY));
+    } catch (_) { /* best-effort */ }
+  }
 });
