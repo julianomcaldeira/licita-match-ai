@@ -102,6 +102,7 @@ export function FontesHealthTab() {
   return (
     <div className="space-y-4">
       <CircuitCard />
+      <EndpointMetricsCard />
 
       {problemas.length > 0 && (
         <div className="rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-sm">
