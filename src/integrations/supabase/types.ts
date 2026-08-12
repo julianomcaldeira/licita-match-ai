@@ -2622,6 +2622,19 @@ export type Database = {
       }
       pncp_dadosabertos_backfill_fast_tick: { Args: never; Returns: Json }
       pncp_dadosabertos_backfill_tick: { Args: never; Returns: Json }
+      pncp_endpoint_budgets: {
+        Args: { p_minutes?: number }
+        Returns: {
+          avg_latency_ms: number
+          base_backoff_ms: number
+          endpoint: string
+          error_rate: number
+          max_latency_ms: number
+          max_retries: number
+          requests: number
+          timeout_ms: number
+        }[]
+      }
       pncp_endpoint_metrics_summary: {
         Args: { p_minutes?: number }
         Returns: {
