@@ -27,9 +27,46 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { IngestaoManualButton } from "@/components/dashboard/IngestaoManualButton";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTracker } from "@/hooks/useTracking";
+import TagInput from "@/components/TagInput";
 
 
 const UFS = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
+
+const MODALIDADE_OPTIONS = [
+  "Pregão - Eletrônico",
+  "Pregão - Presencial",
+  "Concorrência - Eletrônica",
+  "Concorrência - Presencial",
+  "Dispensa de Licitação",
+  "Inexigibilidade",
+  "Concurso",
+  "Leilão - Eletrônico",
+  "Leilão - Presencial",
+  "Diálogo Competitivo",
+  "Credenciamento",
+  "Manifestação de Interesse",
+  "Pré-qualificação",
+];
+
+/** Alterna entre exigir todos os termos (AND) ou qualquer um (OR). */
+function ModeToggle({ value, onChange }: { value: "all" | "any"; onChange: (v: "all" | "any") => void }) {
+  return (
+    <div className="ml-auto flex items-center gap-0.5 rounded-md bg-secondary/70 p-0.5">
+      {(["all", "any"] as const).map((m) => (
+        <button
+          key={m}
+          onClick={() => onChange(m)}
+          className={cn(
+            "rounded px-1.5 text-[10px] font-medium leading-4 transition-colors",
+            value === m ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          {m === "all" ? "TODOS" : "QUALQUER"}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 const STATUS_ABERTAS = [
   { value: "", label: "Todas" },
@@ -161,15 +198,19 @@ export default function LicitacoesPage() {
     refetchOnWindowFocus: false,
   });
 
-  // Filter state
-  const [filterOrgao, setFilterOrgao] = useState("");
-  const [filterSearch, setFilterSearch] = useState("");
-  const [filterItens, setFilterItens] = useState("");
+  // Filter state (todos multi-seleção)
+  const [filterOrgaos, setFilterOrgaos] = useState<string[]>([]);
+  const [filterTermos, setFilterTermos] = useState<string[]>([]);
+  const [filterTermosMode, setFilterTermosMode] = useState<"all" | "any">("all");
+  const [filterItens, setFilterItens] = useState<string[]>([]);
+  const [filterItensMode, setFilterItensMode] = useState<"all" | "any">("all");
   const defaultDateFrom = new Date(2023, 0, 1);
   const [filterDateFrom, setFilterDateFrom] = useState<Date | undefined>(defaultDateFrom);
   const [filterDateTo, setFilterDateTo] = useState<Date | undefined>();
-  const [filterUf, setFilterUf] = useState("");
-  const [filterSituacao, setFilterSituacao] = useState("");
+  const [filterUfs, setFilterUfs] = useState<string[]>([]);
+  const [filterSituacoes, setFilterSituacoes] = useState<string[]>([]);
+  const [filterModalidades, setFilterModalidades] = useState<string[]>([]);
+  const [filterSort, setFilterSort] = useState<"recentes" | "valor" | "estimado">("recentes");
   const [filterVencedores, setFilterVencedores] = useState<string[]>([]);
   const [filterApenasParticipei, setFilterApenasParticipei] = useState(false);
 
@@ -239,15 +280,36 @@ export default function LicitacoesPage() {
   });
 
 
-  const [appliedFilters, setAppliedFilters] = useState<{
-    orgao: string; search: string; itens?: string; dateFrom?: string; dateTo?: string; uf?: string; situacao?: string; vencedor?: string; apenasParticipei?: boolean; tab: "abertas" | "encerradas";
-  }>({ orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd"), tab: "abertas" });
+  type AppliedFilters = {
+    orgaos: string[];
+    termos: string[];
+    termosMode: "all" | "any";
+    itens: string[];
+    itensMode: "all" | "any";
+    ufs: string[];
+    situacoes: string[];
+    modalidades: string[];
+    vencedores: string[];
+    sort: "recentes" | "valor" | "estimado";
+    dateFrom?: string;
+    dateTo?: string;
+    apenasParticipei?: boolean;
+    tab: "abertas" | "encerradas";
+  };
+
+  const emptyApplied = (tab: "abertas" | "encerradas"): AppliedFilters => ({
+    orgaos: [], termos: [], termosMode: "all", itens: [], itensMode: "all",
+    ufs: [], situacoes: [], modalidades: [], vencedores: [], sort: "recentes",
+    dateFrom: format(defaultDateFrom, "yyyy-MM-dd"), tab,
+  });
+
+  const [appliedFilters, setAppliedFilters] = useState<AppliedFilters>(emptyApplied("abertas"));
 
   const hasWinnerFilter = filterVencedores.length > 0;
 
   const activateWinnerMode = () => {
     setActiveTab("encerradas");
-    setFilterSituacao("");
+    setFilterSituacoes([]);
   };
 
   const handleWinnerFilterChange = (values: string[]) => {
@@ -255,78 +317,83 @@ export default function LicitacoesPage() {
     if (values.length > 0) activateWinnerMode();
   };
 
+  const buildApplied = (tab: "abertas" | "encerradas", situacoes: string[]): AppliedFilters => ({
+    orgaos: filterOrgaos,
+    termos: filterTermos,
+    termosMode: filterTermosMode,
+    itens: filterItens,
+    itensMode: filterItensMode,
+    ufs: filterUfs,
+    situacoes,
+    modalidades: filterModalidades,
+    vencedores: filterVencedores,
+    sort: filterSort,
+    dateFrom: filterDateFrom ? format(filterDateFrom, "yyyy-MM-dd") : undefined,
+    dateTo: filterDateTo ? format(filterDateTo, "yyyy-MM-dd") : undefined,
+    apenasParticipei: filterApenasParticipei || undefined,
+    tab,
+  });
+
   const handleSearch = () => {
     const nextTab = hasWinnerFilter ? "encerradas" : activeTab;
-    const nextSituacao = hasWinnerFilter ? "" : filterSituacao;
+    const nextSituacoes = hasWinnerFilter ? [] : filterSituacoes;
 
     setPage(0);
-    if (hasWinnerFilter) {
-      activateWinnerMode();
-    }
-    const next = {
-      orgao: filterOrgao.trim(),
-      search: filterSearch.trim(),
-      itens: filterItens.trim() || undefined,
-      dateFrom: filterDateFrom ? format(filterDateFrom, "yyyy-MM-dd") : undefined,
-      dateTo: filterDateTo ? format(filterDateTo, "yyyy-MM-dd") : undefined,
-      uf: filterUf || undefined,
-      situacao: nextSituacao || undefined,
-      vencedor: filterVencedores.length > 0 ? filterVencedores.join("||") : undefined,
-      apenasParticipei: filterApenasParticipei || undefined,
-      tab: nextTab,
-    };
+    if (hasWinnerFilter) activateWinnerMode();
+
+    const next = buildApplied(nextTab, nextSituacoes);
     setAppliedFilters(next);
     track("busca", {
       page: "licitacoes",
-      has_search: !!next.search,
-      has_itens: !!next.itens,
-      has_orgao: !!next.orgao,
-      has_uf: !!next.uf,
-      has_situacao: !!next.situacao,
-      has_vencedor: !!next.vencedor,
+      termos: next.termos.length,
+      itens: next.itens.length,
+      orgaos: next.orgaos.length,
+      ufs: next.ufs.length,
+      situacoes: next.situacoes.length,
+      modalidades: next.modalidades.length,
+      vencedores: next.vencedores.length,
       has_date_range: !!(next.dateFrom || next.dateTo),
+      sort: next.sort,
       tab: next.tab,
     });
   };
 
   const handleTabChange = (tab: "abertas" | "encerradas") => {
     setActiveTab(tab);
-    setFilterSituacao("");
+    setFilterSituacoes([]);
     setFilterVencedores([]);
     setPage(0);
-    setAppliedFilters({
-      orgao: filterOrgao.trim(),
-      search: filterSearch.trim(),
-      itens: filterItens.trim() || undefined,
-      dateFrom: filterDateFrom ? format(filterDateFrom, "yyyy-MM-dd") : undefined,
-      dateTo: filterDateTo ? format(filterDateTo, "yyyy-MM-dd") : undefined,
-      uf: filterUf || undefined,
-      tab: tab,
-    });
+    setAppliedFilters({ ...buildApplied(tab, []), vencedores: [] });
   };
 
   const handleClearFilters = () => {
-    setFilterOrgao("");
-    setFilterSearch("");
-    setFilterItens("");
+    setFilterOrgaos([]);
+    setFilterTermos([]);
+    setFilterItens([]);
+    setFilterModalidades([]);
     setFilterDateFrom(defaultDateFrom);
     setFilterDateTo(undefined);
-    setFilterUf("");
-    setFilterSituacao("");
+    setFilterUfs([]);
+    setFilterSituacoes([]);
     setFilterVencedores([]);
     setFilterApenasParticipei(false);
+    setFilterSort("recentes");
     setPage(0);
-    setAppliedFilters({ orgao: "", search: "", dateFrom: format(defaultDateFrom, "yyyy-MM-dd"), tab: activeTab });
+    setAppliedFilters(emptyApplied(activeTab));
   };
 
-  const hasActiveFilters = appliedFilters.orgao || appliedFilters.search || appliedFilters.itens || appliedFilters.dateFrom || appliedFilters.dateTo || appliedFilters.uf || appliedFilters.situacao || appliedFilters.vencedor || appliedFilters.apenasParticipei;
+  const hasActiveFilters =
+    appliedFilters.orgaos.length || appliedFilters.termos.length || appliedFilters.itens.length ||
+    appliedFilters.ufs.length || appliedFilters.situacoes.length || appliedFilters.modalidades.length ||
+    appliedFilters.vencedores.length || appliedFilters.dateFrom || appliedFilters.dateTo ||
+    appliedFilters.apenasParticipei;
 
   const searchByWinner = (name: string) => {
     activateWinnerMode();
     setFilterVencedores([name]);
     setDetailOpen(false);
     setPage(0);
-    setAppliedFilters((prev) => ({ ...prev, vencedor: name, situacao: undefined, tab: "encerradas" }));
+    setAppliedFilters((prev) => ({ ...prev, vencedores: [name], situacoes: [], tab: "encerradas" }));
   };
 
   // Detail modal state
@@ -389,186 +456,61 @@ export default function LicitacoesPage() {
     }
   };
 
-  const isAbertas = appliedFilters.vencedor ? false : appliedFilters.tab === "abertas";
-  const useRpc = !appliedFilters.apenasParticipei && !!(appliedFilters.vencedor || appliedFilters.search || appliedFilters.itens);
+  const isAbertas = appliedFilters.vencedores.length > 0 ? false : appliedFilters.tab === "abertas";
+  const hasResultadoStatus = appliedFilters.situacoes.includes("Concluída");
+
+  const nz = (arr: string[]) => (arr.length ? arr : null);
+
+  const buildRpcArgs = (limit: number, offset: number) => ({
+    p_terms: nz(appliedFilters.termos),
+    p_terms_mode: appliedFilters.termosMode,
+    p_itens: nz(appliedFilters.itens),
+    p_itens_mode: appliedFilters.itensMode,
+    p_orgaos: nz(appliedFilters.orgaos),
+    p_ufs: nz(appliedFilters.ufs),
+    p_situacoes: hasResultadoStatus && !isAbertas ? null : nz(appliedFilters.situacoes),
+    p_modalidades: nz(appliedFilters.modalidades),
+    p_vencedores: nz(appliedFilters.vencedores),
+    p_date_from: appliedFilters.dateFrom || null,
+    p_date_to: appliedFilters.dateTo || null,
+    p_com_vencedor: !isAbertas && hasResultadoStatus,
+    p_sem_resultado: isAbertas,
+    p_sort: appliedFilters.sort,
+    p_limit: limit,
+    p_offset: offset,
+  });
 
   const { data: queryResult, isLoading, isFetching, isError, error: queryError, refetch } = useQuery({
     queryKey: ["licitacoes-all", page, appliedFilters, appliedFilters.apenasParticipei ? (minhasParticipacaoIds ?? []).length : 0],
     queryFn: async () => {
-      const hasResultadoStatus = appliedFilters.situacao === "Concluída";
-
-      const buildBaseQuery = () => {
-        let query = supabase
-          .from("licitacoes")
-          .select("id, orgao, objeto, modalidade, valor_estimado, valor_homologado, data_publicacao, uf, municipio, situacao, numero_controle_pncp", { count: "estimated" })
-          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-
-
-        if (isAbertas) {
-          query = query.order("data_publicacao", { ascending: false });
-        } else {
-          query = query.order("valor_homologado", { ascending: false, nullsFirst: false });
-        }
-
-        if (appliedFilters.dateFrom) {
-          query = query.gte("data_publicacao", appliedFilters.dateFrom);
-        }
-        if (appliedFilters.dateTo) {
-          query = query.lte("data_publicacao", appliedFilters.dateTo);
-        }
-        if (appliedFilters.uf) {
-          query = query.eq("uf", appliedFilters.uf);
-        }
-
-        if (isAbertas) {
-          if (appliedFilters.situacao) {
-            query = query.eq("situacao", appliedFilters.situacao);
-          }
-          query = query.or("valor_homologado.is.null,valor_homologado.eq.0");
-          query = query.not("situacao", "in", "(Revogada,Anulada)");
-        } else {
-          if (hasResultadoStatus) {
-            query = query.not("valor_homologado", "is", null).gt("valor_homologado", 0);
-          } else if (appliedFilters.situacao) {
-            query = query.eq("situacao", appliedFilters.situacao);
-          } else {
-            query = query.or("valor_homologado.gt.0,situacao.in.(Revogada,Anulada)");
-          }
-        }
-
-        if (appliedFilters.orgao) {
-          query = query.ilike("orgao", `%${appliedFilters.orgao}%`);
-        }
-
-        if (appliedFilters.apenasParticipei) {
-          const ids = minhasParticipacaoIds ?? [];
-          if (ids.length === 0) {
-            // força zero resultados sem gerar erro
-            query = query.eq("id", "00000000-0000-0000-0000-000000000000");
-          } else {
-            query = query.in("id", ids);
-          }
-        }
-
-        return query;
-      };
-
-      if (useRpc) {
-        // For "abertas" tab, force situacao to open statuses if no specific status selected
-        const rpcSituacao = isAbertas
-          ? (appliedFilters.situacao || null)
-          : (hasResultadoStatus ? null : appliedFilters.situacao || null);
-
-        try {
-          const rpcPromise = (supabase as any).rpc("search_licitacoes", {
-            p_search: appliedFilters.search || null,
-            p_orgao: appliedFilters.orgao || null,
-            p_date_from: appliedFilters.dateFrom || null,
-            p_date_to: appliedFilters.dateTo || null,
-            p_uf: appliedFilters.uf || null,
-            p_situacao: rpcSituacao,
-            p_vencedor: appliedFilters.vencedor || null,
-            p_modalidade: null,
-            p_com_vencedor: !isAbertas && hasResultadoStatus,
-            p_sem_resultado: isAbertas,
-            p_limit: PAGE_SIZE + 1,
-            p_offset: page * PAGE_SIZE,
-            p_itens: appliedFilters.itens || null,
-          });
-          const rpcResult = await withTimeout<{ data: any[] | null; error: any }>(
-            rpcPromise as PromiseLike<{ data: any[] | null; error: any }>,
-            QUERY_TIMEOUT_MS,
-            "A busca demorou demais no modo avançado."
-          );
-          const { data, error } = rpcResult;
-          if (error) throw error;
-
-          const fetchedRows = (data || []) as any[];
-          const hasMore = fetchedRows.length > PAGE_SIZE;
-          const rows = hasMore ? fetchedRows.slice(0, PAGE_SIZE) : fetchedRows;
-          const rpcTotal = Number(rows[0]?.total_count ?? fetchedRows[0]?.total_count ?? 0);
-          const totalCount = rpcTotal > 0
-            ? rpcTotal
-            : (hasMore ? (page + 2) * PAGE_SIZE + 1 : page * PAGE_SIZE + rows.length);
-
-          return { rows, totalCount };
-
-        } catch (rpcError) {
-          console.error("search_licitacoes falhou, usando fallback:", rpcError);
-
-          let fallbackQuery = buildBaseQuery();
-
-          const words = (appliedFilters.search || "").toLowerCase().split(/\s+/).filter(Boolean);
-          for (const word of words) {
-            fallbackQuery = fallbackQuery.ilike("objeto", `%${word}%`);
-          }
-
-          if (appliedFilters.vencedor) {
-            const winnersPromise = supabase
-              .from("licitacao_vencedores")
-              .select("licitacao_id")
-              .ilike("razao_social", `%${appliedFilters.vencedor}%`)
-              .limit(800);
-
-            const winnersResult = await withTimeout<{ data: { licitacao_id: string | null }[] | null; error: any }>(
-              winnersPromise as PromiseLike<{ data: { licitacao_id: string | null }[] | null; error: any }>,
-              8_000,
-              "A busca por vencedor demorou demais."
-            );
-            const { data: winnerRows, error: winnerError } = winnersResult;
-
-            if (winnerError) throw rpcError;
-
-            const licitacaoIds = [
-              ...new Set(
-                (winnerRows || [])
-                  .map((row) => row.licitacao_id)
-                  .filter((id): id is string => typeof id === "string" && id.length > 0)
-              ),
-            ].slice(0, 150);
-            if (licitacaoIds.length === 0) {
-              return { rows: [], totalCount: 0 };
-            }
-
-            fallbackQuery = fallbackQuery.in("id", licitacaoIds);
-          }
-
-          const fallbackResult = await withTimeout<{ data: any[] | null; error: any; count?: number | null }>(
-            fallbackQuery as PromiseLike<{ data: any[] | null; error: any; count?: number | null }>,
-            QUERY_TIMEOUT_MS,
-            "A busca de fallback demorou demais."
-          );
-          const { data: fallbackRows, error: fallbackError, count: fallbackCount } = fallbackResult;
-          if (fallbackError) {
-            throw rpcError;
-          }
-
-          const fetchedRows = (fallbackRows || []) as any[];
-          const rows = fetchedRows.slice(0, PAGE_SIZE);
-          const totalCount = typeof fallbackCount === "number" && fallbackCount >= 0
-            ? fallbackCount
-            : (fetchedRows.length > PAGE_SIZE ? (page + 2) * PAGE_SIZE + 1 : page * PAGE_SIZE + rows.length);
-
-          return { rows, totalCount };
-        }
-      }
-
-      const query = buildBaseQuery();
-      const queryResult = await withTimeout<{ data: any[] | null; error: any; count?: number | null }>(
-        query as PromiseLike<{ data: any[] | null; error: any; count?: number | null }>,
-        QUERY_TIMEOUT_MS
+      const rpcPromise = (supabase as any).rpc("search_licitacoes_v2", buildRpcArgs(PAGE_SIZE + 1, page * PAGE_SIZE));
+      const rpcResult = await withTimeout<{ data: any[] | null; error: any }>(
+        rpcPromise as PromiseLike<{ data: any[] | null; error: any }>,
+        QUERY_TIMEOUT_MS,
+        "A busca demorou demais. Refine os filtros e tente novamente."
       );
-      const { data, error, count } = queryResult;
+      const { data, error } = rpcResult;
       if (error) throw error;
 
-      const fetchedRows = (data || []) as any[];
-      const rows = fetchedRows.slice(0, PAGE_SIZE);
-      const totalCount = typeof count === "number" && count >= 0
-        ? count
-        : (fetchedRows.length > PAGE_SIZE ? (page + 2) * PAGE_SIZE + 1 : page * PAGE_SIZE + rows.length);
+      let fetchedRows = (data || []) as any[];
+
+      if (appliedFilters.apenasParticipei) {
+        const ids = new Set(minhasParticipacaoIds ?? []);
+        fetchedRows = fetchedRows.filter((r) => ids.has(r.id));
+      }
+
+      const hasMore = fetchedRows.length > PAGE_SIZE;
+      const rows = hasMore ? fetchedRows.slice(0, PAGE_SIZE) : fetchedRows;
+      const rpcTotal = Number(fetchedRows[0]?.total_count ?? 0);
+      const totalCount = appliedFilters.apenasParticipei
+        ? rows.length
+        : rpcTotal > 0
+        ? rpcTotal
+        : hasMore
+        ? (page + 2) * PAGE_SIZE + 1
+        : page * PAGE_SIZE + rows.length;
 
       return { rows, totalCount };
-
     },
     placeholderData: (prev) => prev,
     staleTime: 60_000,
@@ -665,12 +607,13 @@ export default function LicitacoesPage() {
   const appliedFiltersSummary = useCallback(() => {
     const items: { label: string; value: string }[] = [];
     items.push({ label: "Aba", value: appliedFilters.tab === "abertas" ? "Abertas / Em Andamento" : "Encerradas / Com Resultado" });
-    if (appliedFilters.search) items.push({ label: "Palavra-chave", value: appliedFilters.search });
-    if (appliedFilters.itens) items.push({ label: "Itens", value: appliedFilters.itens });
-    if (appliedFilters.orgao) items.push({ label: "Órgão", value: appliedFilters.orgao });
-    if (appliedFilters.uf) items.push({ label: "UF", value: appliedFilters.uf });
-    if (appliedFilters.situacao) items.push({ label: "Situação", value: appliedFilters.situacao });
-    if (appliedFilters.vencedor) items.push({ label: "Vencedor", value: appliedFilters.vencedor.split("||").join(", ") });
+    if (appliedFilters.termos.length) items.push({ label: `Palavras-chave (${appliedFilters.termosMode === "all" ? "todas" : "qualquer"})`, value: appliedFilters.termos.join(", ") });
+    if (appliedFilters.itens.length) items.push({ label: `Itens (${appliedFilters.itensMode === "all" ? "todos" : "qualquer"})`, value: appliedFilters.itens.join(", ") });
+    if (appliedFilters.orgaos.length) items.push({ label: "Órgãos", value: appliedFilters.orgaos.join(", ") });
+    if (appliedFilters.ufs.length) items.push({ label: "UFs", value: appliedFilters.ufs.join(", ") });
+    if (appliedFilters.situacoes.length) items.push({ label: "Situações", value: appliedFilters.situacoes.join(", ") });
+    if (appliedFilters.modalidades.length) items.push({ label: "Modalidades", value: appliedFilters.modalidades.join(", ") });
+    if (appliedFilters.vencedores.length) items.push({ label: "Vencedores", value: appliedFilters.vencedores.join(", ") });
     if (appliedFilters.dateFrom) items.push({ label: "Data inicial", value: appliedFilters.dateFrom });
     if (appliedFilters.dateTo) items.push({ label: "Data final", value: appliedFilters.dateTo });
     return items;
@@ -679,65 +622,24 @@ export default function LicitacoesPage() {
   // Compute server-side count using the same filter logic as the export
   const computeExportCount = useCallback(async (): Promise<number | null> => {
     const MAX_EXPORT = 10000;
-    const hasResultadoStatus = appliedFilters.situacao === "Concluída";
-    const useRpcExport = !!(appliedFilters.vencedor || appliedFilters.search || appliedFilters.itens);
     try {
-      if (useRpcExport) {
-        const rpcSituacao = isAbertas
-          ? (appliedFilters.situacao || null)
-          : (hasResultadoStatus ? null : appliedFilters.situacao || null);
-        const probeBatch = 1000;
-        let probed = 0;
-        let off = 0;
-        let more = true;
-        while (more && probed <= MAX_EXPORT) {
-          const { data, error } = await (supabase as any).rpc("search_licitacoes", {
-            p_search: appliedFilters.search || null,
-            p_orgao: appliedFilters.orgao || null,
-            p_date_from: appliedFilters.dateFrom || null,
-            p_date_to: appliedFilters.dateTo || null,
-            p_uf: appliedFilters.uf || null,
-            p_situacao: rpcSituacao,
-            p_vencedor: appliedFilters.vencedor || null,
-            p_modalidade: null,
-            p_com_vencedor: !isAbertas && hasResultadoStatus,
-            p_sem_resultado: isAbertas,
-            p_limit: probeBatch,
-            p_offset: off,
-            p_itens: appliedFilters.itens || null,
-          });
-          if (error) throw error;
-          const n = (data || []).length;
-          probed += n;
-          more = n === probeBatch;
-          off += probeBatch;
-        }
-        return probed;
-      } else {
-        let cq = supabase
-          .from("licitacoes")
-          .select("id", { count: "exact", head: true });
-        if (appliedFilters.dateFrom) cq = cq.gte("data_publicacao", appliedFilters.dateFrom);
-        if (appliedFilters.dateTo) cq = cq.lte("data_publicacao", appliedFilters.dateTo);
-        if (appliedFilters.uf) cq = cq.eq("uf", appliedFilters.uf);
-        if (isAbertas) {
-          if (appliedFilters.situacao) cq = cq.eq("situacao", appliedFilters.situacao);
-          cq = cq.or("valor_homologado.is.null,valor_homologado.eq.0");
-          cq = cq.not("situacao", "in", "(Revogada,Anulada)");
-        } else {
-          if (hasResultadoStatus) {
-            cq = cq.not("valor_homologado", "is", null).gt("valor_homologado", 0);
-          } else if (appliedFilters.situacao) {
-            cq = cq.eq("situacao", appliedFilters.situacao);
-          } else {
-            cq = cq.or("valor_homologado.gt.0,situacao.in.(Revogada,Anulada)");
-          }
-        }
-        if (appliedFilters.orgao) cq = cq.ilike("orgao", `%${appliedFilters.orgao}%`);
-        const { count, error } = await cq;
+      const probeBatch = 1000;
+      let probed = 0;
+      let off = 0;
+      let more = true;
+      while (more && probed <= MAX_EXPORT) {
+        const { data, error } = await (supabase as any).rpc("search_licitacoes_v2", buildRpcArgs(probeBatch, off));
         if (error) throw error;
-        return count || 0;
+        const n = (data || []).length;
+        if (n > 0 && off === 0) {
+          const total = Number((data as any[])[0]?.total_count ?? 0);
+          if (total > 0) return Math.min(total, MAX_EXPORT);
+        }
+        probed += n;
+        more = n === probeBatch;
+        off += probeBatch;
       }
+      return probed;
     } catch (e) {
       console.warn("Count validation failed:", e);
       return null;
@@ -762,90 +664,17 @@ export default function LicitacoesPage() {
     try {
       const MAX_EXPORT = 10000;
       const batchSize = 1000;
-      const hasResultadoStatus = appliedFilters.situacao === "Concluída";
-      const useRpcExport = !!(appliedFilters.vencedor || appliedFilters.search || appliedFilters.itens);
-
-      // Build a filtered base query (mirrors buildBaseQuery in main fetch, no pagination)
-      const buildFilteredQuery = (from: number, to: number) => {
-        let q = supabase
-          .from("licitacoes")
-          .select("orgao, objeto, modalidade, valor_estimado, valor_homologado, data_publicacao, uf, municipio, situacao")
-          .range(from, to);
-
-        if (isAbertas) {
-          q = q.order("data_publicacao", { ascending: false });
-        } else {
-          q = q.order("valor_homologado", { ascending: false, nullsFirst: false });
-        }
-
-        if (appliedFilters.dateFrom) q = q.gte("data_publicacao", appliedFilters.dateFrom);
-        if (appliedFilters.dateTo) q = q.lte("data_publicacao", appliedFilters.dateTo);
-        if (appliedFilters.uf) q = q.eq("uf", appliedFilters.uf);
-
-        if (isAbertas) {
-          if (appliedFilters.situacao) q = q.eq("situacao", appliedFilters.situacao);
-          q = q.or("valor_homologado.is.null,valor_homologado.eq.0");
-          q = q.not("situacao", "in", "(Revogada,Anulada)");
-        } else {
-          if (hasResultadoStatus) {
-            q = q.not("valor_homologado", "is", null).gt("valor_homologado", 0);
-          } else if (appliedFilters.situacao) {
-            q = q.eq("situacao", appliedFilters.situacao);
-          } else {
-            q = q.or("valor_homologado.gt.0,situacao.in.(Revogada,Anulada)");
-          }
-        }
-
-        if (appliedFilters.orgao) q = q.ilike("orgao", `%${appliedFilters.orgao}%`);
-
-        const words = (appliedFilters.search || "").toLowerCase().split(/\s+/).filter(Boolean);
-        for (const word of words) q = q.ilike("objeto", `%${word}%`);
-
-        return q;
-      };
 
       let allData: any[] = [];
-
-      if (useRpcExport) {
-        const rpcSituacao = isAbertas
-          ? (appliedFilters.situacao || null)
-          : (hasResultadoStatus ? null : appliedFilters.situacao || null);
-
-        let offset = 0;
-        let hasMore = true;
-        while (hasMore && allData.length < MAX_EXPORT) {
-          const { data, error } = await (supabase as any).rpc("search_licitacoes", {
-            p_search: appliedFilters.search || null,
-            p_orgao: appliedFilters.orgao || null,
-            p_date_from: appliedFilters.dateFrom || null,
-            p_date_to: appliedFilters.dateTo || null,
-            p_uf: appliedFilters.uf || null,
-            p_situacao: rpcSituacao,
-            p_vencedor: appliedFilters.vencedor || null,
-            p_modalidade: null,
-            p_com_vencedor: !isAbertas && hasResultadoStatus,
-            p_sem_resultado: isAbertas,
-            p_limit: batchSize,
-            p_offset: offset,
-            p_itens: appliedFilters.itens || null,
-          });
-          if (error) throw error;
-          const rows = (data || []) as any[];
-          allData = allData.concat(rows);
-          hasMore = rows.length === batchSize;
-          offset += batchSize;
-        }
-      } else {
-        let offset = 0;
-        let hasMore = true;
-        while (hasMore && allData.length < MAX_EXPORT) {
-          const { data, error } = await buildFilteredQuery(offset, offset + batchSize - 1);
-          if (error) throw error;
-          const rows = (data || []) as any[];
-          allData = allData.concat(rows);
-          hasMore = rows.length === batchSize;
-          offset += batchSize;
-        }
+      let offset = 0;
+      let hasMore = true;
+      while (hasMore && allData.length < MAX_EXPORT) {
+        const { data, error } = await (supabase as any).rpc("search_licitacoes_v2", buildRpcArgs(batchSize, offset));
+        if (error) throw error;
+        const rows = (data || []) as any[];
+        allData = allData.concat(rows);
+        hasMore = rows.length === batchSize;
+        offset += batchSize;
       }
 
       if (allData.length > MAX_EXPORT) allData = allData.slice(0, MAX_EXPORT);
@@ -943,70 +772,79 @@ export default function LicitacoesPage() {
 
       {/* Filters */}
       <div className="rounded-xl border border-border bg-card p-4 space-y-4">
-        {/* Row 1: Objeto + Itens + Status — grid 12 col, tudo h-9 */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-end">
+        {/* Row 1: Objeto + Itens + Status — multi-seleção */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-start">
           <div className="space-y-1.5 lg:col-span-5">
-            <div className="flex h-4 items-center gap-1">
-              <label className="text-xs font-medium text-muted-foreground">Palavra-chave (objeto)</label>
+            <div className="flex h-4 items-center gap-2">
+              <label className="text-xs font-medium text-muted-foreground">Palavras-chave (objeto)</label>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span className="cursor-help text-[10px] text-muted-foreground">ⓘ</span>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="max-w-xs">
-                  <p className="text-xs">Busca no <strong>objeto</strong> (título) da licitação. Ex: "aquisição medicamentos".</p>
+                  <p className="text-xs">Digite um termo e pressione <strong>Enter</strong> (ou vírgula) para adicionar vários. Escolha se a licitação precisa conter <strong>todos</strong> os termos ou <strong>qualquer um</strong>.</p>
                 </TooltipContent>
               </Tooltip>
+              <ModeToggle value={filterTermosMode} onChange={setFilterTermosMode} />
             </div>
-            <Input
-              placeholder="Ex: plataforma ead, consultoria..."
-              value={filterSearch}
-              onChange={(e) => setFilterSearch(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              className="h-9"
+            <TagInput
+              values={filterTermos}
+              onChange={setFilterTermos}
+              placeholder="Ex: plataforma ead, consultoria... (Enter para adicionar)"
+              onEnterEmpty={handleSearch}
             />
           </div>
           <div className="space-y-1.5 lg:col-span-4">
-            <div className="flex h-4 items-center gap-1">
+            <div className="flex h-4 items-center gap-2">
               <label className="text-xs font-medium text-muted-foreground">Itens</label>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span className="cursor-help text-[10px] text-muted-foreground">ⓘ</span>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="max-w-xs">
-                  <p className="text-xs">Busca na <strong>descrição dos itens</strong> da licitação. Use espaços para exigir todas as palavras (AND). Ex: "seringa descartável 5ml".</p>
+                  <p className="text-xs">Busca na <strong>descrição dos itens</strong>. Vários termos podem ser combinados.</p>
                 </TooltipContent>
               </Tooltip>
+              <ModeToggle value={filterItensMode} onChange={setFilterItensMode} />
             </div>
-            <div className="relative">
-              <Package className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                placeholder="Ex: notebook, seringa 5ml, cadeira..."
-                value={filterItens}
-                onChange={(e) => setFilterItens(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                className="h-9 pl-8"
-              />
-            </div>
+            <TagInput
+              values={filterItens}
+              onChange={setFilterItens}
+              placeholder="Ex: seringa 5ml, bolsa de urina..."
+              icon={<Package className="h-3.5 w-3.5" />}
+              onEnterEmpty={handleSearch}
+            />
           </div>
           <div className="space-y-1.5 lg:col-span-3">
             <div className="flex h-4 items-center">
-              <label className="text-xs font-medium text-muted-foreground">Status</label>
+              <label className="text-xs font-medium text-muted-foreground">Status (multi)</label>
             </div>
-            <div className="flex h-9 items-center gap-1 rounded-lg border border-border bg-secondary/50 p-1">
-              {statusOptions.map((opt) => (
+            <div className="flex min-h-9 flex-wrap items-center gap-1 rounded-lg border border-border bg-secondary/50 p-1">
+              {statusOptions.filter((o) => o.value).map((opt) => {
+                const on = filterSituacoes.includes(opt.value);
+                return (
+                  <button
+                    key={opt.value}
+                    onClick={() =>
+                      setFilterSituacoes(on ? filterSituacoes.filter((s) => s !== opt.value) : [...filterSituacoes, opt.value])
+                    }
+                    className={cn(
+                      "rounded-md px-2 text-xs font-medium leading-7 transition-colors",
+                      on ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+              {filterSituacoes.length > 0 && (
                 <button
-                  key={opt.value}
-                  onClick={() => setFilterSituacao(opt.value)}
-                  className={cn(
-                    "flex-1 rounded-md px-2 text-xs font-medium leading-7 transition-colors",
-                    filterSituacao === opt.value
-                      ? "bg-card text-foreground shadow-xs"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
+                  onClick={() => setFilterSituacoes([])}
+                  className="rounded-md px-2 text-xs leading-7 text-muted-foreground hover:text-foreground"
                 >
-                  {opt.label}
+                  limpar
                 </button>
-              ))}
+              )}
             </div>
           </div>
         </div>
@@ -1036,12 +874,12 @@ export default function LicitacoesPage() {
               >
                 <div className="mt-3 grid grid-cols-1 items-start gap-4 border-t border-border pt-4 sm:grid-cols-2 lg:grid-cols-3">
                   <div className="space-y-1.5">
-                    <label className="block text-xs font-medium text-muted-foreground">Órgão</label>
-                    <ComboboxFilter
-                      value={filterOrgao}
-                      onChange={setFilterOrgao}
+                    <label className="block text-xs font-medium text-muted-foreground">Órgão(s)</label>
+                    <ComboboxMultiFilter
+                      values={filterOrgaos}
+                      onChange={setFilterOrgaos}
                       options={orgaoOptions}
-                      placeholder="Selecionar órgão..."
+                      placeholder="Selecionar órgãos..."
                       searchPlaceholder="Buscar órgão..."
                       isLoading={orgaosLoading}
                       onServerSearch={setOrgaoSearch}
@@ -1060,12 +898,33 @@ export default function LicitacoesPage() {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="block text-xs font-medium text-muted-foreground">Estado (UF)</label>
-                    <Select value={filterUf} onValueChange={(v) => setFilterUf(v === "__all__" ? "" : v)}>
-                      <SelectTrigger className="h-9"><SelectValue placeholder="Todos" /></SelectTrigger>
+                    <label className="block text-xs font-medium text-muted-foreground">Estado(s)</label>
+                    <ComboboxMultiFilter
+                      values={filterUfs}
+                      onChange={setFilterUfs}
+                      options={UFS.map((uf) => ({ label: uf, value: uf }))}
+                      placeholder="Todos os estados"
+                      searchPlaceholder="Buscar UF..."
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-medium text-muted-foreground">Modalidade(s)</label>
+                    <ComboboxMultiFilter
+                      values={filterModalidades}
+                      onChange={setFilterModalidades}
+                      options={MODALIDADE_OPTIONS.map((m) => ({ label: m, value: m }))}
+                      placeholder="Todas as modalidades"
+                      searchPlaceholder="Buscar modalidade..."
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-medium text-muted-foreground">Ordenar por</label>
+                    <Select value={filterSort} onValueChange={(v) => setFilterSort(v as typeof filterSort)}>
+                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="__all__">Todos</SelectItem>
-                        {UFS.map(uf => <SelectItem key={uf} value={uf}>{uf}</SelectItem>)}
+                        <SelectItem value="recentes">Mais recentes</SelectItem>
+                        <SelectItem value="valor">Maior valor homologado</SelectItem>
+                        <SelectItem value="estimado">Maior valor estimado</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1237,23 +1096,23 @@ export default function LicitacoesPage() {
           </div>
           <h2 className="mt-4 font-display text-lg font-semibold text-foreground">Nenhuma licitação encontrada</h2>
           <p className="mt-2 text-sm text-muted-foreground max-w-md text-center">
-            {appliedFilters.vencedor
-              ? `Não há resultados para "${appliedFilters.vencedor}" no período selecionado. Tente ampliar o intervalo de datas para o histórico completo.`
+            {appliedFilters.vencedores.length > 0
+              ? `Não há resultados para "${appliedFilters.vencedores.join(", ")}" no período selecionado. Tente ampliar o intervalo de datas para o histórico completo.`
               : "Use o menu \"Ingestão\" para buscar dados do PNCP."}
           </p>
-          {appliedFilters.vencedor && (
+          {appliedFilters.vencedores.length > 0 && (
             <Button
               variant="outline"
               className="mt-4"
               onClick={() => {
                 setActiveTab("encerradas");
-                setFilterSituacao("");
+                setFilterSituacoes([]);
                 setFilterDateFrom(undefined);
                 setFilterDateTo(undefined);
                 setPage(0);
                 setAppliedFilters((prev) => ({
                   ...prev,
-                  situacao: undefined,
+                  situacoes: [],
                   tab: "encerradas",
                   dateFrom: undefined,
                   dateTo: undefined,
