@@ -61,10 +61,11 @@ async function fetchWithTimeout(url: string): Promise<Response> {
     const timeoutMs = FETCH_TIMEOUT_MS + attempt * 10_000;
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
-      const resp = await fetch(url, {
-        headers: { Accept: "application/json" },
-        signal: ctrl.signal,
-      });
+      const resp = await metrics.timed(
+        url,
+        () => fetch(url, { headers: { Accept: "application/json" }, signal: ctrl.signal }),
+        { retry: attempt > 0 },
+      );
       clearTimeout(timer);
       if (resp.status === 429) {
         runMetrics.http_429++;
