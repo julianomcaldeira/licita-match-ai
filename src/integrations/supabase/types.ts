@@ -2778,6 +2778,41 @@ export type Database = {
           vencedor_nome: string
         }[]
       }
+      search_licitacoes_v2: {
+        Args: {
+          p_com_vencedor?: boolean
+          p_date_from?: string
+          p_date_to?: string
+          p_itens?: string[]
+          p_itens_mode?: string
+          p_limit?: number
+          p_modalidades?: string[]
+          p_offset?: number
+          p_orgaos?: string[]
+          p_sem_resultado?: boolean
+          p_situacoes?: string[]
+          p_sort?: string
+          p_terms?: string[]
+          p_terms_mode?: string
+          p_ufs?: string[]
+          p_vencedores?: string[]
+        }
+        Returns: {
+          data_publicacao: string
+          id: string
+          modalidade: string
+          municipio: string
+          numero_controle_pncp: string
+          objeto: string
+          orgao: string
+          situacao: string
+          total_count: number
+          uf: string
+          valor_estimado: number
+          valor_homologado: number
+          vencedor_nome: string
+        }[]
+      }
       set_winners_backlog_cursor: {
         Args: { p_cursor: string; p_processed?: number }
         Returns: undefined
