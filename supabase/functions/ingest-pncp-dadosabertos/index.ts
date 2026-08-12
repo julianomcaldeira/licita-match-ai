@@ -51,11 +51,16 @@ function todayYmd(): string {
   return fmtDate(new Date());
 }
 
-async function fetchJson(url: string): Promise<any> {
+async function fetchJson(url: string, opts: { deadline?: number } = {}): Promise<any> {
   let lastErr: any = null;
+  const deadline = opts.deadline ?? Infinity;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    // respeita o deadline da execucao: nao inicia tentativa sem folga minima
+    const remaining = deadline - Date.now();
+    if (remaining < 6_000) break;
+    const timeoutMs = Math.max(5_000, Math.min(FETCH_TIMEOUT_MS, remaining - 2_000));
     const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
       const r = await fetch(url, {
         signal: ctrl.signal,
@@ -68,11 +73,14 @@ async function fetchJson(url: string): Promise<any> {
     } catch (e) {
       clearTimeout(t);
       lastErr = e;
-      await new Promise((res) => setTimeout(res, 1500 * (attempt + 1)));
+      const backoff = 1500 * (attempt + 1);
+      if (Date.now() + backoff > deadline - 6_000) break;
+      await new Promise((res) => setTimeout(res, backoff));
     }
   }
   throw lastErr ?? new Error("fetch failed");
 }
+
 
 interface ContratoApi {
   numeroControlePNCP: string;
@@ -124,7 +132,12 @@ async function ingestContratosWindow(
   supabase: any,
   dataInicial: string,
   dataFinal: string,
-  opts: { startPage?: number; deadline?: number; skipRaw?: boolean } = {},
+  opts: {
+    startPage?: number;
+    deadline?: number;
+    skipRaw?: boolean;
+    onPage?: (info: { nextPage: number; contratos: number }) => Promise<void>;
+  } = {},
 ): Promise<{ pages: number; contratos: number; comprasUnicas: number; errors: string[]; nextPage: number | null }> {
   const errors: string[] = [];
   let totalContratos = 0;
@@ -137,15 +150,17 @@ async function ingestContratosWindow(
 
   let pagina = Math.max(1, opts.startPage ?? 1);
   while (true) {
-    if (Date.now() > deadline) {
+    // precisa de folga para buscar + gravar a pagina
+    if (Date.now() > deadline - 8_000) {
       nextPage = pagina;
       break;
     }
     const url = `${PNCP_CONSULTA}/contratos?dataInicial=${dataInicial}&dataFinal=${dataFinal}&pagina=${pagina}&tamanhoPagina=${PAGE_SIZE}`;
     let data: any;
     try {
-      data = await fetchJson(url);
+      data = await fetchJson(url, { deadline });
     } catch (e) {
+
       errors.push(`page ${pagina}: ${e instanceof Error ? e.message : String(e)}`);
       nextPage = pagina;
       break;
@@ -196,7 +211,17 @@ async function ingestContratosWindow(
     if (data.data.length < PAGE_SIZE) break;
     if (data.totalPaginas && pagina >= data.totalPaginas) break;
     pagina++;
+
+    // persiste o progresso a cada pagina concluida (nada se perde se a execucao morrer)
+    if (opts.onPage) {
+      if (rawBatch.length) await flushRaw(supabase, rawBatch.splice(0));
+      if (normBatch.length) await flushContratos(supabase, normBatch.splice(0));
+      try {
+        await opts.onPage({ nextPage: pagina, contratos: totalContratos });
+      } catch (_) { /* progresso e best-effort */ }
+    }
   }
+
 
   if (rawBatch.length) await flushRaw(supabase, rawBatch);
   if (normBatch.length) await flushContratos(supabase, normBatch);
@@ -495,22 +520,36 @@ Deno.serve(async (req) => {
       }
       const startPage = Math.max(1, Number(body.paginaInicial) || 1);
       const diaIso = `${dia.slice(0, 4)}-${dia.slice(4, 6)}-${dia.slice(6, 8)}`;
+      let reportado = 0;
       try {
         const win = await ingestContratosWindow(supabase, dia, dia, {
           startPage,
-          deadline: Date.now() + 55_000,
+          deadline: Date.now() + 50_000,
           skipRaw: true,
+          onPage: async ({ nextPage, contratos }) => {
+            const delta = contratos - reportado;
+            reportado = contratos;
+            await supabase.rpc("mark_contratos_dia", {
+              p_dia: diaIso,
+              p_status: "processing",
+              p_contratos: delta,
+              p_error: null,
+              p_pagina: nextPage,
+              p_acumula: true,
+            });
+          },
         });
         const finished = win.nextPage === null;
         const ok = finished && win.errors.length === 0;
         await supabase.rpc("mark_contratos_dia", {
           p_dia: diaIso,
           p_status: ok ? "done" : "pending",
-          p_contratos: win.contratos,
+          p_contratos: Math.max(0, win.contratos - reportado),
           p_error: win.errors.slice(0, 2).join(" | ") || null,
           p_pagina: win.nextPage ?? 1,
-          p_acumula: startPage > 1,
+          p_acumula: true,
         });
+
         await logRun(
           supabase,
           `contratos/dia`,
