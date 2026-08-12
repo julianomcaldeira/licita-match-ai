@@ -1643,6 +1643,57 @@ export type Database = {
         }
         Relationships: []
       }
+      pncp_endpoint_metrics: {
+        Row: {
+          aborts: number
+          bucket: string
+          endpoint: string
+          errors: number
+          function_name: string
+          http_429: number
+          http_4xx: number
+          http_5xx: number
+          last_error: string | null
+          latency_ms_max: number
+          latency_ms_sum: number
+          requests: number
+          retries: number
+          updated_at: string
+        }
+        Insert: {
+          aborts?: number
+          bucket: string
+          endpoint: string
+          errors?: number
+          function_name: string
+          http_429?: number
+          http_4xx?: number
+          http_5xx?: number
+          last_error?: string | null
+          latency_ms_max?: number
+          latency_ms_sum?: number
+          requests?: number
+          retries?: number
+          updated_at?: string
+        }
+        Update: {
+          aborts?: number
+          bucket?: string
+          endpoint?: string
+          errors?: number
+          function_name?: string
+          http_429?: number
+          http_4xx?: number
+          http_5xx?: number
+          last_error?: string | null
+          latency_ms_max?: number
+          latency_ms_sum?: number
+          requests?: number
+          retries?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pncp_gap_queue: {
         Row: {
           ano: number
@@ -2571,6 +2622,36 @@ export type Database = {
       }
       pncp_dadosabertos_backfill_fast_tick: { Args: never; Returns: Json }
       pncp_dadosabertos_backfill_tick: { Args: never; Returns: Json }
+      pncp_endpoint_metrics_summary: {
+        Args: { p_minutes?: number }
+        Returns: {
+          aborts: number
+          avg_latency_ms: number
+          endpoint: string
+          error_rate: number
+          errors: number
+          function_name: string
+          http_429: number
+          http_4xx: number
+          http_5xx: number
+          last_error: string
+          last_seen: string
+          max_latency_ms: number
+          requests: number
+          retries: number
+        }[]
+      }
+      pncp_endpoint_metrics_timeline: {
+        Args: { p_minutes?: number }
+        Returns: {
+          aborts: number
+          avg_latency_ms: number
+          bucket: string
+          errors: number
+          requests: number
+          retries: number
+        }[]
+      }
       pncp_gaps_por_orgao_ano: {
         Args: { p_limit?: number; p_min_ano?: number }
         Returns: {
@@ -2607,6 +2688,7 @@ export type Database = {
           seq: number
         }[]
       }
+      pncp_metrics_record: { Args: { p_rows: Json }; Returns: undefined }
       pncp_reprocess_summary: {
         Args: never
         Returns: {
