@@ -1604,6 +1604,45 @@ export type Database = {
         }
         Relationships: []
       }
+      pncp_circuit: {
+        Row: {
+          created_at: string
+          failures: number
+          last_opened_at: string | null
+          last_reason: string | null
+          open_until: string | null
+          source: string
+          state: string
+          successes: number
+          trips: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          failures?: number
+          last_opened_at?: string | null
+          last_reason?: string | null
+          open_until?: string | null
+          source: string
+          state?: string
+          successes?: number
+          trips?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          failures?: number
+          last_opened_at?: string | null
+          last_reason?: string | null
+          open_until?: string | null
+          source?: string
+          state?: string
+          successes?: number
+          trips?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pncp_gap_queue: {
         Row: {
           ano: number
@@ -2506,6 +2545,28 @@ export type Database = {
           situacao: string
           uf: string
           valor_estimado: number
+        }[]
+      }
+      pncp_circuit_allow: { Args: { p_source: string }; Returns: boolean }
+      pncp_circuit_report: {
+        Args: {
+          p_ok: boolean
+          p_reason?: string
+          p_source: string
+          p_threshold?: number
+        }
+        Returns: Json
+      }
+      pncp_circuit_status: {
+        Args: never
+        Returns: {
+          failures: number
+          last_reason: string
+          open_until: string
+          source: string
+          state: string
+          trips: number
+          updated_at: string
         }[]
       }
       pncp_dadosabertos_backfill_fast_tick: { Args: never; Returns: Json }
