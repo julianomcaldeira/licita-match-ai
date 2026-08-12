@@ -29,8 +29,6 @@ const corsHeaders = {
 
 const PNCP_CONSULTA_URL = "https://pncp.gov.br/api/consulta/v1";
 const PNCP_DATA_URL = "https://pncp.gov.br/api/pncp/v1";
-const FETCH_TIMEOUT_MS = 20_000;
-const MAX_RETRIES = 3;
 
 // Global counters populated during a run and flushed to ingestao_logs.details
 // so the autoscaler can react to pressure signals.
@@ -40,10 +38,6 @@ const runMetrics = {
   fetch_timeouts: 0,
 };
 let runtimeParallel = 10;
-
-
-function backoff(attempt: number, base: number) {
-  const jitter = Math.floor(Math.random() * 400);
   return base * Math.pow(2, attempt) + jitter;
 }
 

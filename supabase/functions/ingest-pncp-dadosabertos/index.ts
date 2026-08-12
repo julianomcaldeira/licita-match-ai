@@ -33,8 +33,6 @@ const corsHeaders = {
 const PNCP_CONSULTA = "https://pncp.gov.br/api/consulta/v1";
 const PNCP_DATA = "https://pncp.gov.br/api/pncp/v1";
 const PAGE_SIZE = 500;
-const FETCH_TIMEOUT_MS = 20_000;
-const MAX_RETRIES = 3;
 const COMPRA_CONCURRENCY = 8;
 const ITEM_CONCURRENCY = 5;
 
