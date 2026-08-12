@@ -1288,7 +1288,7 @@ export default function LicitacoesPage() {
                             <Eye className="h-3.5 w-3.5" />
                           </button>
                         </td>
-                        <td className="table-sticky-col px-4 py-3 font-medium text-foreground max-w-[220px]">
+                        <td className="table-sticky-col px-4 py-3 font-medium text-foreground max-w-[200px]">
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <span className="flex min-w-0 items-center gap-1">
@@ -1303,7 +1303,7 @@ export default function LicitacoesPage() {
                             <TooltipContent side="bottom" className="max-w-sm"><p>{row.orgao}</p></TooltipContent>
                           </Tooltip>
                         </td>
-                        <td className="px-4 py-3 max-w-xs">
+                        <td className="px-4 py-3 max-w-[240px]">
                           <Tooltip>
                             <TooltipTrigger asChild><span className="block truncate text-foreground">{row.objeto}</span></TooltipTrigger>
                             <TooltipContent side="bottom" className="max-w-md"><p className="text-xs leading-relaxed">{row.objeto}</p></TooltipContent>
