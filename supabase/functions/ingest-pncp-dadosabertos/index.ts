@@ -42,6 +42,8 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const metrics = new PncpMetrics("ingest-pncp-dadosabertos");
+const budgets = new PncpBudgets(30);
+
 
 function fmtDate(d: Date): string {
   return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
