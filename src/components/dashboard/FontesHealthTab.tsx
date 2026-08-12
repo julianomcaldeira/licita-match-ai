@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
+import { EndpointMetricsCard } from "./EndpointMetricsCard";
 
 interface FonteHealth {
   fonte: string;
