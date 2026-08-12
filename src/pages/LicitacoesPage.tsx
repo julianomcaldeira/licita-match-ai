@@ -127,7 +127,7 @@ function StatusBadge({ situacao, hasWinner, valorHomologado }: { situacao: strin
     ? "bg-destructive/10 text-destructive border-destructive/20"
     : "bg-muted text-muted-foreground border-border";
   return (
-    <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${color}`}>
+    <span className={`inline-flex items-center whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-medium ${color}`}>
       {displayStatus || "—"}
     </span>
   );
@@ -703,17 +703,17 @@ export default function LicitacoesPage() {
   }, [appliedFilters, isAbertas]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-display text-2xl font-bold text-foreground">Licitações</h1>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-1">
+          <h1 className="font-display text-3xl font-bold tracking-tight text-foreground">Licitações</h1>
           <p className="text-sm text-muted-foreground">
             {activeTab === "abertas" ? "Abertas · Mais recentes primeiro" : "Encerradas · Ordenadas por maior valor"}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={openExportDialog} disabled={exporting || !hasData} className="flex h-9 items-center gap-2 rounded-lg border border-input bg-card px-3 text-xs font-medium text-muted-foreground hover:bg-secondary transition disabled:opacity-50">
+          <button onClick={openExportDialog} disabled={exporting || !hasData} className="flex h-9 items-center gap-2 rounded-lg border border-input bg-card px-3 text-xs font-medium text-muted-foreground shadow-xs transition hover:bg-secondary disabled:opacity-50">
             {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileSpreadsheet className="h-3.5 w-3.5" />}
             Exportar Excel
           </button>
@@ -721,57 +721,73 @@ export default function LicitacoesPage() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as "abertas" | "encerradas")} className="w-full">
-        <TabsList className="w-full max-w-lg">
-          <TabsTrigger value="abertas" className="flex-1 gap-2">
-            <Clock className="h-4 w-4" />
-            Abertas / Em Andamento
-            {tabCounts && <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">{tabCounts.abertas.toLocaleString("pt-BR")}</Badge>}
-          </TabsTrigger>
-          <TabsTrigger value="encerradas" className="flex-1 gap-2">
-            <Award className="h-4 w-4" />
-            Encerradas / Com Resultado
-            {tabCounts && <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">{tabCounts.encerradas.toLocaleString("pt-BR")}</Badge>}
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      {/* Totalizador de auditoria */}
-      {tabCounts && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="rounded-xl border border-border bg-card p-3 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <Database className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Total Geral</p>
-              <p className="text-xl font-bold text-foreground">{(tabCounts.abertas + tabCounts.encerradas).toLocaleString("pt-BR")}</p>
-            </div>
-          </div>
-          <div className="rounded-xl border border-border bg-card p-3 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-info/10">
-              <Clock className="h-5 w-5 text-info" />
-            </div>
-            <div>
-              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Abertas</p>
-              <p className="text-xl font-bold text-foreground">{tabCounts.abertas.toLocaleString("pt-BR")}</p>
-            </div>
-          </div>
-          <div className="rounded-xl border border-border bg-card p-3 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
-              <Award className="h-5 w-5 text-success" />
-            </div>
-            <div>
-              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Encerradas</p>
-              <p className="text-xl font-bold text-foreground">{tabCounts.encerradas.toLocaleString("pt-BR")}</p>
-            </div>
-          </div>
+      {/* Painel único: abas + indicadores + filtros */}
+      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+        {/* Abas de status */}
+        <div className="flex overflow-x-auto border-b border-border">
+          {([
+            { key: "abertas" as const, label: "Abertas / Em Andamento", icon: Clock, count: tabCounts?.abertas },
+            { key: "encerradas" as const, label: "Encerradas / Com Resultado", icon: Award, count: tabCounts?.encerradas },
+          ]).map((t) => {
+            const active = activeTab === t.key;
+            const Icon = t.icon;
+            return (
+              <button
+                key={t.key}
+                onClick={() => handleTabChange(t.key)}
+                className={cn(
+                  "flex shrink-0 items-center gap-2.5 border-b-2 px-5 py-4 text-sm transition-colors",
+                  active
+                    ? "border-primary font-semibold text-primary"
+                    : "border-transparent font-medium text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                <span className="whitespace-nowrap">{t.label}</span>
+                {t.count != null && (
+                  <span
+                    className={cn(
+                      "rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums",
+                      active ? "bg-primary/10 text-primary" : "bg-secondary text-muted-foreground"
+                    )}
+                  >
+                    {t.count.toLocaleString("pt-BR")}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
-      )}
 
-      {/* Filters */}
-      <div className="rounded-xl border border-border bg-card p-4 space-y-4">
+        {/* Indicadores */}
+        {tabCounts && (
+          <div className="grid grid-cols-1 divide-y divide-border border-b border-border sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+            {[
+              { label: "Total Geral", value: tabCounts.abertas + tabCounts.encerradas, icon: Database, tone: "bg-primary/10 text-primary" },
+              { label: "Abertas", value: tabCounts.abertas, icon: Clock, tone: "bg-info/10 text-info" },
+              { label: "Encerradas", value: tabCounts.encerradas, icon: Award, tone: "bg-success/10 text-success" },
+            ].map((kpi) => {
+              const Icon = kpi.icon;
+              return (
+                <div key={kpi.label} className="flex items-center gap-4 px-5 py-4">
+                  <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl", kpi.tone)}>
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{kpi.label}</p>
+                    <p className="truncate font-display text-2xl font-bold tabular-nums text-foreground">
+                      {kpi.value.toLocaleString("pt-BR")}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Filters */}
+        <div className="space-y-4 bg-secondary/30 p-4 sm:p-5">
+
         {/* Row 1: Objeto + Itens + Status — multi-seleção */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-start">
           <div className="space-y-1.5 lg:col-span-5">
@@ -1026,7 +1042,9 @@ export default function LicitacoesPage() {
           </Button>
         </div>
 
+        </div>
       </div>
+
 
       {/* Search loading bar */}
       <AnimatePresence>
@@ -1227,29 +1245,29 @@ export default function LicitacoesPage() {
               <table className="table-sticky">
                 <thead>
                   <tr className="border-b border-border bg-secondary/50">
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground w-16"></th>
-                    <th className="table-sticky-col px-4 py-3 text-left font-medium text-muted-foreground">Órgão</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Objeto</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Modalidade</th>
-                    <th className="px-4 py-3 text-right font-medium text-muted-foreground">Valor Est.</th>
+                    <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-16"></th>
+                    <th className="table-sticky-col px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Órgão</th>
+                    <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Objeto</th>
+                    <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Modalidade</th>
+                    <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Valor Est.</th>
                     {activeTab === "encerradas" && (
                       <>
-                        <th className="px-4 py-3 text-right font-medium text-muted-foreground">Val. Homologado</th>
-                        <th className="px-4 py-3 text-right font-medium text-muted-foreground">Economia</th>
-                        <th className="px-4 py-3 text-right font-medium text-muted-foreground">
+                        <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Val. Homologado</th>
+                        <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Economia</th>
+                        <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                           <Tooltip>
                             <TooltipTrigger asChild><span className="cursor-help border-b border-dotted border-muted-foreground/40">Empenhado</span></TooltipTrigger>
                             <TooltipContent side="bottom" className="max-w-xs"><p className="text-xs">Valor já comprometido pelo órgão via empenho. Fonte oficial disponível apenas para órgãos federais; estaduais e municipais aparecem como <strong>n/d</strong> (sem fonte pública), não como ausência de execução.</p></TooltipContent>
                           </Tooltip>
                         </th>
-                        <th className="px-4 py-3 text-left font-medium text-muted-foreground">Vencedor</th>
+                        <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Vencedor</th>
                       </>
                     )}
                     {activeTab === "abertas" && (
-                      <th className="px-4 py-3 text-center font-medium text-muted-foreground">Situação</th>
+                      <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Situação</th>
                     )}
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Data</th>
-                    <th className="px-4 py-3 text-center font-medium text-muted-foreground">UF</th>
+                    <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Data</th>
+                    <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-muted-foreground">UF</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1270,28 +1288,29 @@ export default function LicitacoesPage() {
                             <Eye className="h-3.5 w-3.5" />
                           </button>
                         </td>
-                        <td className="table-sticky-col px-4 py-3 font-medium text-foreground max-w-[220px]">
+                        <td className="table-sticky-col px-4 py-3 font-medium text-foreground max-w-[200px]">
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <span className="block truncate">
+                              <span className="flex min-w-0 items-center gap-1">
                                 {pncpLink ? (
-                                  <a href={pncpLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="flex items-center gap-1 text-primary hover:underline">
-                                    {row.orgao} <ExternalLink className="h-3 w-3 shrink-0" />
+                                  <a href={pncpLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="flex min-w-0 items-center gap-1 text-primary hover:underline">
+                                    <span className="truncate">{row.orgao}</span>
+                                    <ExternalLink className="h-3 w-3 shrink-0" />
                                   </a>
-                                ) : row.orgao}
+                                ) : <span className="truncate">{row.orgao}</span>}
                               </span>
                             </TooltipTrigger>
                             <TooltipContent side="bottom" className="max-w-sm"><p>{row.orgao}</p></TooltipContent>
                           </Tooltip>
                         </td>
-                        <td className="px-4 py-3 max-w-xs">
+                        <td className="px-4 py-3 max-w-[240px]">
                           <Tooltip>
                             <TooltipTrigger asChild><span className="block truncate text-foreground">{row.objeto}</span></TooltipTrigger>
                             <TooltipContent side="bottom" className="max-w-md"><p className="text-xs leading-relaxed">{row.objeto}</p></TooltipContent>
                           </Tooltip>
                         </td>
-                        <td className="px-4 py-3 text-muted-foreground text-xs">{row.modalidade || "—"}</td>
-                        <td className="px-4 py-3 text-right font-medium text-foreground tabular-nums">{formatCurrency(row.valor_estimado)}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-muted-foreground text-xs">{row.modalidade || "—"}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-foreground tabular-nums">{formatCurrency(row.valor_estimado)}</td>
                         {activeTab === "encerradas" && (
                           <>
                             <td className="px-4 py-3 text-right font-medium text-success tabular-nums">{row.valor_homologado ? formatCurrency(row.valor_homologado) : "—"}</td>
@@ -1356,7 +1375,7 @@ export default function LicitacoesPage() {
                             <StatusBadge situacao={row.situacao} valorHomologado={row.valor_homologado} />
                           </td>
                         )}
-                        <td className="px-4 py-3 text-muted-foreground text-xs">{formattedDate}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-muted-foreground text-xs">{formattedDate}</td>
                         <td className="px-4 py-3 text-center text-muted-foreground text-xs font-medium">{row.uf || "—"}</td>
                       </tr>
                     );
