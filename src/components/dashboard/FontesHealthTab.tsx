@@ -29,6 +29,19 @@ const SEV = {
   critico: { label: "Crítico", icon: XCircle, cls: "bg-destructive/10 text-destructive border-destructive/30" },
 } as const;
 
+const CIRCUIT_LABELS: Record<string, string> = {
+  contratos: "Contratos",
+  contratos_itens: "Itens de contrato",
+  atas: "Atas de registro de preço",
+  compras: "Compras / editais",
+  compras_itens: "Itens da compra",
+  compras_resultados: "Resultados da compra",
+  contratacoes: "Contratações (consulta)",
+  instrumentos_cobranca: "Instrumentos de cobrança",
+  pca: "Plano de contratações (PCA)",
+  outros: "Outros endpoints",
+};
+
 function CircuitCard() {
   const { data } = useQuery({
     queryKey: ["pncp-circuit"],
@@ -48,12 +61,13 @@ function CircuitCard() {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm">Circuit breaker do PNCP</CardTitle>
+        <CardTitle className="text-sm">Circuit breaker do PNCP (por endpoint)</CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
         {data.map((c) => (
           <div key={c.source} className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="font-medium">{c.source}</span>
+            <span className="font-medium">{CIRCUIT_LABELS[c.source] ?? c.source}</span>
+
             <Badge
               variant="outline"
               className={
