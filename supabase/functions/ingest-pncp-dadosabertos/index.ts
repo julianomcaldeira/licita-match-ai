@@ -20,6 +20,7 @@
 //   POST {"mode":"compra","cnpj":"...","ano":2024,"sequencial":67}
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { PncpMetrics } from "../_shared/pncp-metrics.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
