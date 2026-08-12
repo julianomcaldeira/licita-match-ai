@@ -520,22 +520,36 @@ Deno.serve(async (req) => {
       }
       const startPage = Math.max(1, Number(body.paginaInicial) || 1);
       const diaIso = `${dia.slice(0, 4)}-${dia.slice(4, 6)}-${dia.slice(6, 8)}`;
+      let reportado = 0;
       try {
         const win = await ingestContratosWindow(supabase, dia, dia, {
           startPage,
-          deadline: Date.now() + 55_000,
+          deadline: Date.now() + 50_000,
           skipRaw: true,
+          onPage: async ({ nextPage, contratos }) => {
+            const delta = contratos - reportado;
+            reportado = contratos;
+            await supabase.rpc("mark_contratos_dia", {
+              p_dia: diaIso,
+              p_status: "processing",
+              p_contratos: delta,
+              p_error: null,
+              p_pagina: nextPage,
+              p_acumula: true,
+            });
+          },
         });
         const finished = win.nextPage === null;
         const ok = finished && win.errors.length === 0;
         await supabase.rpc("mark_contratos_dia", {
           p_dia: diaIso,
           p_status: ok ? "done" : "pending",
-          p_contratos: win.contratos,
+          p_contratos: Math.max(0, win.contratos - reportado),
           p_error: win.errors.slice(0, 2).join(" | ") || null,
           p_pagina: win.nextPage ?? 1,
-          p_acumula: startPage > 1,
+          p_acumula: true,
         });
+
         await logRun(
           supabase,
           `contratos/dia`,
