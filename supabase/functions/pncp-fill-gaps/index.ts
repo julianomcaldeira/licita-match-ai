@@ -318,6 +318,9 @@ const handler = async (req: Request) => {
 
   // carrega timeouts/retries adaptativos com base nas métricas recentes
   await budgets.load(supabase);
+  // circuit breaker por endpoint (compras, itens, resultados, atas, contratos...)
+  circuits = new PncpCircuits(supabase);
+
 
 
 
