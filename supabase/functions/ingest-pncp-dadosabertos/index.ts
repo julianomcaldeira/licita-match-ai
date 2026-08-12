@@ -21,6 +21,8 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PncpMetrics } from "../_shared/pncp-metrics.ts";
+import { PncpBudgets } from "../_shared/pncp-budget.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -31,8 +33,6 @@ const corsHeaders = {
 const PNCP_CONSULTA = "https://pncp.gov.br/api/consulta/v1";
 const PNCP_DATA = "https://pncp.gov.br/api/pncp/v1";
 const PAGE_SIZE = 500;
-const FETCH_TIMEOUT_MS = 20_000;
-const MAX_RETRIES = 3;
 const COMPRA_CONCURRENCY = 8;
 const ITEM_CONCURRENCY = 5;
 
@@ -40,6 +40,8 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const metrics = new PncpMetrics("ingest-pncp-dadosabertos");
+const budgets = new PncpBudgets(30);
+
 
 function fmtDate(d: Date): string {
   return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
@@ -57,11 +59,18 @@ function todayYmd(): string {
 async function fetchJson(url: string, opts: { deadline?: number } = {}): Promise<any> {
   let lastErr: any = null;
   const deadline = opts.deadline ?? Infinity;
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+  const maxRetries = budgets.retriesFor(url);
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
     // respeita o deadline da execucao: nao inicia tentativa sem folga minima
     const remaining = deadline - Date.now();
     if (remaining < 6_000) break;
-    const timeoutMs = Math.max(5_000, Math.min(FETCH_TIMEOUT_MS, remaining - 2_000));
+    // timeout adaptativo por endpoint (latencia media recente), limitado
+    // pelo tempo restante da execucao
+    const timeoutMs = budgets.timeoutFor(
+      url,
+      attempt,
+      Number.isFinite(remaining) ? remaining : undefined,
+    );
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
@@ -77,11 +86,12 @@ async function fetchJson(url: string, opts: { deadline?: number } = {}): Promise
     } catch (e) {
       clearTimeout(t);
       lastErr = e;
-      const backoff = 1500 * (attempt + 1);
+      const backoff = budgets.backoffFor(url, attempt);
       if (Date.now() + backoff > deadline - 6_000) break;
       await new Promise((res) => setTimeout(res, backoff));
     }
   }
+
   throw lastErr ?? new Error("fetch failed");
 }
 
@@ -475,6 +485,11 @@ const handler = async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+
+  // timeouts/retries adaptativos conforme latencia recente por endpoint
+  await budgets.load(supabase);
+
+
 
   let body: any = {};
   try {

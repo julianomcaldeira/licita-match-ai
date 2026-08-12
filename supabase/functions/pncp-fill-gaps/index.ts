@@ -15,8 +15,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PncpMetrics } from "../_shared/pncp-metrics.ts";
+import { PncpBudgets } from "../_shared/pncp-budget.ts";
 
 const metrics = new PncpMetrics("pncp-fill-gaps");
+const budgets = new PncpBudgets(30);
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,8 +29,6 @@ const corsHeaders = {
 
 const PNCP_CONSULTA_URL = "https://pncp.gov.br/api/consulta/v1";
 const PNCP_DATA_URL = "https://pncp.gov.br/api/pncp/v1";
-const FETCH_TIMEOUT_MS = 20_000;
-const MAX_RETRIES = 3;
 
 // Global counters populated during a run and flushed to ingestao_logs.details
 // so the autoscaler can react to pressure signals.
@@ -39,11 +40,6 @@ const runMetrics = {
 let runtimeParallel = 10;
 
 
-function backoff(attempt: number, base: number) {
-  const jitter = Math.floor(Math.random() * 400);
-  return base * Math.pow(2, attempt) + jitter;
-}
-
 // Cooldown global: quando o PNCP responde 429, todas as tarefas do run
 // esperam até este timestamp antes de disparar novas requisições.
 let throttleUntil = 0;
@@ -54,11 +50,13 @@ async function waitForThrottle() {
 
 async function fetchWithTimeout(url: string): Promise<Response> {
   let lastErr: unknown = null;
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+  const maxRetries = budgets.retriesFor(url);
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
     await waitForThrottle();
     const ctrl = new AbortController();
-    // timeout adaptativo: cada retentativa espera um pouco mais
-    const timeoutMs = FETCH_TIMEOUT_MS + attempt * 10_000;
+    // timeout adaptativo por endpoint: baseado na latência média recente
+    // do PNCP e ampliado a cada retentativa.
+    const timeoutMs = budgets.timeoutFor(url, attempt);
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
       const resp = await metrics.timed(
@@ -74,14 +72,14 @@ async function fetchWithTimeout(url: string): Promise<Response> {
         const retryAfter = Number(resp.headers.get("retry-after"));
         const waitMs = Number.isFinite(retryAfter) && retryAfter > 0
           ? Math.min(retryAfter * 1000, 20_000)
-          : backoff(attempt, 2500);
+          : budgets.backoffFor(url, attempt) * 2;
         throttleUntil = Math.max(throttleUntil, Date.now() + waitMs);
         await waitForThrottle();
         continue;
       }
       if (resp.status >= 500) {
         runMetrics.http_5xx++;
-        await new Promise((r) => setTimeout(r, backoff(attempt, 1200)));
+        await new Promise((r) => setTimeout(r, budgets.backoffFor(url, attempt)));
         continue;
       }
       return resp;
@@ -89,9 +87,10 @@ async function fetchWithTimeout(url: string): Promise<Response> {
       clearTimeout(timer);
       runMetrics.fetch_timeouts++;
       lastErr = e;
-      await new Promise((r) => setTimeout(r, backoff(attempt, 800)));
+      await new Promise((r) => setTimeout(r, budgets.backoffFor(url, attempt)));
     }
   }
+
   throw new Error(
     lastErr instanceof Error
       ? `fetch_failed:${lastErr.message || "timeout"}`
@@ -301,6 +300,11 @@ const handler = async (req: Request) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
+
+  // carrega timeouts/retries adaptativos com base nas métricas recentes
+  await budgets.load(supabase);
+
+
 
   let body: any = {};
   try {
