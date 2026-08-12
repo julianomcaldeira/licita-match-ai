@@ -681,7 +681,19 @@ Deno.serve(async (req) => {
     }
 
     // 1) Walk contratos for window
+    const gateWin = await circuitAllow(supabase);
+    if (!gateWin.allowed) {
+      return new Response(
+        JSON.stringify({ ok: false, mode, skipped: "circuit_open", retryAt: gateWin.retryAt }),
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
     const win = await ingestContratosWindow(supabase, dataInicial, dataFinal);
+    if (win.errors.some((e) => isSourceOutage(e))) {
+      await circuitReport(supabase, false, win.errors[0]);
+    } else {
+      await circuitReport(supabase, true);
+    }
 
     // 2) For each unique compra discovered, fetch items + resultados
     // (We re-extract from pncp_raw rows just inserted)
