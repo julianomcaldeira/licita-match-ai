@@ -1042,7 +1042,9 @@ export default function LicitacoesPage() {
           </Button>
         </div>
 
+        </div>
       </div>
+
 
       {/* Search loading bar */}
       <AnimatePresence>
