@@ -30,8 +30,8 @@ const corsHeaders = {
 const PNCP_CONSULTA = "https://pncp.gov.br/api/consulta/v1";
 const PNCP_DATA = "https://pncp.gov.br/api/pncp/v1";
 const PAGE_SIZE = 500;
-const FETCH_TIMEOUT_MS = 45_000;
-const MAX_RETRIES = 6;
+const FETCH_TIMEOUT_MS = 20_000;
+const MAX_RETRIES = 3;
 const COMPRA_CONCURRENCY = 8;
 const ITEM_CONCURRENCY = 5;
 
@@ -124,22 +124,30 @@ async function ingestContratosWindow(
   supabase: any,
   dataInicial: string,
   dataFinal: string,
-): Promise<{ pages: number; contratos: number; comprasUnicas: number; errors: string[] }> {
+  opts: { startPage?: number; deadline?: number; skipRaw?: boolean } = {},
+): Promise<{ pages: number; contratos: number; comprasUnicas: number; errors: string[]; nextPage: number | null }> {
   const errors: string[] = [];
   let totalContratos = 0;
   let pages = 0;
   const compraKeys = new Set<string>();
   const rawBatch: any[] = [];
   const normBatch: any[] = [];
+  const deadline = opts.deadline ?? Infinity;
+  let nextPage: number | null = null;
 
-  let pagina = 1;
+  let pagina = Math.max(1, opts.startPage ?? 1);
   while (true) {
+    if (Date.now() > deadline) {
+      nextPage = pagina;
+      break;
+    }
     const url = `${PNCP_CONSULTA}/contratos?dataInicial=${dataInicial}&dataFinal=${dataFinal}&pagina=${pagina}&tamanhoPagina=${PAGE_SIZE}`;
     let data: any;
     try {
       data = await fetchJson(url);
     } catch (e) {
       errors.push(`page ${pagina}: ${e instanceof Error ? e.message : String(e)}`);
+      nextPage = pagina;
       break;
     }
     if (!data || !Array.isArray(data.data) || data.data.length === 0) break;
@@ -149,11 +157,13 @@ async function ingestContratosWindow(
       totalContratos++;
       if (c.numeroControlePncpCompra) compraKeys.add(c.numeroControlePncpCompra);
 
-      rawBatch.push({
-        tipo: "contrato",
-        chave_origem: c.numeroControlePNCP ?? `${c.orgaoEntidade?.cnpj}-${c.anoContrato}-${c.numeroContratoEmpenho}`,
-        payload: c,
-      });
+      if (!opts.skipRaw) {
+        rawBatch.push({
+          tipo: "contrato",
+          chave_origem: c.numeroControlePNCP ?? `${c.orgaoEntidade?.cnpj}-${c.anoContrato}-${c.numeroContratoEmpenho}`,
+          payload: c,
+        });
+      }
 
       normBatch.push({
         numero_contrato: c.numeroContratoEmpenho ?? c.numeroControlePNCP,
@@ -178,8 +188,8 @@ async function ingestContratosWindow(
     }
 
     // Flush in chunks
-    if (rawBatch.length >= 200) {
-      await flushRaw(supabase, rawBatch.splice(0));
+    if (normBatch.length >= 200) {
+      if (rawBatch.length) await flushRaw(supabase, rawBatch.splice(0));
       await flushContratos(supabase, normBatch.splice(0));
     }
 
@@ -191,8 +201,9 @@ async function ingestContratosWindow(
   if (rawBatch.length) await flushRaw(supabase, rawBatch);
   if (normBatch.length) await flushContratos(supabase, normBatch);
 
-  return { pages, contratos: totalContratos, comprasUnicas: compraKeys.size, errors };
+  return { pages, contratos: totalContratos, comprasUnicas: compraKeys.size, errors, nextPage };
 }
+
 
 async function flushRaw(supabase: any, rows: any[]) {
   if (!rows.length) return;
@@ -472,8 +483,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // mode "dia": ingere UM único dia de contratos e marca a fila diária.
-    // Janela curta = nunca estoura CPU/tempo, garantindo cobertura dia a dia.
+    // mode "dia": ingere UM único dia de contratos, com retomada por página.
+    // Roda até um deadline curto e devolve o dia para a fila apontando a próxima página.
     if (mode === "dia") {
       const dia = String(body.dia || "");
       if (!/^\d{8}$/.test(dia)) {
@@ -482,15 +493,23 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      const startPage = Math.max(1, Number(body.paginaInicial) || 1);
       const diaIso = `${dia.slice(0, 4)}-${dia.slice(4, 6)}-${dia.slice(6, 8)}`;
       try {
-        const win = await ingestContratosWindow(supabase, dia, dia);
-        const ok = win.errors.length === 0;
+        const win = await ingestContratosWindow(supabase, dia, dia, {
+          startPage,
+          deadline: Date.now() + 55_000,
+          skipRaw: true,
+        });
+        const finished = win.nextPage === null;
+        const ok = finished && win.errors.length === 0;
         await supabase.rpc("mark_contratos_dia", {
           p_dia: diaIso,
           p_status: ok ? "done" : "pending",
           p_contratos: win.contratos,
           p_error: win.errors.slice(0, 2).join(" | ") || null,
+          p_pagina: win.nextPage ?? 1,
+          p_acumula: startPage > 1,
         });
         await logRun(
           supabase,
@@ -501,7 +520,7 @@ Deno.serve(async (req) => {
           dia,
           win.errors.slice(0, 2).join(" | ") || undefined,
         );
-        return new Response(JSON.stringify({ ok, mode, dia, ...win }), {
+        return new Response(JSON.stringify({ ok, mode, dia, startPage, ...win }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       } catch (e) {
@@ -511,10 +530,13 @@ Deno.serve(async (req) => {
           p_status: "pending",
           p_contratos: 0,
           p_error: msg,
+          p_pagina: startPage,
+          p_acumula: false,
         });
         throw e;
       }
     }
+
 
 
     let dataInicial: string;
