@@ -20,6 +20,7 @@
 //   POST {"mode":"compra","cnpj":"...","ano":2024,"sequencial":67}
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { PncpMetrics } from "../_shared/pncp-metrics.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -37,6 +38,8 @@ const ITEM_CONCURRENCY = 5;
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+const metrics = new PncpMetrics("ingest-pncp-dadosabertos");
 
 function fmtDate(d: Date): string {
   return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
@@ -62,10 +65,11 @@ async function fetchJson(url: string, opts: { deadline?: number } = {}): Promise
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
-      const r = await fetch(url, {
-        signal: ctrl.signal,
-        headers: { accept: "application/json" },
-      });
+      const r = await metrics.timed(
+        url,
+        () => fetch(url, { signal: ctrl.signal, headers: { accept: "application/json" } }),
+        { retry: attempt > 0 },
+      );
       clearTimeout(t);
       if (r.status === 204 || r.status === 404) return null;
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -80,6 +84,7 @@ async function fetchJson(url: string, opts: { deadline?: number } = {}): Promise
   }
   throw lastErr ?? new Error("fetch failed");
 }
+
 
 // ---- Circuit breaker (fonte PNCP /consulta/v1/contratos) -------------------
 // Falhas 503/504/timeout/abort abrem o circuito; retomada automatica com
@@ -466,7 +471,7 @@ async function logRun(
   });
 }
 
-Deno.serve(async (req) => {
+const handler = async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
@@ -762,5 +767,16 @@ Deno.serve(async (req) => {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
+  }
+};
+
+Deno.serve(async (req) => {
+  try {
+    return await handler(req);
+  } finally {
+    // métricas por endpoint (latência, erros, aborts, retries) em tempo real
+    try {
+      await metrics.flush(createClient(SUPABASE_URL, SERVICE_KEY));
+    } catch (_) { /* best-effort */ }
   }
 });

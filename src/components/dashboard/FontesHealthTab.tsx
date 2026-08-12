@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
+import { EndpointMetricsCard } from "./EndpointMetricsCard";
 
 interface FonteHealth {
   fonte: string;
@@ -102,6 +103,7 @@ export function FontesHealthTab() {
   return (
     <div className="space-y-4">
       <CircuitCard />
+      <EndpointMetricsCard />
 
       {problemas.length > 0 && (
         <div className="rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-sm">

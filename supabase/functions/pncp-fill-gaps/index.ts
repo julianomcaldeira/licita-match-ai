@@ -14,6 +14,9 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { PncpMetrics } from "../_shared/pncp-metrics.ts";
+
+const metrics = new PncpMetrics("pncp-fill-gaps");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -58,10 +61,11 @@ async function fetchWithTimeout(url: string): Promise<Response> {
     const timeoutMs = FETCH_TIMEOUT_MS + attempt * 10_000;
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
-      const resp = await fetch(url, {
-        headers: { Accept: "application/json" },
-        signal: ctrl.signal,
-      });
+      const resp = await metrics.timed(
+        url,
+        () => fetch(url, { headers: { Accept: "application/json" }, signal: ctrl.signal }),
+        { retry: attempt > 0 },
+      );
       clearTimeout(timer);
       if (resp.status === 429) {
         runMetrics.http_429++;
@@ -280,7 +284,7 @@ async function authenticateRequest(req: Request, supabase: any): Promise<
   return { ok: true };
 }
 
-serve(async (req: Request) => {
+const handler = async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -555,5 +559,19 @@ serve(async (req: Request) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
+  }
+};
+
+serve(async (req: Request) => {
+  try {
+    return await handler(req);
+  } finally {
+    try {
+      const sb = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      );
+      await metrics.flush(sb);
+    } catch (_) { /* best-effort */ }
   }
 });
