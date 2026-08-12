@@ -563,6 +563,24 @@ Deno.serve(async (req) => {
       }
       const startPage = Math.max(1, Number(body.paginaInicial) || 1);
       const diaIso = `${dia.slice(0, 4)}-${dia.slice(4, 6)}-${dia.slice(6, 8)}`;
+
+      // circuit breaker: se o PNCP esta fora, nem tentamos
+      const gate = await circuitAllow(supabase);
+      if (!gate.allowed) {
+        await supabase.rpc("mark_contratos_dia", {
+          p_dia: diaIso,
+          p_status: "pending",
+          p_contratos: 0,
+          p_error: "circuit_open",
+          p_pagina: startPage,
+          p_acumula: false,
+        });
+        return new Response(
+          JSON.stringify({ ok: false, mode, dia, skipped: "circuit_open", retryAt: gate.retryAt }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
       let reportado = 0;
       try {
         const win = await ingestContratosWindow(supabase, dia, dia, {
@@ -584,6 +602,14 @@ Deno.serve(async (req) => {
         });
         const finished = win.nextPage === null;
         const ok = finished && win.errors.length === 0;
+
+        const outage = win.errors.some((e) => isSourceOutage(e));
+        if (outage) {
+          await circuitReport(supabase, false, win.errors[0]);
+        } else if (win.pages > 0 || finished) {
+          await circuitReport(supabase, true);
+        }
+
         await supabase.rpc("mark_contratos_dia", {
           p_dia: diaIso,
           p_status: ok ? "done" : "pending",
@@ -607,6 +633,7 @@ Deno.serve(async (req) => {
         });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
+        if (isSourceOutage(msg)) await circuitReport(supabase, false, msg);
         await supabase.rpc("mark_contratos_dia", {
           p_dia: diaIso,
           p_status: "pending",
@@ -617,6 +644,7 @@ Deno.serve(async (req) => {
         });
         throw e;
       }
+
     }
 
 
