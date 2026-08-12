@@ -429,6 +429,12 @@ const handler = async (req: Request) => {
             runLog.errors.push(`${g.cnpj}/${g.ano}/${g.seq}: ${errMsg}`);
           }
         } catch (e) {
+          if (e instanceof CircuitOpenError) {
+            // endpoint pausado pelo circuit breaker: não conta tentativa,
+            // a linha volta para a fila pelo requeue de itens travados
+            runLog.errors.push(`circuit_open:${e.source}`);
+            return;
+          }
           const raw = e instanceof Error ? e.message : String(e);
           errMsg = raw && raw !== "null" && raw !== "undefined"
             ? raw
@@ -443,6 +449,7 @@ const handler = async (req: Request) => {
           error: errMsg,
         });
         await flushMarks();
+
       });
       await flushMarks(true);
     } else if (mode === "refresh-queue") {
