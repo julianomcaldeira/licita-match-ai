@@ -63,10 +63,11 @@ async function fetchJson(url: string, opts: { deadline?: number } = {}): Promise
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
-      const r = await fetch(url, {
-        signal: ctrl.signal,
-        headers: { accept: "application/json" },
-      });
+      const r = await metrics.timed(
+        url,
+        () => fetch(url, { signal: ctrl.signal, headers: { accept: "application/json" } }),
+        { retry: attempt > 0 },
+      );
       clearTimeout(t);
       if (r.status === 204 || r.status === 404) return null;
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -81,6 +82,7 @@ async function fetchJson(url: string, opts: { deadline?: number } = {}): Promise
   }
   throw lastErr ?? new Error("fetch failed");
 }
+
 
 // ---- Circuit breaker (fonte PNCP /consulta/v1/contratos) -------------------
 // Falhas 503/504/timeout/abort abrem o circuito; retomada automatica com
