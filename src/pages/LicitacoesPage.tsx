@@ -1059,23 +1059,23 @@ export default function LicitacoesPage() {
           </div>
           <h2 className="mt-4 font-display text-lg font-semibold text-foreground">Nenhuma licitação encontrada</h2>
           <p className="mt-2 text-sm text-muted-foreground max-w-md text-center">
-            {appliedFilters.vencedor
-              ? `Não há resultados para "${appliedFilters.vencedor}" no período selecionado. Tente ampliar o intervalo de datas para o histórico completo.`
+            {appliedFilters.vencedores.length > 0
+              ? `Não há resultados para "${appliedFilters.vencedores.join(", ")}" no período selecionado. Tente ampliar o intervalo de datas para o histórico completo.`
               : "Use o menu \"Ingestão\" para buscar dados do PNCP."}
           </p>
-          {appliedFilters.vencedor && (
+          {appliedFilters.vencedores.length > 0 && (
             <Button
               variant="outline"
               className="mt-4"
               onClick={() => {
                 setActiveTab("encerradas");
-                setFilterSituacao("");
+                setFilterSituacoes([]);
                 setFilterDateFrom(undefined);
                 setFilterDateTo(undefined);
                 setPage(0);
                 setAppliedFilters((prev) => ({
                   ...prev,
-                  situacao: undefined,
+                  situacoes: [],
                   tab: "encerradas",
                   dateFrom: undefined,
                   dateTo: undefined,
