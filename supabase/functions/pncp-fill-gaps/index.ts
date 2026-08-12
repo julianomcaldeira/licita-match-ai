@@ -308,6 +308,11 @@ const handler = async (req: Request) => {
     });
   }
 
+  // carrega timeouts/retries adaptativos com base nas métricas recentes
+  await budgets.load(supabase);
+
+
+
   let body: any = {};
   try {
     body = await req.json();
