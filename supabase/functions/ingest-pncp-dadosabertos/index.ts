@@ -488,6 +488,11 @@ const handler = async (req: Request) => {
 
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
+  // timeouts/retries adaptativos conforme latencia recente por endpoint
+  await budgets.load(supabase);
+
+
+
   let body: any = {};
   try {
     body = await req.json();
