@@ -57,11 +57,13 @@ async function waitForThrottle() {
 
 async function fetchWithTimeout(url: string): Promise<Response> {
   let lastErr: unknown = null;
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+  const maxRetries = budgets.retriesFor(url);
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
     await waitForThrottle();
     const ctrl = new AbortController();
-    // timeout adaptativo: cada retentativa espera um pouco mais
-    const timeoutMs = FETCH_TIMEOUT_MS + attempt * 10_000;
+    // timeout adaptativo por endpoint: baseado na latência média recente
+    // do PNCP e ampliado a cada retentativa.
+    const timeoutMs = budgets.timeoutFor(url, attempt);
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
       const resp = await metrics.timed(
@@ -77,14 +79,14 @@ async function fetchWithTimeout(url: string): Promise<Response> {
         const retryAfter = Number(resp.headers.get("retry-after"));
         const waitMs = Number.isFinite(retryAfter) && retryAfter > 0
           ? Math.min(retryAfter * 1000, 20_000)
-          : backoff(attempt, 2500);
+          : budgets.backoffFor(url, attempt) * 2;
         throttleUntil = Math.max(throttleUntil, Date.now() + waitMs);
         await waitForThrottle();
         continue;
       }
       if (resp.status >= 500) {
         runMetrics.http_5xx++;
-        await new Promise((r) => setTimeout(r, backoff(attempt, 1200)));
+        await new Promise((r) => setTimeout(r, budgets.backoffFor(url, attempt)));
         continue;
       }
       return resp;
@@ -92,9 +94,10 @@ async function fetchWithTimeout(url: string): Promise<Response> {
       clearTimeout(timer);
       runMetrics.fetch_timeouts++;
       lastErr = e;
-      await new Promise((r) => setTimeout(r, backoff(attempt, 800)));
+      await new Promise((r) => setTimeout(r, budgets.backoffFor(url, attempt)));
     }
   }
+
   throw new Error(
     lastErr instanceof Error
       ? `fetch_failed:${lastErr.message || "timeout"}`
