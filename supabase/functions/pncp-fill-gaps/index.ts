@@ -16,9 +16,12 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PncpMetrics } from "../_shared/pncp-metrics.ts";
 import { PncpBudgets } from "../_shared/pncp-budget.ts";
+import { PncpCircuits, CircuitOpenError } from "../_shared/pncp-circuit.ts";
 
 const metrics = new PncpMetrics("pncp-fill-gaps");
 const budgets = new PncpBudgets(30);
+let circuits: PncpCircuits | null = null;
+
 
 
 const corsHeaders = {
@@ -51,6 +54,9 @@ async function waitForThrottle() {
 async function fetchWithTimeout(url: string): Promise<Response> {
   let lastErr: unknown = null;
   const maxRetries = budgets.retriesFor(url);
+  // circuit breaker por endpoint: se essa família de endpoints está pausada,
+  // nem tentamos (evita desperdício e prolonga a recuperação da fonte)
+  if (circuits) await circuits.ensure(url);
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     await waitForThrottle();
     const ctrl = new AbortController();
@@ -75,13 +81,16 @@ async function fetchWithTimeout(url: string): Promise<Response> {
           : budgets.backoffFor(url, attempt) * 2;
         throttleUntil = Math.max(throttleUntil, Date.now() + waitMs);
         await waitForThrottle();
+        lastErr = new Error("HTTP 429");
         continue;
       }
       if (resp.status >= 500) {
         runMetrics.http_5xx++;
+        lastErr = new Error(`HTTP ${resp.status}`);
         await new Promise((r) => setTimeout(r, budgets.backoffFor(url, attempt)));
         continue;
       }
+      if (circuits) await circuits.reportOutcome(url, true);
       return resp;
     } catch (e) {
       clearTimeout(timer);
@@ -91,8 +100,14 @@ async function fetchWithTimeout(url: string): Promise<Response> {
     }
   }
 
+  const failMsg = lastErr instanceof Error
+    ? (lastErr.message || "timeout")
+    : String(lastErr ?? "timeout");
+  if (circuits) await circuits.reportOutcome(url, false, failMsg);
+
   throw new Error(
     lastErr instanceof Error
+
       ? `fetch_failed:${lastErr.message || "timeout"}`
       : `fetch_failed:${String(lastErr ?? "timeout")}`,
   );
@@ -303,6 +318,9 @@ const handler = async (req: Request) => {
 
   // carrega timeouts/retries adaptativos com base nas métricas recentes
   await budgets.load(supabase);
+  // circuit breaker por endpoint (compras, itens, resultados, atas, contratos...)
+  circuits = new PncpCircuits(supabase);
+
 
 
 
@@ -411,6 +429,12 @@ const handler = async (req: Request) => {
             runLog.errors.push(`${g.cnpj}/${g.ano}/${g.seq}: ${errMsg}`);
           }
         } catch (e) {
+          if (e instanceof CircuitOpenError) {
+            // endpoint pausado pelo circuit breaker: não conta tentativa,
+            // a linha volta para a fila pelo requeue de itens travados
+            runLog.errors.push(`circuit_open:${e.source}`);
+            return;
+          }
           const raw = e instanceof Error ? e.message : String(e);
           errMsg = raw && raw !== "null" && raw !== "undefined"
             ? raw
@@ -425,6 +449,7 @@ const handler = async (req: Request) => {
           error: errMsg,
         });
         await flushMarks();
+
       });
       await flushMarks(true);
     } else if (mode === "refresh-queue") {
