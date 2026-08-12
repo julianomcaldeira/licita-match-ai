@@ -71,8 +71,8 @@ export function IngestaoManualButton() {
         .limit(1)
         .maybeSingle();
       if (mounted && data) {
+        // Only reflect the running job in the button badge — never auto-open the dialog
         setJob(data as any);
-        setOpen(true);
       }
     })();
     return () => { mounted = false; };
