@@ -51,11 +51,16 @@ function todayYmd(): string {
   return fmtDate(new Date());
 }
 
-async function fetchJson(url: string): Promise<any> {
+async function fetchJson(url: string, opts: { deadline?: number } = {}): Promise<any> {
   let lastErr: any = null;
+  const deadline = opts.deadline ?? Infinity;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    // respeita o deadline da execucao: nao inicia tentativa sem folga minima
+    const remaining = deadline - Date.now();
+    if (remaining < 6_000) break;
+    const timeoutMs = Math.max(5_000, Math.min(FETCH_TIMEOUT_MS, remaining - 2_000));
     const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
       const r = await fetch(url, {
         signal: ctrl.signal,
@@ -68,11 +73,14 @@ async function fetchJson(url: string): Promise<any> {
     } catch (e) {
       clearTimeout(t);
       lastErr = e;
-      await new Promise((res) => setTimeout(res, 1500 * (attempt + 1)));
+      const backoff = 1500 * (attempt + 1);
+      if (Date.now() + backoff > deadline - 6_000) break;
+      await new Promise((res) => setTimeout(res, backoff));
     }
   }
   throw lastErr ?? new Error("fetch failed");
 }
+
 
 interface ContratoApi {
   numeroControlePNCP: string;
