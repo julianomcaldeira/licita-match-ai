@@ -22,6 +22,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PncpMetrics } from "../_shared/pncp-metrics.ts";
 import { PncpBudgets } from "../_shared/pncp-budget.ts";
+import { PncpCircuits, CircuitOpenError, isSourceOutage } from "../_shared/pncp-circuit.ts";
 
 
 const corsHeaders = {
@@ -487,6 +488,8 @@ const handler = async (req: Request) => {
 
   // timeouts/retries adaptativos conforme latencia recente por endpoint
   await budgets.load(supabase);
+  // circuit breaker por endpoint (contratos, itens de contrato, atas, compras...)
+  circuits = new PncpCircuits(supabase);
 
 
 
