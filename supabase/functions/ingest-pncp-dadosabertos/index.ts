@@ -61,11 +61,18 @@ function todayYmd(): string {
 async function fetchJson(url: string, opts: { deadline?: number } = {}): Promise<any> {
   let lastErr: any = null;
   const deadline = opts.deadline ?? Infinity;
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+  const maxRetries = budgets.retriesFor(url);
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
     // respeita o deadline da execucao: nao inicia tentativa sem folga minima
     const remaining = deadline - Date.now();
     if (remaining < 6_000) break;
-    const timeoutMs = Math.max(5_000, Math.min(FETCH_TIMEOUT_MS, remaining - 2_000));
+    // timeout adaptativo por endpoint (latencia media recente), limitado
+    // pelo tempo restante da execucao
+    const timeoutMs = budgets.timeoutFor(
+      url,
+      attempt,
+      Number.isFinite(remaining) ? remaining : undefined,
+    );
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
@@ -81,11 +88,12 @@ async function fetchJson(url: string, opts: { deadline?: number } = {}): Promise
     } catch (e) {
       clearTimeout(t);
       lastErr = e;
-      const backoff = 1500 * (attempt + 1);
+      const backoff = budgets.backoffFor(url, attempt);
       if (Date.now() + backoff > deadline - 6_000) break;
       await new Promise((res) => setTimeout(res, backoff));
     }
   }
+
   throw lastErr ?? new Error("fetch failed");
 }
 
