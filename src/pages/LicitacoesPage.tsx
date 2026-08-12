@@ -27,9 +27,46 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { IngestaoManualButton } from "@/components/dashboard/IngestaoManualButton";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTracker } from "@/hooks/useTracking";
+import TagInput from "@/components/TagInput";
 
 
 const UFS = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
+
+const MODALIDADE_OPTIONS = [
+  "Pregão - Eletrônico",
+  "Pregão - Presencial",
+  "Concorrência - Eletrônica",
+  "Concorrência - Presencial",
+  "Dispensa de Licitação",
+  "Inexigibilidade",
+  "Concurso",
+  "Leilão - Eletrônico",
+  "Leilão - Presencial",
+  "Diálogo Competitivo",
+  "Credenciamento",
+  "Manifestação de Interesse",
+  "Pré-qualificação",
+];
+
+/** Alterna entre exigir todos os termos (AND) ou qualquer um (OR). */
+function ModeToggle({ value, onChange }: { value: "all" | "any"; onChange: (v: "all" | "any") => void }) {
+  return (
+    <div className="ml-auto flex items-center gap-0.5 rounded-md bg-secondary/70 p-0.5">
+      {(["all", "any"] as const).map((m) => (
+        <button
+          key={m}
+          onClick={() => onChange(m)}
+          className={cn(
+            "rounded px-1.5 text-[10px] font-medium leading-4 transition-colors",
+            value === m ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          {m === "all" ? "TODOS" : "QUALQUER"}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 const STATUS_ABERTAS = [
   { value: "", label: "Todas" },
