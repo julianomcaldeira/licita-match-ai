@@ -1149,12 +1149,30 @@ export default function LicitacoesPage() {
         </div>
       )}
 
+      {/* Barra de progresso durante troca de página / nova busca */}
+      {isFetching && !isLoading && (
+        <div className="mb-2 h-0.5 w-full overflow-hidden rounded-full bg-secondary">
+          <motion.div
+            className="h-full w-1/3 rounded-full bg-primary"
+            animate={{ x: ["-100%", "300%"] }}
+            transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
+          />
+        </div>
+      )}
+
       {/* Table */}
       {isLoading ? (
-
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="space-y-2">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4 rounded-lg border border-border/60 bg-card px-4 py-3">
+              <div className="h-3 w-24 animate-pulse rounded bg-muted" />
+              <div className="h-3 flex-1 animate-pulse rounded bg-muted" />
+              <div className="h-3 w-20 animate-pulse rounded bg-muted" />
+              <div className="h-3 w-16 animate-pulse rounded bg-muted" />
+            </div>
+          ))}
         </div>
+
       ) : isError ? (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center justify-center py-20">
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-destructive/10">
