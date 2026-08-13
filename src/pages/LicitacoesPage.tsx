@@ -1115,8 +1115,20 @@ export default function LicitacoesPage() {
         </motion.div>
       )}
 
+      {/* Aviso de resultado parcial (fallback do filtro por vencedor) */}
+      {isPartial && !isLoading && (
+        <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            A busca completa demorou demais. Mostrando <strong>resultados parciais</strong> do filtro por vencedor —
+            os demais filtros (órgão, texto, itens) não foram aplicados nesta consulta rápida.
+          </span>
+        </div>
+      )}
+
       {/* Table */}
       {isLoading ? (
+
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
