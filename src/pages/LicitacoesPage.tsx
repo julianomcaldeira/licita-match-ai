@@ -646,7 +646,7 @@ export default function LicitacoesPage() {
         if (error) { await new Promise(r => setTimeout(r, 2000)); continue; }
         totalWinners += data?.winnersFound || 0; totalProcessed += data?.processed || 0; hasMore = data?.hasMore || false;
         setProgress({ totalProcessed, currentChunk: "", currentModalidade: "", currentPage: 0, isRunning: true, phase: "winners", winnersFound: totalWinners });
-        if (totalProcessed % 100 < 30) clearNamespace("licitacoes"); queryClient.invalidateQueries({ queryKey: ["licitacoes-all"] });
+        if (totalProcessed % 100 < 30) { clearNamespace("licitacoes"); queryClient.invalidateQueries({ queryKey: ["licitacoes-all"] }); }
       } catch { await new Promise(r => setTimeout(r, 2000)); }
     }
     setProgress(p => (p ? { ...p, isRunning: false } : null));
