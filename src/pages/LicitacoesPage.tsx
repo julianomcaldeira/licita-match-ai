@@ -484,12 +484,19 @@ export default function LicitacoesPage() {
   const pageQueryKey = (p: number) => ["licitacoes-all", p, appliedFilters, participacaoKeyPart];
 
   const fetchPage = async (pageIndex: number) => {
+    const args = buildRpcArgs(PAGE_SIZE + 1, pageIndex * PAGE_SIZE);
+    const key = cacheKey("licitacoes", { args, participacaoKeyPart, part: appliedFilters.apenasParticipei });
+
+    // Cache curto (5 min): buscas repetidas não voltam ao banco.
+    const cached = readCache<{ rows: any[]; totalCount: number; partial: boolean; hasMore: boolean }>(key);
+    if (cached) return { ...cached, fromCache: true };
+
     const vencedoresAtivos = appliedFilters.vencedores.length > 0;
     let partial = false;
     let data: any[] | null = null;
 
     try {
-      const rpcPromise = (supabase as any).rpc("search_licitacoes_v2", buildRpcArgs(PAGE_SIZE + 1, pageIndex * PAGE_SIZE));
+      const rpcPromise = (supabase as any).rpc("search_licitacoes_v2", args);
       const rpcResult = await withTimeout<{ data: any[] | null; error: any }>(
         rpcPromise as PromiseLike<{ data: any[] | null; error: any }>,
         QUERY_TIMEOUT_MS,
@@ -536,18 +543,24 @@ export default function LicitacoesPage() {
       ? (pageIndex + 2) * PAGE_SIZE + 1
       : pageIndex * PAGE_SIZE + rows.length;
 
-    return { rows, totalCount, partial, hasMore };
+    const result = { rows, totalCount, partial, hasMore };
+    // resultados parciais (fallback) têm TTL menor
+    writeCache(key, result, partial ? 60_000 : SEARCH_CACHE_TTL_MS);
+    return { ...result, fromCache: false };
   };
 
   const { data: queryResult, isLoading, isFetching, isError, error: queryError, refetch } = useQuery({
     queryKey: pageQueryKey(page),
     queryFn: () => fetchPage(page),
     placeholderData: (prev) => prev,
-    staleTime: 60_000,
+    staleTime: SEARCH_CACHE_TTL_MS,
+    gcTime: 30 * 60 * 1000,
     retry: 0,
     retryDelay: 2000,
     refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
+
 
   const licitacoes = queryResult?.rows || [];
   const totalCount = queryResult?.totalCount || 0;
