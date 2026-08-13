@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { cacheKey, readCache, writeCache, clearNamespace } from "@/lib/shortCache";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
@@ -83,6 +84,7 @@ const STATUS_ENCERRADAS = [
 
 const PAGE_SIZE = 20;
 const QUERY_TIMEOUT_MS = 12_000;
+const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
 
 async function withTimeout<T>(
   promiseLike: PromiseLike<T>,
@@ -578,7 +580,7 @@ export default function LicitacoesPage() {
       queryClient.prefetchQuery({
         queryKey: pageQueryKey(next),
         queryFn: () => fetchPage(next),
-        staleTime: 60_000,
+        staleTime: SEARCH_CACHE_TTL_MS,
       });
     }, 300);
     return () => clearTimeout(timer);
