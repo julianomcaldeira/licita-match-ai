@@ -1197,7 +1197,7 @@ export default function LicitacoesPage() {
           <p className="mt-2 text-sm text-muted-foreground max-w-md text-center">
             {(queryError as any)?.message || "A consulta falhou. Tente filtros mais específicos ou tente novamente."}
           </p>
-          <Button onClick={() => refetch()} variant="outline" className="mt-4 gap-2">
+          <Button onClick={() => { clearNamespace("licitacoes"); refetch(); }} variant="outline" className="mt-4 gap-2">
             <RefreshCw className="h-4 w-4" /> Tentar novamente
           </Button>
         </motion.div>
