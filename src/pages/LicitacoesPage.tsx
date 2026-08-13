@@ -483,14 +483,39 @@ export default function LicitacoesPage() {
   const { data: queryResult, isLoading, isFetching, isError, error: queryError, refetch } = useQuery({
     queryKey: ["licitacoes-all", page, appliedFilters, appliedFilters.apenasParticipei ? (minhasParticipacaoIds ?? []).length : 0],
     queryFn: async () => {
-      const rpcPromise = (supabase as any).rpc("search_licitacoes_v2", buildRpcArgs(PAGE_SIZE + 1, page * PAGE_SIZE));
-      const rpcResult = await withTimeout<{ data: any[] | null; error: any }>(
-        rpcPromise as PromiseLike<{ data: any[] | null; error: any }>,
-        QUERY_TIMEOUT_MS,
-        "A busca demorou demais. Refine os filtros e tente novamente."
-      );
-      const { data, error } = rpcResult;
-      if (error) throw error;
+      const vencedoresAtivos = appliedFilters.vencedores.length > 0;
+      let partial = false;
+      let data: any[] | null = null;
+
+      try {
+        const rpcPromise = (supabase as any).rpc("search_licitacoes_v2", buildRpcArgs(PAGE_SIZE + 1, page * PAGE_SIZE));
+        const rpcResult = await withTimeout<{ data: any[] | null; error: any }>(
+          rpcPromise as PromiseLike<{ data: any[] | null; error: any }>,
+          QUERY_TIMEOUT_MS,
+          "A busca demorou demais. Refine os filtros e tente novamente."
+        );
+        if (rpcResult.error) throw rpcResult.error;
+        data = rpcResult.data;
+      } catch (err) {
+        // Fallback: quando o filtro por vencedor falha ou demora, usamos a rota rápida
+        // (somente vencedores + ordenação), retornando resultados parciais.
+        if (!vencedoresAtivos) throw err;
+        console.warn("Fallback de vencedores acionado:", err);
+        const fbPromise = (supabase as any).rpc("search_licitacoes_por_vencedor_fast", {
+          p_vencedores: appliedFilters.vencedores,
+          p_sort: appliedFilters.sort,
+          p_limit: PAGE_SIZE + 1,
+          p_offset: page * PAGE_SIZE,
+        });
+        const fbResult = await withTimeout<{ data: any[] | null; error: any }>(
+          fbPromise as PromiseLike<{ data: any[] | null; error: any }>,
+          QUERY_TIMEOUT_MS,
+          "A busca por vencedor demorou demais. Tente novamente."
+        );
+        if (fbResult.error) throw fbResult.error;
+        data = fbResult.data;
+        partial = true;
+      }
 
       let fetchedRows = (data || []) as any[];
 
@@ -510,8 +535,9 @@ export default function LicitacoesPage() {
         ? (page + 2) * PAGE_SIZE + 1
         : page * PAGE_SIZE + rows.length;
 
-      return { rows, totalCount };
+      return { rows, totalCount, partial };
     },
+
     placeholderData: (prev) => prev,
     staleTime: 60_000,
     retry: 0,
