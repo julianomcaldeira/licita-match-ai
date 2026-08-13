@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { cacheKey, readCache, writeCache, clearNamespace } from "@/lib/shortCache";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
@@ -83,6 +84,7 @@ const STATUS_ENCERRADAS = [
 
 const PAGE_SIZE = 20;
 const QUERY_TIMEOUT_MS = 12_000;
+const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
 
 async function withTimeout<T>(
   promiseLike: PromiseLike<T>,
@@ -484,12 +486,19 @@ export default function LicitacoesPage() {
   const pageQueryKey = (p: number) => ["licitacoes-all", p, appliedFilters, participacaoKeyPart];
 
   const fetchPage = async (pageIndex: number) => {
+    const args = buildRpcArgs(PAGE_SIZE + 1, pageIndex * PAGE_SIZE);
+    const key = cacheKey("licitacoes", { args, participacaoKeyPart, part: appliedFilters.apenasParticipei });
+
+    // Cache curto (5 min): buscas repetidas não voltam ao banco.
+    const cached = readCache<{ rows: any[]; totalCount: number; partial: boolean; hasMore: boolean }>(key);
+    if (cached) return { ...cached, fromCache: true };
+
     const vencedoresAtivos = appliedFilters.vencedores.length > 0;
     let partial = false;
     let data: any[] | null = null;
 
     try {
-      const rpcPromise = (supabase as any).rpc("search_licitacoes_v2", buildRpcArgs(PAGE_SIZE + 1, pageIndex * PAGE_SIZE));
+      const rpcPromise = (supabase as any).rpc("search_licitacoes_v2", args);
       const rpcResult = await withTimeout<{ data: any[] | null; error: any }>(
         rpcPromise as PromiseLike<{ data: any[] | null; error: any }>,
         QUERY_TIMEOUT_MS,
@@ -536,18 +545,24 @@ export default function LicitacoesPage() {
       ? (pageIndex + 2) * PAGE_SIZE + 1
       : pageIndex * PAGE_SIZE + rows.length;
 
-    return { rows, totalCount, partial, hasMore };
+    const result = { rows, totalCount, partial, hasMore };
+    // resultados parciais (fallback) têm TTL menor
+    writeCache(key, result, partial ? 60_000 : SEARCH_CACHE_TTL_MS);
+    return { ...result, fromCache: false };
   };
 
   const { data: queryResult, isLoading, isFetching, isError, error: queryError, refetch } = useQuery({
     queryKey: pageQueryKey(page),
     queryFn: () => fetchPage(page),
     placeholderData: (prev) => prev,
-    staleTime: 60_000,
+    staleTime: SEARCH_CACHE_TTL_MS,
+    gcTime: 30 * 60 * 1000,
     retry: 0,
     retryDelay: 2000,
     refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
+
 
   const licitacoes = queryResult?.rows || [];
   const totalCount = queryResult?.totalCount || 0;
@@ -565,7 +580,7 @@ export default function LicitacoesPage() {
       queryClient.prefetchQuery({
         queryKey: pageQueryKey(next),
         queryFn: () => fetchPage(next),
-        staleTime: 60_000,
+        staleTime: SEARCH_CACHE_TTL_MS,
       });
     }, 300);
     return () => clearTimeout(timer);
@@ -611,13 +626,13 @@ export default function LicitacoesPage() {
             const { data, error } = await supabase.functions.invoke("ingest-pncp", { body: { dataInicial: chunk.dataInicial, dataFinal: chunk.dataFinal, modalidade, pagina } });
             if (error) { consecutiveErrors++; if (consecutiveErrors >= 3) hasMore = false; else await new Promise(r => setTimeout(r, 1000)); continue; }
             consecutiveErrors = 0; grandTotal += data?.totalProcessed || 0; hasMore = data?.hasMore || false; pagina++;
-            if (grandTotal % 500 < 50) { queryClient.invalidateQueries({ queryKey: ["licitacoes-all"] }); }
+            if (grandTotal % 500 < 50) { clearNamespace("licitacoes"); queryClient.invalidateQueries({ queryKey: ["licitacoes-all"] }); }
           } catch { consecutiveErrors++; if (consecutiveErrors >= 3) hasMore = false; await new Promise(r => setTimeout(r, 1000)); }
         }
       }
     }
     setProgress(p => (p ? { ...p, isRunning: false } : null));
-    queryClient.invalidateQueries({ queryKey: ["licitacoes-all"] });
+    clearNamespace("licitacoes"); queryClient.invalidateQueries({ queryKey: ["licitacoes-all"] });
     toast.success(`Ingestão concluída! ${grandTotal.toLocaleString("pt-BR")} registros processados.`);
   }, [queryClient]);
 
@@ -631,11 +646,11 @@ export default function LicitacoesPage() {
         if (error) { await new Promise(r => setTimeout(r, 2000)); continue; }
         totalWinners += data?.winnersFound || 0; totalProcessed += data?.processed || 0; hasMore = data?.hasMore || false;
         setProgress({ totalProcessed, currentChunk: "", currentModalidade: "", currentPage: 0, isRunning: true, phase: "winners", winnersFound: totalWinners });
-        if (totalProcessed % 100 < 30) queryClient.invalidateQueries({ queryKey: ["licitacoes-all"] });
+        if (totalProcessed % 100 < 30) { clearNamespace("licitacoes"); queryClient.invalidateQueries({ queryKey: ["licitacoes-all"] }); }
       } catch { await new Promise(r => setTimeout(r, 2000)); }
     }
     setProgress(p => (p ? { ...p, isRunning: false } : null));
-    queryClient.invalidateQueries({ queryKey: ["licitacoes-all"] });
+    clearNamespace("licitacoes"); queryClient.invalidateQueries({ queryKey: ["licitacoes-all"] });
     toast.success(`Vencedores: ${totalWinners.toLocaleString("pt-BR")} encontrados em ${totalProcessed.toLocaleString("pt-BR")} licitações.`);
   }, [queryClient]);
 
@@ -1182,7 +1197,7 @@ export default function LicitacoesPage() {
           <p className="mt-2 text-sm text-muted-foreground max-w-md text-center">
             {(queryError as any)?.message || "A consulta falhou. Tente filtros mais específicos ou tente novamente."}
           </p>
-          <Button onClick={() => refetch()} variant="outline" className="mt-4 gap-2">
+          <Button onClick={() => { clearNamespace("licitacoes"); refetch(); }} variant="outline" className="mt-4 gap-2">
             <RefreshCw className="h-4 w-4" /> Tentar novamente
           </Button>
         </motion.div>
