@@ -141,11 +141,11 @@ export default function ComboboxMultiFilter({
             ) : filtered.length === 0 ? (
               <div className="py-6 text-center text-sm text-muted-foreground">Nenhum resultado</div>
             ) : (
-              filtered.slice(0, 100).map((option) => {
+              filtered.slice(0, 100).map((option, optionIndex) => {
                 const isSelected = values.includes(option.value);
                 return (
                   <button
-                    key={option.value}
+                    key={`${option.value}-${optionIndex}`}
                     onClick={() => toggleValue(option.value)}
                     className={cn(
                       "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground cursor-pointer",
