@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { RefreshCw, Loader2, Database, ChevronLeft, ChevronRight, X, Trophy, ExternalLink, ChevronDown, FileSpreadsheet, Eye, Package, Award, FileText, MapPin, DollarSign, Clock, Brain, Sparkles, Search, CalendarIcon, SlidersHorizontal } from "lucide-react";
+import { RefreshCw, Loader2, Database, ChevronLeft, ChevronRight, X, Trophy, ExternalLink, ChevronDown, FileSpreadsheet, Eye, Package, Award, FileText, MapPin, DollarSign, Clock, Brain, Sparkles, Search, CalendarIcon, SlidersHorizontal, AlertTriangle } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -548,6 +548,7 @@ export default function LicitacoesPage() {
   const licitacoes = queryResult?.rows || [];
   const totalCount = queryResult?.totalCount || 0;
   const hasData = licitacoes.length > 0;
+  const isPartial = Boolean((queryResult as any)?.partial);
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   // Empenhos agregados para as licitações visíveis (coluna "Empenhado")
