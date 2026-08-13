@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { RefreshCw, Loader2, Database, ChevronLeft, ChevronRight, X, Trophy, ExternalLink, ChevronDown, FileSpreadsheet, Eye, Package, Award, FileText, MapPin, DollarSign, Clock, Brain, Sparkles, Search, CalendarIcon, SlidersHorizontal } from "lucide-react";
+import { RefreshCw, Loader2, Database, ChevronLeft, ChevronRight, X, Trophy, ExternalLink, ChevronDown, FileSpreadsheet, Eye, Package, Award, FileText, MapPin, DollarSign, Clock, Brain, Sparkles, Search, CalendarIcon, SlidersHorizontal, AlertTriangle } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -483,14 +483,39 @@ export default function LicitacoesPage() {
   const { data: queryResult, isLoading, isFetching, isError, error: queryError, refetch } = useQuery({
     queryKey: ["licitacoes-all", page, appliedFilters, appliedFilters.apenasParticipei ? (minhasParticipacaoIds ?? []).length : 0],
     queryFn: async () => {
-      const rpcPromise = (supabase as any).rpc("search_licitacoes_v2", buildRpcArgs(PAGE_SIZE + 1, page * PAGE_SIZE));
-      const rpcResult = await withTimeout<{ data: any[] | null; error: any }>(
-        rpcPromise as PromiseLike<{ data: any[] | null; error: any }>,
-        QUERY_TIMEOUT_MS,
-        "A busca demorou demais. Refine os filtros e tente novamente."
-      );
-      const { data, error } = rpcResult;
-      if (error) throw error;
+      const vencedoresAtivos = appliedFilters.vencedores.length > 0;
+      let partial = false;
+      let data: any[] | null = null;
+
+      try {
+        const rpcPromise = (supabase as any).rpc("search_licitacoes_v2", buildRpcArgs(PAGE_SIZE + 1, page * PAGE_SIZE));
+        const rpcResult = await withTimeout<{ data: any[] | null; error: any }>(
+          rpcPromise as PromiseLike<{ data: any[] | null; error: any }>,
+          QUERY_TIMEOUT_MS,
+          "A busca demorou demais. Refine os filtros e tente novamente."
+        );
+        if (rpcResult.error) throw rpcResult.error;
+        data = rpcResult.data;
+      } catch (err) {
+        // Fallback: quando o filtro por vencedor falha ou demora, usamos a rota rápida
+        // (somente vencedores + ordenação), retornando resultados parciais.
+        if (!vencedoresAtivos) throw err;
+        console.warn("Fallback de vencedores acionado:", err);
+        const fbPromise = (supabase as any).rpc("search_licitacoes_por_vencedor_fast", {
+          p_vencedores: appliedFilters.vencedores,
+          p_sort: appliedFilters.sort,
+          p_limit: PAGE_SIZE + 1,
+          p_offset: page * PAGE_SIZE,
+        });
+        const fbResult = await withTimeout<{ data: any[] | null; error: any }>(
+          fbPromise as PromiseLike<{ data: any[] | null; error: any }>,
+          QUERY_TIMEOUT_MS,
+          "A busca por vencedor demorou demais. Tente novamente."
+        );
+        if (fbResult.error) throw fbResult.error;
+        data = fbResult.data;
+        partial = true;
+      }
 
       let fetchedRows = (data || []) as any[];
 
@@ -510,8 +535,9 @@ export default function LicitacoesPage() {
         ? (page + 2) * PAGE_SIZE + 1
         : page * PAGE_SIZE + rows.length;
 
-      return { rows, totalCount };
+      return { rows, totalCount, partial };
     },
+
     placeholderData: (prev) => prev,
     staleTime: 60_000,
     retry: 0,
@@ -522,6 +548,7 @@ export default function LicitacoesPage() {
   const licitacoes = queryResult?.rows || [];
   const totalCount = queryResult?.totalCount || 0;
   const hasData = licitacoes.length > 0;
+  const isPartial = Boolean((queryResult as any)?.partial);
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   // Empenhos agregados para as licitações visíveis (coluna "Empenhado")
@@ -1089,8 +1116,20 @@ export default function LicitacoesPage() {
         </motion.div>
       )}
 
+      {/* Aviso de resultado parcial (fallback do filtro por vencedor) */}
+      {isPartial && !isLoading && (
+        <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            A busca completa demorou demais. Mostrando <strong>resultados parciais</strong> do filtro por vencedor —
+            os demais filtros (órgão, texto, itens) não foram aplicados nesta consulta rápida.
+          </span>
+        </div>
+      )}
+
       {/* Table */}
       {isLoading ? (
+
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>

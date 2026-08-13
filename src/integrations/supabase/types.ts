@@ -2778,6 +2778,29 @@ export type Database = {
           vencedor_nome: string
         }[]
       }
+      search_licitacoes_por_vencedor_fast: {
+        Args: {
+          p_limit?: number
+          p_offset?: number
+          p_sort?: string
+          p_vencedores: string[]
+        }
+        Returns: {
+          data_publicacao: string
+          id: string
+          modalidade: string
+          municipio: string
+          numero_controle_pncp: string
+          objeto: string
+          orgao: string
+          situacao: string
+          total_count: number
+          uf: string
+          valor_estimado: number
+          valor_homologado: number
+          vencedor_nome: string
+        }[]
+      }
       search_licitacoes_v2: {
         Args: {
           p_com_vencedor?: boolean
