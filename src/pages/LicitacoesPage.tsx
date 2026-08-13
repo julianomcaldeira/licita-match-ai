@@ -480,64 +480,68 @@ export default function LicitacoesPage() {
     p_offset: offset,
   });
 
+  const participacaoKeyPart = appliedFilters.apenasParticipei ? (minhasParticipacaoIds ?? []).length : 0;
+  const pageQueryKey = (p: number) => ["licitacoes-all", p, appliedFilters, participacaoKeyPart];
+
+  const fetchPage = async (pageIndex: number) => {
+    const vencedoresAtivos = appliedFilters.vencedores.length > 0;
+    let partial = false;
+    let data: any[] | null = null;
+
+    try {
+      const rpcPromise = (supabase as any).rpc("search_licitacoes_v2", buildRpcArgs(PAGE_SIZE + 1, pageIndex * PAGE_SIZE));
+      const rpcResult = await withTimeout<{ data: any[] | null; error: any }>(
+        rpcPromise as PromiseLike<{ data: any[] | null; error: any }>,
+        QUERY_TIMEOUT_MS,
+        "A busca demorou demais. Refine os filtros e tente novamente."
+      );
+      if (rpcResult.error) throw rpcResult.error;
+      data = rpcResult.data;
+    } catch (err) {
+      // Fallback: quando o filtro por vencedor falha ou demora, usamos a rota rápida
+      // (somente vencedores + ordenação), retornando resultados parciais.
+      if (!vencedoresAtivos) throw err;
+      console.warn("Fallback de vencedores acionado:", err);
+      const fbPromise = (supabase as any).rpc("search_licitacoes_por_vencedor_fast", {
+        p_vencedores: appliedFilters.vencedores,
+        p_sort: appliedFilters.sort,
+        p_limit: PAGE_SIZE + 1,
+        p_offset: pageIndex * PAGE_SIZE,
+      });
+      const fbResult = await withTimeout<{ data: any[] | null; error: any }>(
+        fbPromise as PromiseLike<{ data: any[] | null; error: any }>,
+        QUERY_TIMEOUT_MS,
+        "A busca por vencedor demorou demais. Tente novamente."
+      );
+      if (fbResult.error) throw fbResult.error;
+      data = fbResult.data;
+      partial = true;
+    }
+
+    let fetchedRows = (data || []) as any[];
+
+    if (appliedFilters.apenasParticipei) {
+      const ids = new Set(minhasParticipacaoIds ?? []);
+      fetchedRows = fetchedRows.filter((r) => ids.has(r.id));
+    }
+
+    const hasMore = fetchedRows.length > PAGE_SIZE;
+    const rows = hasMore ? fetchedRows.slice(0, PAGE_SIZE) : fetchedRows;
+    const rpcTotal = Number(fetchedRows[0]?.total_count ?? 0);
+    const totalCount = appliedFilters.apenasParticipei
+      ? rows.length
+      : rpcTotal > 0
+      ? rpcTotal
+      : hasMore
+      ? (pageIndex + 2) * PAGE_SIZE + 1
+      : pageIndex * PAGE_SIZE + rows.length;
+
+    return { rows, totalCount, partial, hasMore };
+  };
+
   const { data: queryResult, isLoading, isFetching, isError, error: queryError, refetch } = useQuery({
-    queryKey: ["licitacoes-all", page, appliedFilters, appliedFilters.apenasParticipei ? (minhasParticipacaoIds ?? []).length : 0],
-    queryFn: async () => {
-      const vencedoresAtivos = appliedFilters.vencedores.length > 0;
-      let partial = false;
-      let data: any[] | null = null;
-
-      try {
-        const rpcPromise = (supabase as any).rpc("search_licitacoes_v2", buildRpcArgs(PAGE_SIZE + 1, page * PAGE_SIZE));
-        const rpcResult = await withTimeout<{ data: any[] | null; error: any }>(
-          rpcPromise as PromiseLike<{ data: any[] | null; error: any }>,
-          QUERY_TIMEOUT_MS,
-          "A busca demorou demais. Refine os filtros e tente novamente."
-        );
-        if (rpcResult.error) throw rpcResult.error;
-        data = rpcResult.data;
-      } catch (err) {
-        // Fallback: quando o filtro por vencedor falha ou demora, usamos a rota rápida
-        // (somente vencedores + ordenação), retornando resultados parciais.
-        if (!vencedoresAtivos) throw err;
-        console.warn("Fallback de vencedores acionado:", err);
-        const fbPromise = (supabase as any).rpc("search_licitacoes_por_vencedor_fast", {
-          p_vencedores: appliedFilters.vencedores,
-          p_sort: appliedFilters.sort,
-          p_limit: PAGE_SIZE + 1,
-          p_offset: page * PAGE_SIZE,
-        });
-        const fbResult = await withTimeout<{ data: any[] | null; error: any }>(
-          fbPromise as PromiseLike<{ data: any[] | null; error: any }>,
-          QUERY_TIMEOUT_MS,
-          "A busca por vencedor demorou demais. Tente novamente."
-        );
-        if (fbResult.error) throw fbResult.error;
-        data = fbResult.data;
-        partial = true;
-      }
-
-      let fetchedRows = (data || []) as any[];
-
-      if (appliedFilters.apenasParticipei) {
-        const ids = new Set(minhasParticipacaoIds ?? []);
-        fetchedRows = fetchedRows.filter((r) => ids.has(r.id));
-      }
-
-      const hasMore = fetchedRows.length > PAGE_SIZE;
-      const rows = hasMore ? fetchedRows.slice(0, PAGE_SIZE) : fetchedRows;
-      const rpcTotal = Number(fetchedRows[0]?.total_count ?? 0);
-      const totalCount = appliedFilters.apenasParticipei
-        ? rows.length
-        : rpcTotal > 0
-        ? rpcTotal
-        : hasMore
-        ? (page + 2) * PAGE_SIZE + 1
-        : page * PAGE_SIZE + rows.length;
-
-      return { rows, totalCount, partial };
-    },
-
+    queryKey: pageQueryKey(page),
+    queryFn: () => fetchPage(page),
     placeholderData: (prev) => prev,
     staleTime: 60_000,
     retry: 0,
@@ -550,6 +554,24 @@ export default function LicitacoesPage() {
   const hasData = licitacoes.length > 0;
   const isPartial = Boolean((queryResult as any)?.partial);
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const hasNextPage = Boolean((queryResult as any)?.hasMore) || page < totalPages - 1;
+
+  // Carregamento progressivo: pré-carrega a próxima página em segundo plano,
+  // para que a navegação seja instantânea mesmo com muitos resultados.
+  useEffect(() => {
+    if (!queryResult || isFetching || isError || !hasNextPage) return;
+    const next = page + 1;
+    const timer = setTimeout(() => {
+      queryClient.prefetchQuery({
+        queryKey: pageQueryKey(next),
+        queryFn: () => fetchPage(next),
+        staleTime: 60_000,
+      });
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, queryResult, isFetching, isError, hasNextPage]);
+
 
   // Empenhos agregados para as licitações visíveis (coluna "Empenhado")
   const visibleIds = licitacoes.map((r: any) => r.id).filter(Boolean);
