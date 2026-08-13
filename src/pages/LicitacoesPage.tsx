@@ -626,13 +626,13 @@ export default function LicitacoesPage() {
             const { data, error } = await supabase.functions.invoke("ingest-pncp", { body: { dataInicial: chunk.dataInicial, dataFinal: chunk.dataFinal, modalidade, pagina } });
             if (error) { consecutiveErrors++; if (consecutiveErrors >= 3) hasMore = false; else await new Promise(r => setTimeout(r, 1000)); continue; }
             consecutiveErrors = 0; grandTotal += data?.totalProcessed || 0; hasMore = data?.hasMore || false; pagina++;
-            if (grandTotal % 500 < 50) { queryClient.invalidateQueries({ queryKey: ["licitacoes-all"] }); }
+            if (grandTotal % 500 < 50) { clearNamespace("licitacoes"); queryClient.invalidateQueries({ queryKey: ["licitacoes-all"] }); }
           } catch { consecutiveErrors++; if (consecutiveErrors >= 3) hasMore = false; await new Promise(r => setTimeout(r, 1000)); }
         }
       }
     }
     setProgress(p => (p ? { ...p, isRunning: false } : null));
-    queryClient.invalidateQueries({ queryKey: ["licitacoes-all"] });
+    clearNamespace("licitacoes"); queryClient.invalidateQueries({ queryKey: ["licitacoes-all"] });
     toast.success(`Ingestão concluída! ${grandTotal.toLocaleString("pt-BR")} registros processados.`);
   }, [queryClient]);
 
@@ -646,11 +646,11 @@ export default function LicitacoesPage() {
         if (error) { await new Promise(r => setTimeout(r, 2000)); continue; }
         totalWinners += data?.winnersFound || 0; totalProcessed += data?.processed || 0; hasMore = data?.hasMore || false;
         setProgress({ totalProcessed, currentChunk: "", currentModalidade: "", currentPage: 0, isRunning: true, phase: "winners", winnersFound: totalWinners });
-        if (totalProcessed % 100 < 30) queryClient.invalidateQueries({ queryKey: ["licitacoes-all"] });
+        if (totalProcessed % 100 < 30) clearNamespace("licitacoes"); queryClient.invalidateQueries({ queryKey: ["licitacoes-all"] });
       } catch { await new Promise(r => setTimeout(r, 2000)); }
     }
     setProgress(p => (p ? { ...p, isRunning: false } : null));
-    queryClient.invalidateQueries({ queryKey: ["licitacoes-all"] });
+    clearNamespace("licitacoes"); queryClient.invalidateQueries({ queryKey: ["licitacoes-all"] });
     toast.success(`Vencedores: ${totalWinners.toLocaleString("pt-BR")} encontrados em ${totalProcessed.toLocaleString("pt-BR")} licitações.`);
   }, [queryClient]);
 
