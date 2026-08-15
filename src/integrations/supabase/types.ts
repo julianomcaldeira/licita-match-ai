@@ -2291,6 +2291,7 @@ export type Database = {
           velocidade_dia: number
         }[]
       }
+      ingestao_rotas_resumo: { Args: never; Returns: Json }
       ingestion_watchdog: { Args: never; Returns: Json }
       licitacoes_pendentes_winners_count: {
         Args: { p_max?: number }
@@ -2620,6 +2621,7 @@ export type Database = {
           updated_at: string
         }[]
       }
+      pncp_dadosabertos_backfill_2023_tick: { Args: never; Returns: Json }
       pncp_dadosabertos_backfill_fast_tick: { Args: never; Returns: Json }
       pncp_dadosabertos_backfill_tick: { Args: never; Returns: Json }
       pncp_endpoint_budgets: {
@@ -2708,6 +2710,13 @@ export type Database = {
         Returns: {
           por_ano: Json
           total: number
+        }[]
+      }
+      reconcile_gap_queue: {
+        Args: { p_limit?: number }
+        Returns: {
+          reconciled: number
+          scanned: number
         }[]
       }
       refresh_all_mvs: { Args: never; Returns: undefined }
