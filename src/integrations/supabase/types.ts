@@ -2665,6 +2665,7 @@ export type Database = {
           retries: number
         }[]
       }
+      pncp_gaps_dispatch: { Args: never; Returns: string }
       pncp_gaps_por_orgao_ano: {
         Args: { p_limit?: number; p_min_ano?: number }
         Returns: {
