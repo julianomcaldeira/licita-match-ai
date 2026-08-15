@@ -29,6 +29,16 @@ import { IngestaoManualButton } from "@/components/dashboard/IngestaoManualButto
 import { useAuth } from "@/contexts/AuthContext";
 import { useTracker } from "@/hooks/useTracking";
 import TagInput from "@/components/TagInput";
+import ColumnHeaderCell from "@/components/table/ColumnHeaderCell";
+import { useColumnPrefs } from "@/hooks/useColumnPrefs";
+import { Columns3 } from "lucide-react";
+
+const DEFAULT_COL_ORDER = [
+  "orgao", "objeto", "modalidade", "valor_estimado", "valor_homologado",
+  "economia", "empenhado", "vencedor", "situacao", "data", "uf",
+];
+
+
 
 
 const UFS = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
@@ -766,6 +776,306 @@ export default function LicitacoesPage() {
     finally { setExporting(false); }
   }, [appliedFilters, isAbertas]);
 
+  // ---------- Colunas configuráveis (ordem + visibilidade persistidas) ----------
+  const {
+    order: colOrder,
+    hidden: colHidden,
+    moveColumn,
+    toggleColumn,
+    reset: resetColumns,
+  } = useColumnPrefs("licitacoes", DEFAULT_COL_ORDER, empresaId || role || null);
+  const [dragCol, setDragCol] = useState<string | null>(null);
+
+  const setSort = (k: "recentes" | "valor" | "estimado") => {
+    setFilterSort(k);
+    setPage(0);
+    setAppliedFilters((p) => ({ ...p, sort: k }));
+  };
+
+  const columnDefs: Record<string, any> = {
+    orgao: {
+      label: "Órgão",
+      thClass: "table-sticky-col",
+      filterActive: filterOrgaos.length > 0,
+      onClear: () => { setFilterOrgaos([]); setPage(0); setAppliedFilters((p) => ({ ...p, orgaos: [] })); },
+      filter: (
+        <ComboboxMultiFilter
+          values={filterOrgaos}
+          onChange={setFilterOrgaos}
+          options={orgaoOptions}
+          placeholder="Selecionar órgãos..."
+          searchPlaceholder="Buscar órgão..."
+          isLoading={orgaosLoading}
+          onServerSearch={setOrgaoSearch}
+        />
+      ),
+    },
+    objeto: {
+      label: "Objeto",
+      filterActive: filterTermos.length > 0 || filterItens.length > 0,
+      onClear: () => { setFilterTermos([]); setFilterItens([]); setPage(0); setAppliedFilters((p) => ({ ...p, termos: [], itens: [] })); },
+      filter: (
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-medium text-muted-foreground">Palavras no objeto</label>
+              <ModeToggle value={filterTermosMode} onChange={setFilterTermosMode} />
+            </div>
+            <TagInput values={filterTermos} onChange={setFilterTermos} placeholder="Ex: consultoria (Enter)" />
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-medium text-muted-foreground">Descrição dos itens</label>
+              <ModeToggle value={filterItensMode} onChange={setFilterItensMode} />
+            </div>
+            <TagInput values={filterItens} onChange={setFilterItens} placeholder="Ex: seringa 5ml (Enter)" icon={<Package className="h-3.5 w-3.5" />} />
+          </div>
+        </div>
+      ),
+    },
+    modalidade: {
+      label: "Modalidade",
+      filterActive: filterModalidades.length > 0,
+      onClear: () => { setFilterModalidades([]); setPage(0); setAppliedFilters((p) => ({ ...p, modalidades: [] })); },
+      filter: (
+        <ComboboxMultiFilter
+          values={filterModalidades}
+          onChange={setFilterModalidades}
+          options={MODALIDADE_OPTIONS.map((m) => ({ label: m, value: m }))}
+          placeholder="Todas as modalidades"
+          searchPlaceholder="Buscar modalidade..."
+        />
+      ),
+    },
+    valor_estimado: {
+      label: "Valor Est.",
+      align: "right",
+      sortKey: "estimado",
+    },
+    valor_homologado: {
+      label: "Val. Homologado",
+      align: "right",
+      tabs: ["encerradas"],
+      sortKey: "valor",
+    },
+    economia: { label: "Economia", align: "right", tabs: ["encerradas"] },
+    empenhado: {
+      label: (
+        <Tooltip>
+          <TooltipTrigger asChild><span className="cursor-help border-b border-dotted border-muted-foreground/40">Empenhado</span></TooltipTrigger>
+          <TooltipContent side="bottom" className="max-w-xs"><p className="text-xs normal-case">Valor já comprometido pelo órgão via empenho. Fonte oficial disponível apenas para órgãos federais; estaduais e municipais aparecem como <strong>n/d</strong>.</p></TooltipContent>
+        </Tooltip>
+      ),
+      align: "right",
+      tabs: ["encerradas"],
+    },
+    vencedor: {
+      label: "Vencedor",
+      tabs: ["encerradas"],
+      filterActive: filterVencedores.length > 0,
+      onClear: () => { setFilterVencedores([]); setPage(0); setAppliedFilters((p) => ({ ...p, vencedores: [] })); },
+      filter: (
+        <ComboboxMultiFilter
+          values={filterVencedores}
+          onChange={handleWinnerFilterChange}
+          options={vencedorOptions}
+          placeholder="Selecionar vencedores..."
+          searchPlaceholder="Buscar vencedor..."
+          isLoading={vencedoresLoading}
+          onServerSearch={setVencedorSearch}
+        />
+      ),
+    },
+    situacao: {
+      label: "Situação",
+      align: "center",
+      tabs: ["abertas"],
+      filterActive: filterSituacoes.length > 0,
+      onClear: () => { setFilterSituacoes([]); setPage(0); setAppliedFilters((p) => ({ ...p, situacoes: [] })); },
+      filter: (
+        <div className="flex flex-wrap gap-1">
+          {statusOptions.filter((o) => o.value).map((opt) => {
+            const on = filterSituacoes.includes(opt.value);
+            return (
+              <button
+                key={opt.value}
+                onClick={() => setFilterSituacoes(on ? filterSituacoes.filter((s) => s !== opt.value) : [...filterSituacoes, opt.value])}
+                className={cn(
+                  "rounded-md border px-2 py-1 text-xs font-medium transition-colors",
+                  on ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      ),
+    },
+    data: {
+      label: "Data",
+      sortKey: "recentes",
+      filterActive: !!filterDateFrom || !!filterDateTo,
+      onClear: () => { setFilterDateFrom(undefined); setFilterDateTo(undefined); setPage(0); setAppliedFilters((p) => ({ ...p, dateFrom: undefined, dateTo: undefined })); },
+      filter: (
+        <div className="space-y-2">
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">De</label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className={cn("h-8 w-full justify-start text-xs font-normal", !filterDateFrom && "text-muted-foreground")}>
+                  <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                  {filterDateFrom ? format(filterDateFrom, "dd/MM/yyyy") : "Selecionar..."}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={filterDateFrom} onSelect={setFilterDateFrom} locale={ptBR} initialFocus className="p-3 pointer-events-auto" />
+              </PopoverContent>
+            </Popover>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Até</label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className={cn("h-8 w-full justify-start text-xs font-normal", !filterDateTo && "text-muted-foreground")}>
+                  <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                  {filterDateTo ? format(filterDateTo, "dd/MM/yyyy") : "Selecionar..."}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={filterDateTo} onSelect={setFilterDateTo} locale={ptBR} initialFocus className="p-3 pointer-events-auto" />
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
+      ),
+    },
+    uf: {
+      label: "UF",
+      align: "center",
+      filterActive: filterUfs.length > 0,
+      onClear: () => { setFilterUfs([]); setPage(0); setAppliedFilters((p) => ({ ...p, ufs: [] })); },
+      filter: (
+        <ComboboxMultiFilter
+          values={filterUfs}
+          onChange={setFilterUfs}
+          options={UFS.map((uf) => ({ label: uf, value: uf }))}
+          placeholder="Todos os estados"
+          searchPlaceholder="Buscar UF..."
+        />
+      ),
+    },
+  };
+
+  const visibleCols = colOrder.filter((id) => {
+    const def = columnDefs[id];
+    if (!def || colHidden.includes(id)) return false;
+    return def.tabs ? def.tabs.includes(activeTab) : true;
+  });
+
+  const renderCell = (colId: string, row: any, ctx: { pncpLink: string | null; formattedDate: string; empenhoRow: any }) => {
+    switch (colId) {
+      case "orgao":
+        return (
+          <td key={colId} className="table-sticky-col px-4 py-3 font-medium text-foreground max-w-[200px]">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="flex min-w-0 items-center gap-1">
+                  {ctx.pncpLink ? (
+                    <a href={ctx.pncpLink} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="flex min-w-0 items-center gap-1 text-primary hover:underline">
+                      <span className="truncate">{row.orgao}</span>
+                      <ExternalLink className="h-3 w-3 shrink-0" />
+                    </a>
+                  ) : <span className="truncate">{row.orgao}</span>}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-sm"><p>{row.orgao}</p></TooltipContent>
+            </Tooltip>
+          </td>
+        );
+      case "objeto":
+        return (
+          <td key={colId} className="px-4 py-3 max-w-[240px]">
+            <Tooltip>
+              <TooltipTrigger asChild><span className="block truncate text-foreground">{row.objeto}</span></TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-md"><p className="text-xs leading-relaxed">{row.objeto}</p></TooltipContent>
+            </Tooltip>
+          </td>
+        );
+      case "modalidade":
+        return <td key={colId} className="whitespace-nowrap px-4 py-3 text-muted-foreground text-xs">{row.modalidade || "—"}</td>;
+      case "valor_estimado":
+        return <td key={colId} className="whitespace-nowrap px-4 py-3 text-right font-medium text-foreground tabular-nums">{formatCurrency(row.valor_estimado)}</td>;
+      case "valor_homologado":
+        return <td key={colId} className="px-4 py-3 text-right font-medium text-success tabular-nums">{row.valor_homologado ? formatCurrency(row.valor_homologado) : "—"}</td>;
+      case "economia":
+        return (
+          <td key={colId} className="px-4 py-3 text-right font-medium tabular-nums">
+            {row.valor_estimado && row.valor_homologado ? (
+              <span className={row.valor_estimado - row.valor_homologado > 0 ? "text-success" : "text-destructive"}>
+                {formatCurrency(row.valor_estimado - row.valor_homologado)}
+              </span>
+            ) : "—"}
+          </td>
+        );
+      case "empenhado":
+        return (
+          <td key={colId} className="px-4 py-3 text-right font-medium tabular-nums">
+            {ctx.empenhoRow && ctx.empenhoRow.total_empenhado > 0 ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-primary cursor-help border-b border-dotted border-primary/40">{formatCurrency(ctx.empenhoRow.total_empenhado)}</span>
+                </TooltipTrigger>
+                <TooltipContent side="left" className="max-w-xs">
+                  <div className="text-xs space-y-1">
+                    <p><strong>{ctx.empenhoRow.qtd_empenhos}</strong> empenho{ctx.empenhoRow.qtd_empenhos > 1 ? "s" : ""}</p>
+                    <p>Empenhado: {formatCurrency(ctx.empenhoRow.total_empenhado)}</p>
+                    <p>Liquidado: {formatCurrency(ctx.empenhoRow.total_liquidado)}</p>
+                    <p>Pago: {formatCurrency(ctx.empenhoRow.total_pago)}</p>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-muted-foreground text-xs cursor-help border-b border-dotted border-muted-foreground/40">n/d</span>
+                </TooltipTrigger>
+                <TooltipContent side="left" className="max-w-xs">
+                  <p className="text-xs">Empenho não disponível. A execução orçamentária só é publicada de forma aberta para órgãos federais; estaduais e municipais não expõem esse dado.</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </td>
+        );
+      case "vencedor":
+        return (
+          <td key={colId} className="px-4 py-3 max-w-[200px]" onClick={(e) => e.stopPropagation()}>
+            {row.vencedor_nome ? (
+              <button
+                onClick={() => searchByWinner(row.vencedor_nome)}
+                className="block truncate text-primary text-xs font-medium hover:underline text-left max-w-full"
+                title={`Ver todas licitações de ${row.vencedor_nome}`}
+              >
+                {row.vencedor_nome}
+              </button>
+            ) : <span className="text-xs text-muted-foreground">—</span>}
+          </td>
+        );
+      case "situacao":
+        return (
+          <td key={colId} className="px-4 py-3 text-center">
+            <StatusBadge situacao={row.situacao} valorHomologado={row.valor_homologado} />
+          </td>
+        );
+      case "data":
+        return <td key={colId} className="whitespace-nowrap px-4 py-3 text-muted-foreground text-xs">{ctx.formattedDate}</td>;
+      case "uf":
+        return <td key={colId} className="px-4 py-3 text-center text-muted-foreground text-xs font-medium">{row.uf || "—"}</td>;
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -849,263 +1159,68 @@ export default function LicitacoesPage() {
           </div>
         )}
 
-        {/* Filters */}
-        <div className="space-y-4 bg-secondary/30 p-4 sm:p-5">
+        {/* Barra compacta: filtros ficam nos cabeçalhos das colunas */}
+        <div className="flex flex-wrap items-center gap-2 bg-secondary/30 px-4 py-3 sm:px-5">
+          <span className="mr-auto text-xs text-muted-foreground">
+            Use o ícone de filtro em cada coluna. Arraste o cabeçalho para reordenar — a configuração fica salva.
+          </span>
 
-        {/* Row 1: Objeto + Itens + Status — multi-seleção */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-start">
-          <div className="space-y-1.5 lg:col-span-5">
-            <div className="flex h-4 items-center gap-2">
-              <label className="text-xs font-medium text-muted-foreground">Palavras-chave (objeto)</label>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="cursor-help text-[10px] text-muted-foreground">ⓘ</span>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="max-w-xs">
-                  <p className="text-xs">Digite um termo e pressione <strong>Enter</strong> (ou vírgula) para adicionar vários. Escolha se a licitação precisa conter <strong>todos</strong> os termos ou <strong>qualquer um</strong>.</p>
-                </TooltipContent>
-              </Tooltip>
-              <ModeToggle value={filterTermosMode} onChange={setFilterTermosMode} />
-            </div>
-            <TagInput
-              values={filterTermos}
-              onChange={setFilterTermos}
-              placeholder="Ex: plataforma ead, consultoria... (Enter para adicionar)"
-              onEnterEmpty={handleSearch}
-            />
-          </div>
-          <div className="space-y-1.5 lg:col-span-4">
-            <div className="flex h-4 items-center gap-2">
-              <label className="text-xs font-medium text-muted-foreground">Itens</label>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="cursor-help text-[10px] text-muted-foreground">ⓘ</span>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="max-w-xs">
-                  <p className="text-xs">Busca na <strong>descrição dos itens</strong>. Vários termos podem ser combinados.</p>
-                </TooltipContent>
-              </Tooltip>
-              <ModeToggle value={filterItensMode} onChange={setFilterItensMode} />
-            </div>
-            <TagInput
-              values={filterItens}
-              onChange={setFilterItens}
-              placeholder="Ex: seringa 5ml, bolsa de urina..."
-              icon={<Package className="h-3.5 w-3.5" />}
-              onEnterEmpty={handleSearch}
-            />
-          </div>
-          <div className="space-y-1.5 lg:col-span-3">
-            <div className="flex h-4 items-center">
-              <label className="text-xs font-medium text-muted-foreground">Status (multi)</label>
-            </div>
-            <div className="flex min-h-9 flex-wrap items-center gap-1 rounded-lg border border-border bg-secondary/50 p-1">
-              {statusOptions.filter((o) => o.value).map((opt) => {
-                const on = filterSituacoes.includes(opt.value);
-                return (
-                  <button
-                    key={opt.value}
-                    onClick={() =>
-                      setFilterSituacoes(on ? filterSituacoes.filter((s) => s !== opt.value) : [...filterSituacoes, opt.value])
-                    }
-                    className={cn(
-                      "rounded-md px-2 text-xs font-medium leading-7 transition-colors",
-                      on ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-              {filterSituacoes.length > 0 && (
-                <button
-                  onClick={() => setFilterSituacoes([])}
-                  className="rounded-md px-2 text-xs leading-7 text-muted-foreground hover:text-foreground"
-                >
-                  limpar
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-
-
-
-        {/* Expandable filters section */}
-        <div>
-          <button
-            onClick={() => setFiltersExpanded(!filtersExpanded)}
-            className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <SlidersHorizontal className="h-3.5 w-3.5" />
-            FILTROS AVANÇADOS
-            <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", filtersExpanded && "rotate-180")} />
-          </button>
-
-          <AnimatePresence>
-            {filtersExpanded && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden"
-              >
-                <div className="mt-3 grid grid-cols-1 items-start gap-4 border-t border-border pt-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-medium text-muted-foreground">Órgão(s)</label>
-                    <ComboboxMultiFilter
-                      values={filterOrgaos}
-                      onChange={setFilterOrgaos}
-                      options={orgaoOptions}
-                      placeholder="Selecionar órgãos..."
-                      searchPlaceholder="Buscar órgão..."
-                      isLoading={orgaosLoading}
-                      onServerSearch={setOrgaoSearch}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-medium text-muted-foreground">Vencedor(es)</label>
-                    <ComboboxMultiFilter
-                      values={filterVencedores}
-                      onChange={handleWinnerFilterChange}
-                      options={vencedorOptions}
-                      placeholder="Selecionar vencedores..."
-                      searchPlaceholder="Buscar vencedor..."
-                      isLoading={vencedoresLoading}
-                      onServerSearch={setVencedorSearch}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-medium text-muted-foreground">Estado(s)</label>
-                    <ComboboxMultiFilter
-                      values={filterUfs}
-                      onChange={setFilterUfs}
-                      options={UFS.map((uf) => ({ label: uf, value: uf }))}
-                      placeholder="Todos os estados"
-                      searchPlaceholder="Buscar UF..."
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-medium text-muted-foreground">Modalidade(s)</label>
-                    <ComboboxMultiFilter
-                      values={filterModalidades}
-                      onChange={setFilterModalidades}
-                      options={MODALIDADE_OPTIONS.map((m) => ({ label: m, value: m }))}
-                      placeholder="Todas as modalidades"
-                      searchPlaceholder="Buscar modalidade..."
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-medium text-muted-foreground">Ordenar por</label>
-                    <Select value={filterSort} onValueChange={(v) => setFilterSort(v as typeof filterSort)}>
-                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="recentes">Mais recentes</SelectItem>
-                        <SelectItem value="valor">Maior valor homologado</SelectItem>
-                        <SelectItem value="estimado">Maior valor estimado</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-medium text-muted-foreground">Data Início</label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className={cn("h-9 w-full justify-start text-left font-normal", !filterDateFrom && "text-muted-foreground")}>
-                          <CalendarIcon className="mr-2 h-3.5 w-3.5" />
-                          {filterDateFrom ? format(filterDateFrom, "dd/MM/yyyy") : "Selecionar..."}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={filterDateFrom} onSelect={setFilterDateFrom} locale={ptBR} initialFocus className="p-3 pointer-events-auto" />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-medium text-muted-foreground">Data Fim</label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className={cn("h-9 w-full justify-start text-left font-normal", !filterDateTo && "text-muted-foreground")}>
-                          <CalendarIcon className="mr-2 h-3.5 w-3.5" />
-                          {filterDateTo ? format(filterDateTo, "dd/MM/yyyy") : "Selecionar..."}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={filterDateTo} onSelect={setFilterDateTo} locale={ptBR} initialFocus className="p-3 pointer-events-auto" />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                  {empresaId && (
-                    <div className="space-y-1.5">
-                      <label className="block text-xs font-medium text-muted-foreground">Minha atuação</label>
-                      <label
-                        htmlFor="apenas-participei"
-                        className="flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm"
-                      >
-                        <input
-                          id="apenas-participei"
-                          type="checkbox"
-                          className="h-4 w-4 rounded border-border accent-primary cursor-pointer"
-                          checked={filterApenasParticipei}
-                          onChange={(e) => setFilterApenasParticipei(e.target.checked)}
-                        />
-                        <span className="truncate">
-                          Apenas onde participei
-                          {minhasParticipacaoIds && (
-                            <span className="ml-1 text-xs text-muted-foreground">({minhasParticipacaoIds.length})</span>
-                          )}
-                        </span>
-                      </label>
-                    </div>
-                  )}
-                </div>
-
-                {filterVencedores.length > 0 && (
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    {vencedorStats && (
-                      <>
-                        <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                          <Trophy className="h-3 w-3" />
-                          {vencedorStats.totalSum} vitória{vencedorStats.totalSum !== 1 ? "s" : ""} ({filterVencedores.length} empresa{filterVencedores.length > 1 ? "s" : ""})
-                        </span>
-                        <span className="inline-flex items-center gap-1 rounded-full border border-success/20 bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success">
-                          <Award className="h-3 w-3" />
-                          Busca em Encerradas / Com Resultado
-                        </span>
-                      </>
-                    )}
-                    <span className="text-[11px] text-muted-foreground">
-                      Ao pesquisar por vencedor, o sistema consulta automaticamente licitações encerradas com resultado.
-                    </span>
-                  </div>
-                )}
-
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Ações */}
-        <div className="flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
-          {hasActiveFilters ? (
-            <Button variant="outline" onClick={handleClearFilters} className="h-9 w-full gap-2 sm:w-auto">
-              <X className="h-3.5 w-3.5" />
-              Limpar filtros
-            </Button>
-          ) : (
-            <span className="hidden sm:block" />
+          {empresaId && (
+            <label
+              htmlFor="apenas-participei"
+              className="flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-border bg-card px-3 text-xs"
+            >
+              <input
+                id="apenas-participei"
+                type="checkbox"
+                className="h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
+                checked={filterApenasParticipei}
+                onChange={(e) => setFilterApenasParticipei(e.target.checked)}
+              />
+              Apenas onde participei
+              {minhasParticipacaoIds && <span className="text-muted-foreground">({minhasParticipacaoIds.length})</span>}
+            </label>
           )}
-          <Button
-            onClick={handleSearch}
-            disabled={isFetching}
-            className="h-9 w-full gap-2 px-6 text-sm font-semibold sm:w-auto"
-          >
-            {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="h-9 gap-2 text-xs">
+                <Columns3 className="h-3.5 w-3.5" /> Colunas
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-64 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-semibold text-foreground">Colunas visíveis</span>
+                <button onClick={resetColumns} className="text-[11px] text-muted-foreground hover:text-foreground">restaurar</button>
+              </div>
+              <div className="space-y-1">
+                {colOrder
+                  .filter((id) => !columnDefs[id]?.tabs || columnDefs[id].tabs.includes(activeTab))
+                  .map((id) => (
+                    <label key={id} className="flex cursor-pointer items-center gap-2 rounded-md px-1 py-1 text-sm hover:bg-secondary">
+                      <input
+                        type="checkbox"
+                        className="h-3.5 w-3.5 rounded border-border accent-primary"
+                        checked={!colHidden.includes(id)}
+                        onChange={() => toggleColumn(id)}
+                      />
+                      <span className="truncate">{typeof columnDefs[id]?.label === "string" ? columnDefs[id].label : id}</span>
+                    </label>
+                  ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          {hasActiveFilters ? (
+            <Button variant="outline" onClick={handleClearFilters} className="h-9 gap-2 text-xs">
+              <X className="h-3.5 w-3.5" /> Limpar filtros
+            </Button>
+          ) : null}
+
+          <Button onClick={handleSearch} disabled={isFetching} className="h-9 gap-2 px-5 text-xs font-semibold">
+            {isFetching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
             {isFetching ? "Pesquisando..." : "Pesquisar"}
           </Button>
-        </div>
-
         </div>
       </div>
 
@@ -1340,28 +1455,27 @@ export default function LicitacoesPage() {
                 <thead>
                   <tr className="border-b border-border bg-secondary/50">
                     <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-16"></th>
-                    <th className="table-sticky-col px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Órgão</th>
-                    <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Objeto</th>
-                    <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Modalidade</th>
-                    <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Valor Est.</th>
-                    {activeTab === "encerradas" && (
-                      <>
-                        <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Val. Homologado</th>
-                        <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Economia</th>
-                        <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                          <Tooltip>
-                            <TooltipTrigger asChild><span className="cursor-help border-b border-dotted border-muted-foreground/40">Empenhado</span></TooltipTrigger>
-                            <TooltipContent side="bottom" className="max-w-xs"><p className="text-xs">Valor já comprometido pelo órgão via empenho. Fonte oficial disponível apenas para órgãos federais; estaduais e municipais aparecem como <strong>n/d</strong> (sem fonte pública), não como ausência de execução.</p></TooltipContent>
-                          </Tooltip>
-                        </th>
-                        <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Vencedor</th>
-                      </>
-                    )}
-                    {activeTab === "abertas" && (
-                      <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Situação</th>
-                    )}
-                    <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Data</th>
-                    <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-muted-foreground">UF</th>
+                    {visibleCols.map((id) => {
+                      const def = columnDefs[id];
+                      return (
+                        <ColumnHeaderCell
+                          key={id}
+                          id={id}
+                          label={def.label}
+                          align={def.align}
+                          className={def.thClass}
+                          filter={def.filter}
+                          filterActive={def.filterActive}
+                          onClearFilter={def.onClear ? () => { def.onClear(); handleSearch(); } : undefined}
+                          onApplyFilter={def.filter ? handleSearch : undefined}
+                          sortActive={def.sortKey ? appliedFilters.sort === def.sortKey : undefined}
+                          onSort={def.sortKey ? () => setSort(def.sortKey) : undefined}
+                          onDragStartCol={setDragCol}
+                          onDropCol={(target) => { if (dragCol) moveColumn(dragCol, target); setDragCol(null); }}
+                          isDragging={dragCol === id}
+                        />
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody>
@@ -1382,95 +1496,7 @@ export default function LicitacoesPage() {
                             <Eye className="h-3.5 w-3.5" />
                           </button>
                         </td>
-                        <td className="table-sticky-col px-4 py-3 font-medium text-foreground max-w-[200px]">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="flex min-w-0 items-center gap-1">
-                                {pncpLink ? (
-                                  <a href={pncpLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="flex min-w-0 items-center gap-1 text-primary hover:underline">
-                                    <span className="truncate">{row.orgao}</span>
-                                    <ExternalLink className="h-3 w-3 shrink-0" />
-                                  </a>
-                                ) : <span className="truncate">{row.orgao}</span>}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent side="bottom" className="max-w-sm"><p>{row.orgao}</p></TooltipContent>
-                          </Tooltip>
-                        </td>
-                        <td className="px-4 py-3 max-w-[240px]">
-                          <Tooltip>
-                            <TooltipTrigger asChild><span className="block truncate text-foreground">{row.objeto}</span></TooltipTrigger>
-                            <TooltipContent side="bottom" className="max-w-md"><p className="text-xs leading-relaxed">{row.objeto}</p></TooltipContent>
-                          </Tooltip>
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-muted-foreground text-xs">{row.modalidade || "—"}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-foreground tabular-nums">{formatCurrency(row.valor_estimado)}</td>
-                        {activeTab === "encerradas" && (
-                          <>
-                            <td className="px-4 py-3 text-right font-medium text-success tabular-nums">{row.valor_homologado ? formatCurrency(row.valor_homologado) : "—"}</td>
-                            <td className="px-4 py-3 text-right font-medium tabular-nums">
-                              {row.valor_estimado && row.valor_homologado ? (
-                                <span className={row.valor_estimado - row.valor_homologado > 0 ? "text-success" : "text-destructive"}>
-                                  {formatCurrency(row.valor_estimado - row.valor_homologado)}
-                                </span>
-                              ) : "—"}
-                            </td>
-                            <td className="px-4 py-3 text-right font-medium tabular-nums">
-                              {empenhoRow && empenhoRow.total_empenhado > 0 ? (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span className="text-primary cursor-help border-b border-dotted border-primary/40">
-                                      {formatCurrency(empenhoRow.total_empenhado)}
-                                    </span>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="left" className="max-w-xs">
-                                    <div className="text-xs space-y-1">
-                                      <p><strong>{empenhoRow.qtd_empenhos}</strong> empenho{empenhoRow.qtd_empenhos > 1 ? "s" : ""}</p>
-                                      <p>Empenhado: {formatCurrency(empenhoRow.total_empenhado)}</p>
-                                      <p>Liquidado: {formatCurrency(empenhoRow.total_liquidado)}</p>
-                                      <p>Pago: {formatCurrency(empenhoRow.total_pago)}</p>
-                                    </div>
-                                  </TooltipContent>
-                                </Tooltip>
-                              ) : (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span className="text-muted-foreground text-xs cursor-help border-b border-dotted border-muted-foreground/40">
-                                      n/d
-                                    </span>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="left" className="max-w-xs">
-                                    <p className="text-xs">
-                                      Empenho não disponível. A execução orçamentária só é publicada de forma
-                                      aberta para órgãos federais (SIAFE/União). Órgãos estaduais e municipais
-                                      não expõem esse dado — ausência aqui não significa que não houve empenho.
-                                    </p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 max-w-[200px]" onClick={(e) => e.stopPropagation()}>
-                              {row.vencedor_nome ? (
-                                <button
-                                  onClick={() => searchByWinner(row.vencedor_nome)}
-                                  className="block truncate text-primary text-xs font-medium hover:underline text-left max-w-full"
-                                  title={`Ver todas licitações de ${row.vencedor_nome}`}
-                                >
-                                  {row.vencedor_nome}
-                                </button>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">—</span>
-                              )}
-                            </td>
-                          </>
-                        )}
-                        {activeTab === "abertas" && (
-                          <td className="px-4 py-3 text-center">
-                            <StatusBadge situacao={row.situacao} valorHomologado={row.valor_homologado} />
-                          </td>
-                        )}
-                        <td className="whitespace-nowrap px-4 py-3 text-muted-foreground text-xs">{formattedDate}</td>
-                        <td className="px-4 py-3 text-center text-muted-foreground text-xs font-medium">{row.uf || "—"}</td>
+                        {visibleCols.map((id) => renderCell(id, row, { pncpLink, formattedDate, empenhoRow }))}
                       </tr>
                     );
                   })}
