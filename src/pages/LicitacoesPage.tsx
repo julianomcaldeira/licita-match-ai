@@ -29,6 +29,16 @@ import { IngestaoManualButton } from "@/components/dashboard/IngestaoManualButto
 import { useAuth } from "@/contexts/AuthContext";
 import { useTracker } from "@/hooks/useTracking";
 import TagInput from "@/components/TagInput";
+import ColumnHeaderCell from "@/components/table/ColumnHeaderCell";
+import { useColumnPrefs } from "@/hooks/useColumnPrefs";
+import { Columns3 } from "lucide-react";
+
+const DEFAULT_COL_ORDER = [
+  "orgao", "objeto", "modalidade", "valor_estimado", "valor_homologado",
+  "economia", "empenhado", "vencedor", "situacao", "data", "uf",
+];
+
+
 
 
 const UFS = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
