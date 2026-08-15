@@ -1455,28 +1455,27 @@ export default function LicitacoesPage() {
                 <thead>
                   <tr className="border-b border-border bg-secondary/50">
                     <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-16"></th>
-                    <th className="table-sticky-col px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Órgão</th>
-                    <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Objeto</th>
-                    <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Modalidade</th>
-                    <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Valor Est.</th>
-                    {activeTab === "encerradas" && (
-                      <>
-                        <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Val. Homologado</th>
-                        <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Economia</th>
-                        <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                          <Tooltip>
-                            <TooltipTrigger asChild><span className="cursor-help border-b border-dotted border-muted-foreground/40">Empenhado</span></TooltipTrigger>
-                            <TooltipContent side="bottom" className="max-w-xs"><p className="text-xs">Valor já comprometido pelo órgão via empenho. Fonte oficial disponível apenas para órgãos federais; estaduais e municipais aparecem como <strong>n/d</strong> (sem fonte pública), não como ausência de execução.</p></TooltipContent>
-                          </Tooltip>
-                        </th>
-                        <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Vencedor</th>
-                      </>
-                    )}
-                    {activeTab === "abertas" && (
-                      <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Situação</th>
-                    )}
-                    <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Data</th>
-                    <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-muted-foreground">UF</th>
+                    {visibleCols.map((id) => {
+                      const def = columnDefs[id];
+                      return (
+                        <ColumnHeaderCell
+                          key={id}
+                          id={id}
+                          label={def.label}
+                          align={def.align}
+                          className={def.thClass}
+                          filter={def.filter}
+                          filterActive={def.filterActive}
+                          onClearFilter={def.onClear ? () => { def.onClear(); handleSearch(); } : undefined}
+                          onApplyFilter={def.filter ? handleSearch : undefined}
+                          sortActive={def.sortKey ? appliedFilters.sort === def.sortKey : undefined}
+                          onSort={def.sortKey ? () => setSort(def.sortKey) : undefined}
+                          onDragStartCol={setDragCol}
+                          onDropCol={(target) => { if (dragCol) moveColumn(dragCol, target); setDragCol(null); }}
+                          isDragging={dragCol === id}
+                        />
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody>
@@ -1497,95 +1496,7 @@ export default function LicitacoesPage() {
                             <Eye className="h-3.5 w-3.5" />
                           </button>
                         </td>
-                        <td className="table-sticky-col px-4 py-3 font-medium text-foreground max-w-[200px]">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="flex min-w-0 items-center gap-1">
-                                {pncpLink ? (
-                                  <a href={pncpLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="flex min-w-0 items-center gap-1 text-primary hover:underline">
-                                    <span className="truncate">{row.orgao}</span>
-                                    <ExternalLink className="h-3 w-3 shrink-0" />
-                                  </a>
-                                ) : <span className="truncate">{row.orgao}</span>}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent side="bottom" className="max-w-sm"><p>{row.orgao}</p></TooltipContent>
-                          </Tooltip>
-                        </td>
-                        <td className="px-4 py-3 max-w-[240px]">
-                          <Tooltip>
-                            <TooltipTrigger asChild><span className="block truncate text-foreground">{row.objeto}</span></TooltipTrigger>
-                            <TooltipContent side="bottom" className="max-w-md"><p className="text-xs leading-relaxed">{row.objeto}</p></TooltipContent>
-                          </Tooltip>
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-muted-foreground text-xs">{row.modalidade || "—"}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-foreground tabular-nums">{formatCurrency(row.valor_estimado)}</td>
-                        {activeTab === "encerradas" && (
-                          <>
-                            <td className="px-4 py-3 text-right font-medium text-success tabular-nums">{row.valor_homologado ? formatCurrency(row.valor_homologado) : "—"}</td>
-                            <td className="px-4 py-3 text-right font-medium tabular-nums">
-                              {row.valor_estimado && row.valor_homologado ? (
-                                <span className={row.valor_estimado - row.valor_homologado > 0 ? "text-success" : "text-destructive"}>
-                                  {formatCurrency(row.valor_estimado - row.valor_homologado)}
-                                </span>
-                              ) : "—"}
-                            </td>
-                            <td className="px-4 py-3 text-right font-medium tabular-nums">
-                              {empenhoRow && empenhoRow.total_empenhado > 0 ? (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span className="text-primary cursor-help border-b border-dotted border-primary/40">
-                                      {formatCurrency(empenhoRow.total_empenhado)}
-                                    </span>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="left" className="max-w-xs">
-                                    <div className="text-xs space-y-1">
-                                      <p><strong>{empenhoRow.qtd_empenhos}</strong> empenho{empenhoRow.qtd_empenhos > 1 ? "s" : ""}</p>
-                                      <p>Empenhado: {formatCurrency(empenhoRow.total_empenhado)}</p>
-                                      <p>Liquidado: {formatCurrency(empenhoRow.total_liquidado)}</p>
-                                      <p>Pago: {formatCurrency(empenhoRow.total_pago)}</p>
-                                    </div>
-                                  </TooltipContent>
-                                </Tooltip>
-                              ) : (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span className="text-muted-foreground text-xs cursor-help border-b border-dotted border-muted-foreground/40">
-                                      n/d
-                                    </span>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="left" className="max-w-xs">
-                                    <p className="text-xs">
-                                      Empenho não disponível. A execução orçamentária só é publicada de forma
-                                      aberta para órgãos federais (SIAFE/União). Órgãos estaduais e municipais
-                                      não expõem esse dado — ausência aqui não significa que não houve empenho.
-                                    </p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 max-w-[200px]" onClick={(e) => e.stopPropagation()}>
-                              {row.vencedor_nome ? (
-                                <button
-                                  onClick={() => searchByWinner(row.vencedor_nome)}
-                                  className="block truncate text-primary text-xs font-medium hover:underline text-left max-w-full"
-                                  title={`Ver todas licitações de ${row.vencedor_nome}`}
-                                >
-                                  {row.vencedor_nome}
-                                </button>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">—</span>
-                              )}
-                            </td>
-                          </>
-                        )}
-                        {activeTab === "abertas" && (
-                          <td className="px-4 py-3 text-center">
-                            <StatusBadge situacao={row.situacao} valorHomologado={row.valor_homologado} />
-                          </td>
-                        )}
-                        <td className="whitespace-nowrap px-4 py-3 text-muted-foreground text-xs">{formattedDate}</td>
-                        <td className="px-4 py-3 text-center text-muted-foreground text-xs font-medium">{row.uf || "—"}</td>
+                        {visibleCols.map((id) => renderCell(id, row, { pncpLink, formattedDate, empenhoRow }))}
                       </tr>
                     );
                   })}
