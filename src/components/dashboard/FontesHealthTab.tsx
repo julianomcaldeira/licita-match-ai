@@ -92,6 +92,46 @@ function CircuitCard() {
   );
 }
 
+function AlertasCard() {
+  const { data } = useQuery({
+    queryKey: ["ingestao-alertas"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("ingestao_alertas")
+        .select("id, tipo, severidade, titulo, created_at")
+        .is("resolvido_em", null)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      if (error) throw error;
+      return (data || []) as {
+        id: string; tipo: string; severidade: string; titulo: string; created_at: string;
+      }[];
+    },
+    refetchInterval: 60000,
+  });
+
+  if (!data?.length) return null;
+
+  return (
+    <Card className="border-destructive/30">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm">Alertas de ingestão em aberto</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {data.map((a) => (
+          <div key={a.id} className="flex flex-wrap items-center gap-2 text-sm">
+            <Badge variant="outline" className={a.severidade === "critico" ? SEV.critico.cls : SEV.atencao.cls}>
+              {a.tipo}
+            </Badge>
+            <span className="font-medium">{a.titulo}</span>
+            <span className="text-muted-foreground">· {fmt(a.created_at)}</span>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function FontesHealthTab() {
   const { data, isLoading } = useQuery({
     queryKey: ["fontes-health"],
@@ -116,6 +156,7 @@ export function FontesHealthTab() {
 
   return (
     <div className="space-y-4">
+      <AlertasCard />
       <CircuitCard />
       <EndpointMetricsCard />
 

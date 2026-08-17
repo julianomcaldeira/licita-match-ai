@@ -1051,6 +1051,39 @@ export type Database = {
         }
         Relationships: []
       }
+      ingestao_alertas: {
+        Row: {
+          created_at: string
+          detalhes: Json
+          id: string
+          resolvido_em: string | null
+          severidade: string
+          tipo: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          detalhes?: Json
+          id?: string
+          resolvido_em?: string | null
+          severidade?: string
+          tipo: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          detalhes?: Json
+          id?: string
+          resolvido_em?: string | null
+          severidade?: string
+          tipo?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ingestao_health_daily: {
         Row: {
           created_at: string
@@ -2276,6 +2309,8 @@ export type Database = {
           pct_cobertura: number
         }[]
       }
+      ingestao_ajusta_modo: { Args: never; Returns: Json }
+      ingestao_check_estagnacao: { Args: never; Returns: Json }
       ingestao_health_snapshot: {
         Args: never
         Returns: {
@@ -2291,6 +2326,7 @@ export type Database = {
           velocidade_dia: number
         }[]
       }
+      ingestao_regime_tick: { Args: never; Returns: Json }
       ingestao_rotas_resumo: { Args: never; Returns: Json }
       ingestion_watchdog: { Args: never; Returns: Json }
       licitacoes_pendentes_winners_count: {
