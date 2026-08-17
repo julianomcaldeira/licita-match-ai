@@ -2622,6 +2622,7 @@ export type Database = {
         }[]
       }
       pncp_dadosabertos_backfill_2023_tick: { Args: never; Returns: Json }
+      pncp_dadosabertos_backfill_2024_tick: { Args: never; Returns: Json }
       pncp_dadosabertos_backfill_fast_tick: { Args: never; Returns: Json }
       pncp_dadosabertos_backfill_tick: { Args: never; Returns: Json }
       pncp_endpoint_budgets: {

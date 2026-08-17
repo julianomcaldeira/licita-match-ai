@@ -25,7 +25,7 @@ export const DEFAULT_BUDGET: EndpointBudget = {
 };
 
 const MIN_TIMEOUT = 8_000;
-const MAX_TIMEOUT = 55_000;
+const MAX_TIMEOUT = 75_000;
 
 export class PncpBudgets {
   private map = new Map<string, EndpointBudget>();

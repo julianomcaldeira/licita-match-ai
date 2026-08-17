@@ -33,7 +33,7 @@ const corsHeaders = {
 
 const PNCP_CONSULTA = "https://pncp.gov.br/api/consulta/v1";
 const PNCP_DATA = "https://pncp.gov.br/api/pncp/v1";
-const PAGE_SIZE = 500;
+const PAGE_SIZE = 200;
 const COMPRA_CONCURRENCY = 8;
 const ITEM_CONCURRENCY = 5;
 
@@ -67,11 +67,20 @@ async function fetchJson(url: string, opts: { deadline?: number } = {}): Promise
     if (remaining < 6_000) break;
     // timeout adaptativo por endpoint (latencia media recente), limitado
     // pelo tempo restante da execucao
-    const timeoutMs = budgets.timeoutFor(
+    let timeoutMs = budgets.timeoutFor(
       url,
       attempt,
       Number.isFinite(remaining) ? remaining : undefined,
     );
+    // A listagem em massa de contratos e naturalmente lenta (20-50s): piso maior
+    // para nao abortar respostas que iriam chegar.
+    if (url.includes("/consulta/v1/contratos")) {
+      const floor = Number.isFinite(remaining)
+        ? Math.min(65_000, Math.max(10_000, remaining - 3_000))
+        : 65_000;
+      timeoutMs = Math.max(timeoutMs, floor);
+    }
+
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
@@ -461,6 +470,25 @@ async function ingestCompraDetails(
   return { items: insertedItems, winners: insertedWinners };
 }
 
+/** Serializa qualquer erro (Error, objeto do Supabase, string) em texto legível. */
+function errToText(e: unknown): string {
+  if (e instanceof Error) return `${e.name}: ${e.message}`;
+  if (typeof e === "string") return e;
+  if (e && typeof e === "object") {
+    const o = e as Record<string, unknown>;
+    const parts = ["message", "error", "details", "hint", "code", "status"]
+      .filter((k) => o[k] !== undefined && o[k] !== null)
+      .map((k) => `${k}=${typeof o[k] === "object" ? JSON.stringify(o[k]) : String(o[k])}`);
+    if (parts.length) return parts.join(" | ");
+    try {
+      return JSON.stringify(e);
+    } catch {
+      return Object.prototype.toString.call(e);
+    }
+  }
+  return String(e);
+}
+
 async function logRun(
   supabase: any,
   endpoint: string,
@@ -469,6 +497,7 @@ async function logRun(
   inicio: string,
   fim: string,
   erro?: string,
+  detalhes?: Record<string, unknown>,
 ) {
   await supabase.from("ingestao_logs").insert({
     fonte: "PNCP_DADOS_ABERTOS",
@@ -478,8 +507,10 @@ async function logRun(
     data_inicio: inicio,
     data_fim: fim,
     erro: erro ?? null,
+    detalhes: detalhes ?? {},
   });
 }
+
 
 const handler = async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -654,7 +685,8 @@ const handler = async (req: Request) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
+        const msg = errToText(e);
+
         if (isSourceOutage(msg)) await circuitReport(supabase, false, msg);
         await supabase.rpc("mark_contratos_dia", {
           p_dia: diaIso,
@@ -778,12 +810,18 @@ const handler = async (req: Request) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    await logRun(supabase, "fatal", "erro", 0, startedAt, new Date().toISOString(), msg);
+    const msg = errToText(e);
+    const stack = e instanceof Error ? (e.stack ?? "").slice(0, 2000) : undefined;
+    console.error("fatal:", msg, stack ?? "");
+    await logRun(supabase, "fatal", "erro", 0, startedAt, new Date().toISOString(), msg.slice(0, 1000), {
+      mode: new URL(req.url).searchParams.get("mode") ?? undefined,
+      stack,
+    });
     return new Response(JSON.stringify({ ok: false, error: msg }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
+
   }
 };
 
