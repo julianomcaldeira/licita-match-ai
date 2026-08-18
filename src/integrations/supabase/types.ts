@@ -1790,6 +1790,48 @@ export type Database = {
         }
         Relationships: []
       }
+      pncp_reconcile_state: {
+        Row: {
+          created_at: string
+          cycle: number
+          id: string
+          last_ano: number
+          last_cnpj: string
+          last_duration_ms: number | null
+          last_run_at: string | null
+          last_seq: number
+          reconciled_cycle: number
+          scanned_cycle: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          cycle?: number
+          id?: string
+          last_ano?: number
+          last_cnpj?: string
+          last_duration_ms?: number | null
+          last_run_at?: string | null
+          last_seq?: number
+          reconciled_cycle?: number
+          scanned_cycle?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          cycle?: number
+          id?: string
+          last_ano?: number
+          last_cnpj?: string
+          last_duration_ms?: number | null
+          last_run_at?: string | null
+          last_seq?: number
+          reconciled_cycle?: number
+          scanned_cycle?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
