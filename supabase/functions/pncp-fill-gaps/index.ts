@@ -51,6 +51,42 @@ async function waitForThrottle() {
   if (wait > 0) await new Promise((r) => setTimeout(r, wait));
 }
 
+// ---- Drenagem contínua: pacing adaptativo (token bucket serializado) -------
+// Em vez de disparar rajadas e colher 429, mantemos um intervalo mínimo entre
+// requisições. O intervalo sobe a cada 429 e desce lentamente a cada sucesso,
+// convergindo para a maior taxa que o PNCP tolera de forma sustentada.
+let paceMs = 0;              // 0 = desligado (modos não-drenagem)
+let paceMinMs = 0;
+let paceMaxMs = 4_000;
+let nextSlotAt = 0;
+const runMetricsPace = { max_pace_ms: 0 };
+
+async function acquireSlot() {
+  if (paceMs <= 0) return;
+  const now = Date.now();
+  const slot = Math.max(now, nextSlotAt);
+  nextSlotAt = slot + paceMs;
+  const wait = slot - now;
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+}
+
+function slowDown() {
+  if (paceMs <= 0) return;
+  paceMs = Math.min(paceMaxMs, Math.ceil(paceMs * 1.5) + 50);
+  runMetricsPace.max_pace_ms = Math.max(runMetricsPace.max_pace_ms, paceMs);
+}
+
+function speedUp() {
+  if (paceMs <= 0) return;
+  paceMs = Math.max(paceMinMs, Math.floor(paceMs * 0.98));
+}
+
+// Em drenagem, um timeout isolado não deve abrir o circuito por 25 minutos:
+// só reportamos indisponibilidade após N falhas consecutivas.
+let consecutiveFailures = 0;
+let outageTolerance = 1; // 1 = comportamento original (não-drenagem)
+
+
 async function fetchWithTimeout(url: string): Promise<Response> {
   let lastErr: unknown = null;
   const maxRetries = budgets.retriesFor(url);
@@ -59,11 +95,16 @@ async function fetchWithTimeout(url: string): Promise<Response> {
   if (circuits) await circuits.ensure(url);
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     await waitForThrottle();
+    await acquireSlot();
     const ctrl = new AbortController();
     // timeout adaptativo por endpoint: baseado na latência média recente
-    // do PNCP e ampliado a cada retentativa.
-    const timeoutMs = budgets.timeoutFor(url, attempt);
+    // do PNCP e ampliado a cada retentativa. Em drenagem damos mais folga,
+    // pois a fonte responde devagar mas responde.
+    const timeoutMs = paceMs > 0
+      ? Math.max(budgets.timeoutFor(url, attempt), 35_000)
+      : budgets.timeoutFor(url, attempt);
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+
     try {
       const resp = await metrics.timed(
         url,
@@ -73,13 +114,17 @@ async function fetchWithTimeout(url: string): Promise<Response> {
       clearTimeout(timer);
       if (resp.status === 429) {
         runMetrics.http_429++;
-        // pressão da fonte: reduz o paralelismo e aplica cooldown global
-        runtimeParallel = Math.max(2, Math.floor(runtimeParallel * 0.6));
+        // pressão da fonte: reduz o paralelismo, alarga o pacing e aplica
+        // cooldown global antes da próxima tentativa.
+        runtimeParallel = Math.max(1, Math.floor(runtimeParallel * 0.6));
+        slowDown();
         const retryAfter = Number(resp.headers.get("retry-after"));
         const waitMs = Number.isFinite(retryAfter) && retryAfter > 0
           ? Math.min(retryAfter * 1000, 20_000)
           : budgets.backoffFor(url, attempt) * 2;
         throttleUntil = Math.max(throttleUntil, Date.now() + waitMs);
+        // reposiciona a fila de pacing depois do cooldown
+        nextSlotAt = Math.max(nextSlotAt, throttleUntil);
         await waitForThrottle();
         lastErr = new Error("HTTP 429");
         continue;
@@ -91,7 +136,10 @@ async function fetchWithTimeout(url: string): Promise<Response> {
         continue;
       }
       if (circuits) await circuits.reportOutcome(url, true);
+      consecutiveFailures = 0;
+      speedUp();
       return resp;
+
     } catch (e) {
       clearTimeout(timer);
       runMetrics.fetch_timeouts++;
@@ -103,7 +151,14 @@ async function fetchWithTimeout(url: string): Promise<Response> {
   const failMsg = lastErr instanceof Error
     ? (lastErr.message || "timeout")
     : String(lastErr ?? "timeout");
-  if (circuits) await circuits.reportOutcome(url, false, failMsg);
+  consecutiveFailures++;
+  // em drenagem, tolera falhas isoladas antes de pausar o endpoint inteiro
+  if (circuits && consecutiveFailures >= outageTolerance) {
+    await circuits.reportOutcome(url, false, failMsg);
+  }
+  // desacelera mesmo sem abrir o circuito
+  slowDown();
+
 
   throw new Error(
     lastErr instanceof Error
@@ -150,6 +205,11 @@ async function ingestCompra(
   if (compraResp.status === 404) {
     return { ok: false, winners: 0, note: "not_found_in_pncp" };
   }
+  // 410 Gone: registro removido na origem. É definitivo — nunca mais tentar.
+  if (compraResp.status === 410) {
+    return { ok: false, winners: 0, note: "gone_in_pncp" };
+  }
+
   if (!compraResp.ok) {
     return { ok: false, winners: 0, note: `compra_http_${compraResp.status}` };
   }
@@ -331,13 +391,16 @@ const handler = async (req: Request) => {
     body = {};
   }
   const mode: string = body.mode || "gaps";
+  // Modo drenagem contínua: mesma lógica de "gaps", mas com paralelismo baixo
+  // e pacing adaptativo — objetivo é escoar a fila sem provocar 429 no PNCP.
+  const drain: boolean = mode === "drain" || body.drain === true;
 
   // Autoscale: if no explicit limit or autoscale=true, read tuned params.
   let tunedLimit = 200;
   let tunedParallel = 10;
   if (body.autoscale || body.limit == null) {
     const { data: state } = await supabase
-      .rpc("get_autoscale_state", { p_target: mode });
+      .rpc("get_autoscale_state", { p_target: drain ? "gaps" : mode });
     const row = Array.isArray(state) ? state[0] : state;
     if (row) {
       tunedLimit = Number(row.limit_per_run) || tunedLimit;
@@ -349,6 +412,24 @@ const handler = async (req: Request) => {
     Math.min(Number(body.limit) || tunedLimit, 3000),
   );
   runtimeParallel = Math.max(1, Math.min(tunedParallel, 40));
+
+  if (drain) {
+    // 1–2 requisições simultâneas + intervalo mínimo entre chamadas.
+    runtimeParallel = Math.max(1, Math.min(Number(body.parallel) || 2, 2));
+    paceMinMs = Math.max(50, Number(body.paceMinMs) || 250);
+    paceMs = Math.max(paceMinMs, Number(body.paceMs) || 400);
+    paceMaxMs = Math.max(paceMs, Number(body.paceMaxMs) || 6_000);
+    nextSlotAt = Date.now();
+    runMetricsPace.max_pace_ms = paceMs;
+    outageTolerance = Math.max(1, Number(body.outageTolerance) || 4);
+  } else {
+    paceMs = 0;
+    runMetricsPace.max_pace_ms = 0;
+    outageTolerance = 1;
+  }
+  consecutiveFailures = 0;
+
+
 
   const startedAt = Date.now();
   runMetrics.http_429 = 0;
@@ -363,13 +444,15 @@ const handler = async (req: Request) => {
     inserted: 0,
     winners: 0,
     notFound: 0,
+    gone: 0,
     errors: [] as string[],
   };
 
 
   // Hard deadline so we always flush the run log before the platform kills us.
   const DEADLINE_MS = Number(body.deadlineMs) ||
-    (mode === "gaps" ? 110_000 : 240_000);
+    (drain ? 220_000 : mode === "gaps" ? 110_000 : 240_000);
+
   const outOfTime = () => Date.now() - startedAt > DEADLINE_MS;
 
   async function runPool<T>(items: T[], worker: (item: T) => Promise<void>) {
@@ -387,7 +470,7 @@ const handler = async (req: Request) => {
   }
 
   try {
-    if (mode === "gaps") {
+    if (mode === "gaps" || drain) {
       // Fila persistente: claim rápido por índice (a detecção de lacunas roda
       // em cron separado, fora do caminho crítico).
       // Nesta fase só gravamos a licitação (1 request por registro) — os
@@ -420,10 +503,16 @@ const handler = async (req: Request) => {
             runLog.inserted++;
             runLog.winners += r.winners;
             status = "done";
-          } else if (r.note === "not_found_in_pncp") {
+          } else if (
+            r.note === "not_found_in_pncp" || r.note === "gone_in_pncp"
+          ) {
+            // 404 (nunca existiu) e 410 (removido na origem) são definitivos:
+            // marcamos como not_found para sair da fila de retentativas.
             runLog.notFound++;
             status = "not_found";
-            errMsg = "not_found_in_pncp";
+            errMsg = r.note;
+            if (r.note === "gone_in_pncp") runLog.gone++;
+
           } else {
             errMsg = String(r.note ?? "erro_desconhecido");
             runLog.errors.push(`${g.cnpj}/${g.ano}/${g.seq}: ${errMsg}`);
@@ -567,11 +656,16 @@ const handler = async (req: Request) => {
         inserted: runLog.inserted,
         winners: runLog.winners,
         not_found: runLog.notFound,
+        gone: runLog.gone,
+        drain,
+        pace_ms_final: paceMs,
+        pace_ms_max: runMetricsPace.max_pace_ms,
         errors_sample: runLog.errors.slice(0, 20),
         duration_ms: Date.now() - startedAt,
         http_429: runMetrics.http_429,
         http_5xx: runMetrics.http_5xx,
         fetch_timeouts: runMetrics.fetch_timeouts,
+
       },
     });
 
