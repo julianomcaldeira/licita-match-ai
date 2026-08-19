@@ -76,10 +76,17 @@ Deno.serve(async (req) => {
       rt.waitUntil(fetchPromise);
     }
 
+    // Jobs longos (ex.: drenagem da fila do PNCP) pedem waitMs alto: mantemos
+    // a conexão aberta até o alvo terminar, senão o worker é encerrado cedo.
+    const waitMs = Math.max(
+      1000,
+      Math.min(Number(body.waitMs) || 5000, 240_000),
+    );
+
     const result = await Promise.race([
       fetchPromise.then((r) => ({ status: r ? r.status : "failed" })),
       new Promise<{ status: string }>((resolve) =>
-        setTimeout(() => resolve({ status: "dispatched" }), 5000)
+        setTimeout(() => resolve({ status: "dispatched" }), waitMs)
       ),
     ]);
 
