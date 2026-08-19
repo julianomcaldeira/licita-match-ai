@@ -414,14 +414,16 @@ const handler = async (req: Request) => {
   runtimeParallel = Math.max(1, Math.min(tunedParallel, 40));
 
   if (drain) {
-    // 1–2 requisições simultâneas + intervalo mínimo entre chamadas.
-    runtimeParallel = Math.max(1, Math.min(Number(body.parallel) || 2, 2));
-    paceMinMs = Math.max(50, Number(body.paceMinMs) || 250);
-    paceMs = Math.max(paceMinMs, Number(body.paceMs) || 400);
-    paceMaxMs = Math.max(paceMs, Number(body.paceMaxMs) || 6_000);
+    // Drenagem acelerada: até 6 requisições simultâneas com pacing adaptativo
+    // (o pace sobe sozinho ao primeiro 429 e volta a cair quando estabiliza).
+    runtimeParallel = Math.max(1, Math.min(Number(body.parallel) || 4, 6));
+    paceMinMs = Math.max(50, Number(body.paceMinMs) || 90);
+    paceMs = Math.max(paceMinMs, Number(body.paceMs) || 150);
+    paceMaxMs = Math.max(paceMs, Number(body.paceMaxMs) || 5_000);
     nextSlotAt = Date.now();
     runMetricsPace.max_pace_ms = paceMs;
     outageTolerance = Math.max(1, Number(body.outageTolerance) || 4);
+
   } else {
     paceMs = 0;
     runMetricsPace.max_pace_ms = 0;
