@@ -1735,6 +1735,7 @@ export type Database = {
           cnpj: string
           created_at: string
           last_error: string | null
+          mat_checked_at: string | null
           seq: number
           status: string
           updated_at: string
@@ -1746,6 +1747,7 @@ export type Database = {
           cnpj: string
           created_at?: string
           last_error?: string | null
+          mat_checked_at?: string | null
           seq: number
           status?: string
           updated_at?: string
@@ -1757,6 +1759,7 @@ export type Database = {
           cnpj?: string
           created_at?: string
           last_error?: string | null
+          mat_checked_at?: string | null
           seq?: number
           status?: string
           updated_at?: string
@@ -2675,6 +2678,13 @@ export type Database = {
           situacao: string
           uf: string
           valor_estimado: number
+        }[]
+      }
+      materialize_gaps_from_contratos: {
+        Args: { p_limit?: number }
+        Returns: {
+          materialized: number
+          scanned: number
         }[]
       }
       pncp_circuit_allow: { Args: { p_source: string }; Returns: boolean }

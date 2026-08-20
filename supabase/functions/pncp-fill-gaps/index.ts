@@ -473,6 +473,35 @@ const handler = async (req: Request) => {
 
   try {
     if (mode === "gaps" || drain) {
+      // Rota rápida (sem HTTP): materializa as licitações que já existem nos
+      // contratos brutos baixados em massa. Isso tira a drenagem da dependência
+      // do endpoint /consulta/v1 (degradado, 429/504) para a maior parte da fila.
+      if (body.materialize !== false) {
+        const matBudgetMs = Number(body.materializeBudgetMs) || (drain ? 90_000 : 30_000);
+        const matStart = Date.now();
+        let matTotal = 0;
+        let matScanned = 0;
+        while (Date.now() - matStart < matBudgetMs && !outOfTime()) {
+          const { data: mat, error: matErr } = await supabase.rpc(
+            "materialize_gaps_from_contratos",
+            { p_limit: Number(body.materializeBatch) || 1000 },
+          );
+          if (matErr) {
+            runLog.errors.push(`materialize: ${matErr.message}`);
+            break;
+          }
+          const row = Array.isArray(mat) ? mat[0] : mat;
+          const scanned = Number(row?.scanned ?? 0);
+          matScanned += scanned;
+          matTotal += Number(row?.materialized ?? 0);
+          if (scanned === 0) break;
+        }
+        (runLog as any).materialized = matTotal;
+        (runLog as any).materializeScanned = matScanned;
+        runLog.inserted += matTotal;
+        runLog.processed += matScanned;
+      }
+
       // Fila persistente: claim rápido por índice (a detecção de lacunas roda
       // em cron separado, fora do caminho crítico).
       // Nesta fase só gravamos a licitação (1 request por registro) — os
@@ -483,6 +512,7 @@ const handler = async (req: Request) => {
         p_limit: limit,
       });
       if (error) throw new Error(`claim_gap_batch: ${error.message}`);
+
 
       const pendingMarks: any[] = [];
       const flushMarks = async (force = false) => {
