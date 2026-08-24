@@ -84,11 +84,19 @@ Deno.serve(async (req) => {
     );
 
     const result = await Promise.race([
-      fetchPromise.then((r) => ({ status: r ? r.status : "failed" })),
+      fetchPromise.then(async (r) => {
+        if (!r) return { status: "failed" };
+        if (body.returnBody) {
+          const text = await r.text().catch(() => "");
+          return { status: r.status, body: text.slice(0, 4000) };
+        }
+        return { status: r.status };
+      }),
       new Promise<{ status: string }>((resolve) =>
         setTimeout(() => resolve({ status: "dispatched" }), waitMs)
       ),
     ]);
+
 
     return new Response(
       JSON.stringify({ ok: true, target, payload, ...result }),

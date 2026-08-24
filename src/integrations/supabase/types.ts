@@ -1255,6 +1255,63 @@ export type Database = {
         }
         Relationships: []
       }
+      itens_backfill_queue: {
+        Row: {
+          attempts: number
+          claimed_at: string | null
+          data_publicacao: string | null
+          licitacao_id: string
+          numero_controle_pncp: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          claimed_at?: string | null
+          data_publicacao?: string | null
+          licitacao_id: string
+          numero_controle_pncp: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          claimed_at?: string | null
+          data_publicacao?: string | null
+          licitacao_id?: string
+          numero_controle_pncp?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      itens_queue_seed_state: {
+        Row: {
+          done: boolean
+          enqueued: number
+          id: string
+          last_id: string | null
+          scanned: number
+          updated_at: string
+        }
+        Insert: {
+          done?: boolean
+          enqueued?: number
+          id?: string
+          last_id?: string | null
+          scanned?: number
+          updated_at?: string
+        }
+        Update: {
+          done?: boolean
+          enqueued?: number
+          id?: string
+          last_id?: string | null
+          scanned?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       licitacao_itens: {
         Row: {
           created_at: string
@@ -2114,6 +2171,7 @@ export type Database = {
         }[]
       }
       cleanup_ai_query_cache: { Args: never; Returns: number }
+      cleanup_itens_backfill_queue: { Args: never; Returns: number }
       cliente_resumo: { Args: { p_empresa_id: string }; Returns: Json }
       cobertura_por_cliente: {
         Args: never
@@ -2808,6 +2866,10 @@ export type Database = {
           scanned: number
         }[]
       }
+      refill_itens_backfill_queue: {
+        Args: { p_since?: string }
+        Returns: number
+      }
       refresh_all_mvs: { Args: never; Returns: undefined }
       refresh_cliente_vinculos: {
         Args: { p_empresa_id?: string }
@@ -2935,6 +2997,7 @@ export type Database = {
           vencedor_nome: string
         }[]
       }
+      seed_itens_backfill_queue: { Args: { p_batch?: number }; Returns: Json }
       set_winners_backlog_cursor: {
         Args: { p_cursor: string; p_processed?: number }
         Returns: undefined
