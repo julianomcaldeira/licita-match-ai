@@ -200,4 +200,4 @@ CREATE INDEX idx_execucao_ano ON public.execucao_despesa(ano);
 CREATE INDEX idx_execucao_orgao ON public.execucao_despesa(orgao);
 CREATE INDEX idx_orcamento_ano ON public.orcamento_anual(ano);
 CREATE INDEX idx_licitacoes_cnpj ON public.iverbas_licitacoes(cnpj_vencedor);
-CREATE INDEX idx_licitacoes_situacao ON public.iverbas_licitacoes(situacao);
+CREATE INDEX idx_iverbas_licitacoes_situacao ON public.iverbas_licitacoes(situacao);
