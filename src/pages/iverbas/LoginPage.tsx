@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { useAuth } from "@/hooks/iverbas/useAuth";
-import logo from "@/assets/logo-iverbas.png";
+import logo from "@/assets/iverbas/logo-iverbas.png";
 import { Eye, EyeOff, Globe, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 
