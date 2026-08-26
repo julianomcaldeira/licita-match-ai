@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { formatCnpj } from "@/lib/utils";
 
 interface EmpresaForm {
   nome: string;
@@ -174,7 +175,14 @@ export default function EmpresasPage() {
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-foreground">CNPJ</label>
-              <input value={form.cnpj} onChange={(e) => setForm({ ...form, cnpj: e.target.value })} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+              <input
+                value={form.cnpj}
+                onChange={(e) => setForm({ ...form, cnpj: formatCnpj(e.target.value) })}
+                placeholder="00.000.000/0000-00"
+                inputMode="numeric"
+                maxLength={18}
+                className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
             </div>
           </div>
           <div>

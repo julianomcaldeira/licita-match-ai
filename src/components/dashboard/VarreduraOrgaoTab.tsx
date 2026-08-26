@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Radar } from "lucide-react";
 import { toast } from "sonner";
+import { formatCnpj } from "@/lib/utils";
 
 type RunResult = {
   ok?: boolean;
@@ -89,9 +90,11 @@ export function VarreduraOrgaoTab() {
               <Input
                 id="vo-cnpj"
                 className="h-9"
-                placeholder="67995027000132"
+                placeholder="00.000.000/0000-00"
+                inputMode="numeric"
+                maxLength={18}
                 value={cnpj}
-                onChange={(e) => setCnpj(e.target.value)}
+                onChange={(e) => setCnpj(formatCnpj(e.target.value))}
               />
             </div>
             <div className="md:col-span-3 space-y-1.5">
