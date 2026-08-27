@@ -2,7 +2,9 @@
 -- Update cron jobs for optimized pipeline
 
 -- 1. Update daily cron to use new 7-day window (already handles all mods)
-SELECT cron.unschedule('pncp-ingestao-diaria');
+DO $$ BEGIN
+  PERFORM cron.unschedule('pncp-ingestao-diaria');
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 SELECT cron.schedule(
   'pncp-ingestao-diaria',
   '0 1 * * *',
@@ -17,7 +19,9 @@ SELECT cron.schedule(
 );
 
 -- 2. Update winner processing to every 2 minutes with larger batch
-SELECT cron.unschedule('backlog-vencedores-5min');
+DO $$ BEGIN
+  PERFORM cron.unschedule('backlog-vencedores-5min');
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 SELECT cron.schedule(
   'backlog-vencedores-2min',
   '*/2 * * * *',
@@ -46,7 +50,9 @@ SELECT cron.schedule(
 );
 
 -- 4. Keep backfill running every 2 min (offset by 1 min from winners)
-SELECT cron.unschedule('backfill-pncp-gaps-v2');
+DO $$ BEGIN
+  PERFORM cron.unschedule('backfill-pncp-gaps-v2');
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 SELECT cron.schedule(
   'backfill-pncp-gaps-v3',
   '1-59/2 * * * *',
