@@ -163,7 +163,15 @@ type OrfaosBreakdown = {
 
 async function getOrfaosBreakdown(): Promise<OrfaosBreakdown | null> {
   const { data, error } = await (supabase as any).rpc("diagnostico_orfaos_homologadas");
-  if (error) throw error;
+  if (error) {
+    // Timeout 57014 (statement_timeout) é esperado em tabelas grandes antes do índice novo propagar
+    const msg = String((error as any)?.message ?? "");
+    if (msg.includes("statement timeout") || (error as any)?.code === "57014") {
+      console.warn("[diagnostico] orfaosBreak timeout, tentando fallback auditoria:", msg);
+      throw new Error("orfaosBreak: timeout na consulta (tente Recarregar; índice novo em propagação)");
+    }
+    throw error;
+  }
   return (data as OrfaosBreakdown) ?? null;
 }
 
