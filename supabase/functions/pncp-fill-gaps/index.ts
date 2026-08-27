@@ -396,8 +396,8 @@ const handler = async (req: Request) => {
   const drain: boolean = mode === "drain" || body.drain === true;
 
   // Autoscale: if no explicit limit or autoscale=true, read tuned params.
-  let tunedLimit = 200;
-  let tunedParallel = 10;
+  let tunedLimit = 500;
+  let tunedParallel = 15;
   if (body.autoscale || body.limit == null) {
     const { data: state } = await supabase
       .rpc("get_autoscale_state", { p_target: drain ? "gaps" : mode });
@@ -414,11 +414,11 @@ const handler = async (req: Request) => {
   runtimeParallel = Math.max(1, Math.min(tunedParallel, 40));
 
   if (drain) {
-    // Drenagem acelerada: até 6 requisições simultâneas com pacing adaptativo
+    // Drenagem acelerada: até 10 requisições simultâneas com pacing adaptativo
     // (o pace sobe sozinho ao primeiro 429 e volta a cair quando estabiliza).
-    runtimeParallel = Math.max(1, Math.min(Number(body.parallel) || 4, 6));
-    paceMinMs = Math.max(50, Number(body.paceMinMs) || 90);
-    paceMs = Math.max(paceMinMs, Number(body.paceMs) || 150);
+    runtimeParallel = Math.max(1, Math.min(Number(body.parallel) || 8, 10));
+    paceMinMs = Math.max(30, Number(body.paceMinMs) || 70);
+    paceMs = Math.max(paceMinMs, Number(body.paceMs) || 120);
     paceMaxMs = Math.max(paceMs, Number(body.paceMaxMs) || 5_000);
     nextSlotAt = Date.now();
     runMetricsPace.max_pace_ms = paceMs;
@@ -472,7 +472,29 @@ const handler = async (req: Request) => {
   }
 
   try {
+    if (mode === "health") {
+      // Health probe sem autenticacao extra (usa SERVICE_ROLE interno) - exposto via dispatcher para monitorar fila sem login
+      const [health, rotas, gapsSummary] = await Promise.all([
+        supabase.rpc("ingestao_health_snapshot").then((r: any) => r.data?.[0] || r.data || null),
+        supabase.rpc("ingestao_rotas_resumo").then((r: any) => r.data || null),
+        supabase.rpc("gap_queue_summary").then((r: any) => r.data?.[0] || r.data || null).catch(() => null),
+      ]);
+      return new Response(JSON.stringify({ ok: true, mode: "health", health, rotas, gapsSummary }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (mode === "gaps" || drain) {
+      // Reconciliacao rapida: marca como done os gaps que ja estao em licitacoes (sem custo PNCP)
+      try {
+        const { data: rec } = await supabase.rpc("reconcile_gap_queue", { p_limit: 20000 });
+        const recRow = Array.isArray(rec) ? rec[0] : rec;
+        if (recRow) {
+          (runLog as any).reconciled = Number(recRow.reconciled || 0);
+          (runLog as any).reconcileScanned = Number(recRow.scanned || 0);
+        }
+      } catch (_) { /* best-effort */ }
+
       // Rota rápida (sem HTTP): materializa as licitações que já existem nos
       // contratos brutos baixados em massa. Isso tira a drenagem da dependência
       // do endpoint /consulta/v1 (degradado, 429/504) para a maior parte da fila.
