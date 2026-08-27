@@ -4,33 +4,30 @@ import { supabase } from "@/integrations/supabase/client";
 export interface OrgaoPotencial {
   orgao: string;
   uf: string;
-  orcamentoAutorizado: number;
+  orcamentoAutorizado: number | null;
   totalEmpenhado: number;
   totalPago: number;
-  saldoDisponivel: number;
-  pctExecutado: number;
+  saldoDisponivel: number | null;
+  pctExecutado: number | null;
   historicoCompraSegmento: number;
   contratosSegmento: number;
-  crescimentoExecucao: number;
+  crescimentoExecucao: number | null;
   scorePotencial: number;
 }
 
 export interface PotencialResult {
   orgaos: OrgaoPotencial[];
   totalGeral: number;
-  totalSaldo: number;
+  totalSaldo: null;
   validacao: {
-    somaOrcamento: number;
-    somaEmpenhado: number;
-    somaSaldo: number;
-    divergencia: boolean;
+    disponivel: false;
+    motivo: string;
   };
 }
 
+// Sem dotação orçamentária real (PNCP/comprasgov não expõe), só "historico" é sinal real.
 const PESOS = {
-  historico: 0.4,
-  saldo: 0.35,
-  crescimento: 0.25,
+  historico: 1,
 };
 
 const PAGE_SIZE = 1000;
@@ -106,14 +103,12 @@ export function usePotencialCompra(
       }
 
       // 3. Build orgao budget map
-      const budgetMap: Record<string, { orcamento: number; empenhado: number; pago: number }> = {};
+      const budgetMap: Record<string, { empenhado: number; pago: number }> = {};
       for (const o of orcamento) {
         const key = o.orgao_nome;
         if (!budgetMap[key]) {
-          budgetMap[key] = { orcamento: 0, empenhado: 0, pago: 0 };
+          budgetMap[key] = { empenhado: 0, pago: 0 };
         }
-        // API doesn't provide dotação, use empenhado as base
-        budgetMap[key].orcamento += Number(o.empenhado_total) || 0;
         budgetMap[key].empenhado += Number(o.empenhado_total) || 0;
         budgetMap[key].pago += Number(o.pago_total) || 0;
       }
@@ -136,87 +131,64 @@ export function usePotencialCompra(
 
       // Normalize values for scoring
       let maxHistorico = 0;
-      let maxSaldo = 0;
 
       const rawData: Array<{
         orgao: string;
         uf: string;
-        orcamento: number;
         empenhado: number;
         pago: number;
         historicoSegmento: number;
         contratosSegmento: number;
-        saldo: number;
-        pctExecutado: number;
       }> = [];
 
       for (const orgao of allOrgaos) {
-        const budget = budgetMap[orgao] || { orcamento: 0, empenhado: 0, pago: 0 };
+        const budget = budgetMap[orgao] || { empenhado: 0, pago: 0 };
         const segmento = segmentoMap[orgao] || { valor: 0, contratos: 0, uf: "" };
 
         // Only include organs with budget OR segment activity
-        if (budget.orcamento === 0 && segmento.valor === 0) continue;
-
-        const saldo = budget.orcamento - budget.empenhado;
-        const pctExecutado = budget.orcamento > 0 ? (budget.empenhado / budget.orcamento) * 100 : 0;
+        if (budget.empenhado === 0 && segmento.valor === 0) continue;
 
         if (segmento.valor > maxHistorico) maxHistorico = segmento.valor;
-        if (saldo > maxSaldo) maxSaldo = saldo;
 
         rawData.push({
           orgao,
           uf: segmento.uf,
-          orcamento: budget.orcamento,
           empenhado: budget.empenhado,
           pago: budget.pago,
           historicoSegmento: segmento.valor,
           contratosSegmento: segmento.contratos,
-          saldo,
-          pctExecutado,
         });
       }
 
-      // Calculate normalized scores
       for (const r of rawData) {
         const normHistorico = maxHistorico > 0 ? r.historicoSegmento / maxHistorico : 0;
-        const normSaldo = maxSaldo > 0 ? Math.max(0, r.saldo) / maxSaldo : 0;
-        // Growth proxy: organs executing faster (higher %) but still have budget = growing demand
-        const crescimento = r.pctExecutado > 50 && r.saldo > 0 ? (r.pctExecutado / 100) : r.pctExecutado > 0 ? (r.pctExecutado / 200) : 0;
-
-        const score = (
-          normHistorico * PESOS.historico +
-          normSaldo * PESOS.saldo +
-          crescimento * PESOS.crescimento
-        ) * 100;
+        const score = normHistorico * PESOS.historico * 100;
 
         results.push({
           orgao: r.orgao,
           uf: r.uf,
-          orcamentoAutorizado: r.orcamento,
+          orcamentoAutorizado: null,
           totalEmpenhado: r.empenhado,
           totalPago: r.pago,
-          saldoDisponivel: r.saldo,
-          pctExecutado: Number(r.pctExecutado.toFixed(1)),
+          saldoDisponivel: null,
+          pctExecutado: null,
           historicoCompraSegmento: r.historicoSegmento,
           contratosSegmento: r.contratosSegmento,
-          crescimentoExecucao: Number((r.pctExecutado).toFixed(1)),
+          crescimentoExecucao: null,
           scorePotencial: Number(score.toFixed(1)),
         });
       }
 
       results.sort((a, b) => b.scorePotencial - a.scorePotencial);
 
-      // 6. Validation
-      const somaOrcamento = results.reduce((s, r) => s + r.orcamentoAutorizado, 0);
-      const somaEmpenhado = results.reduce((s, r) => s + r.totalEmpenhado, 0);
-      const somaSaldo = results.reduce((s, r) => s + r.saldoDisponivel, 0);
-      const divergencia = Math.abs(somaOrcamento - somaEmpenhado - somaSaldo) > 0.01;
-
       setData({
         orgaos: results,
-        totalGeral: somaOrcamento,
-        totalSaldo: somaSaldo,
-        validacao: { somaOrcamento, somaEmpenhado, somaSaldo, divergencia },
+        totalGeral: results.reduce((s, r) => s + r.historicoCompraSegmento, 0),
+        totalSaldo: null,
+        validacao: {
+          disponivel: false,
+          motivo: "PNCP/comprasgov não expõe dotação orçamentária — saldo e % executado não são calculáveis hoje.",
+        },
       });
     } catch (err) {
       console.error("Error in usePotencialCompra", err);

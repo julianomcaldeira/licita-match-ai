@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { formatBRL } from "@/hooks/iverbas/useBudgetData";
 import { usePotencialCompra } from "@/hooks/iverbas/usePotencialCompra";
-import { Search, Target, AlertTriangle, CheckCircle, TrendingUp } from "lucide-react";
+import { Search, Target, AlertTriangle, TrendingUp } from "lucide-react";
 import InfoTooltip from "@/components/iverbas/InfoTooltip";
 
 const CATEGORIAS = [
@@ -147,27 +147,23 @@ const PotencialCompraPage: React.FC = () => {
               <p className="text-2xl font-display font-bold text-foreground">{orgaos.length}</p>
             </div>
             <div className="bg-card rounded-xl border border-border p-5 shadow-card">
-              <p className="text-sm text-muted-foreground mb-1">Orçamento Total</p>
+              <p className="text-sm text-muted-foreground mb-1">Gasto no Segmento</p>
               <p className="text-2xl font-display font-bold text-foreground">{formatBRL(data.totalGeral)}</p>
             </div>
             <div className="bg-card rounded-xl border border-border p-5 shadow-card">
               <p className="text-sm text-muted-foreground mb-1">Saldo Disponível Total</p>
-              <p className="text-2xl font-display font-bold text-foreground">{formatBRL(data.totalSaldo)}</p>
+              <p className="text-2xl font-display font-bold text-muted-foreground">Indisponível</p>
             </div>
             <div className="bg-card rounded-xl border border-border p-5 shadow-card">
               <div className="flex items-center gap-2 mb-1">
                 <p className="text-sm text-muted-foreground">Validação</p>
-                {data.validacao.divergencia ? (
-                  <AlertTriangle className="w-4 h-4 text-destructive" />
-                ) : (
-                  <CheckCircle className="w-4 h-4 text-primary" />
-                )}
+                <AlertTriangle className="w-4 h-4 text-muted-foreground" />
               </div>
-              <p className={`text-lg font-display font-bold ${data.validacao.divergencia ? "text-destructive" : "text-primary"}`}>
-                {data.validacao.divergencia ? "Divergência detectada" : "Conciliado ✓"}
+              <p className="text-lg font-display font-bold text-muted-foreground">
+                Dado indisponível
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Orç - Emp = Saldo: {formatBRL(data.validacao.somaOrcamento - data.validacao.somaEmpenhado)} vs {formatBRL(data.validacao.somaSaldo)}
+                {data.validacao.motivo}
               </p>
             </div>
           </div>
@@ -184,7 +180,7 @@ const PotencialCompraPage: React.FC = () => {
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              Score = Histórico (40%) + Saldo (35%) + Crescimento (25%)
+              Score = Histórico de gasto no segmento (100%) — saldo e crescimento indisponíveis
             </p>
           </div>
 
@@ -199,7 +195,12 @@ const PotencialCompraPage: React.FC = () => {
                   <th className="text-right py-3 px-4 text-muted-foreground font-medium">Empenhado no Segmento</th>
                   <th className="text-right py-3 px-4 text-muted-foreground font-medium">Contratos</th>
                   <th className="text-right py-3 px-4 text-muted-foreground font-medium">Orçamento Total</th>
-                  <th className="text-right py-3 px-4 text-muted-foreground font-medium">Saldo Disponível</th>
+                  <th className="text-right py-3 px-4 text-muted-foreground font-medium">
+                    <span className="inline-flex items-center gap-1">
+                      Saldo Disponível
+                      <InfoTooltip text="Indisponível: PNCP/comprasgov não expõe dotação orçamentária." />
+                    </span>
+                  </th>
                   <th className="text-right py-3 px-4 text-muted-foreground font-medium">% Executado</th>
                   <th className="text-right py-3 px-4 text-muted-foreground font-medium">
                     <span className="flex items-center justify-end gap-1">
@@ -221,15 +222,23 @@ const PotencialCompraPage: React.FC = () => {
                     </td>
                     <td className="py-3 px-4 text-right font-semibold text-foreground">{formatBRL(o.historicoCompraSegmento)}</td>
                     <td className="py-3 px-4 text-right text-muted-foreground">{o.contratosSegmento}</td>
-                    <td className="py-3 px-4 text-right text-muted-foreground">{formatBRL(o.orcamentoAutorizado)}</td>
-                    <td className="py-3 px-4 text-right font-semibold text-foreground">{formatBRL(o.saldoDisponivel)}</td>
+                    <td className="py-3 px-4 text-right text-muted-foreground">
+                      {o.orcamentoAutorizado === null ? "—" : formatBRL(o.orcamentoAutorizado)}
+                    </td>
+                    <td className="py-3 px-4 text-right text-muted-foreground">
+                      {o.saldoDisponivel === null ? "—" : formatBRL(o.saldoDisponivel)}
+                    </td>
                     <td className="py-3 px-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
-                          <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(o.pctExecutado, 100)}%` }} />
+                      {o.pctExecutado === null ? (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      ) : (
+                        <div className="flex items-center justify-end gap-2">
+                          <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(o.pctExecutado, 100)}%` }} />
+                          </div>
+                          <span className="text-xs text-muted-foreground w-12 text-right">{o.pctExecutado}%</span>
                         </div>
-                        <span className="text-xs text-muted-foreground w-12 text-right">{o.pctExecutado}%</span>
-                      </div>
+                      )}
                     </td>
                     <td className="py-3 px-4 text-right">
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${getScoreColor(o.scorePotencial)}`}>
