@@ -164,11 +164,11 @@ type OrfaosBreakdown = {
 async function getOrfaosBreakdown(): Promise<OrfaosBreakdown | null> {
   const { data, error } = await (supabase as any).rpc("diagnostico_orfaos_homologadas");
   if (error) {
-    // Timeout 57014 (statement_timeout) é esperado em tabelas grandes antes do índice novo propagar
     const msg = String((error as any)?.message ?? "");
-    if (msg.includes("statement timeout") || (error as any)?.code === "57014") {
-      console.warn("[diagnostico] orfaosBreak timeout, tentando fallback auditoria:", msg);
-      throw new Error("orfaosBreak: timeout na consulta (tente Recarregar; índice novo em propagação)");
+    const code = (error as any)?.code;
+    if (msg.includes("statement timeout") || code === "57014" || msg.includes("57014")) {
+      console.warn("[diagnostico] orfaosBreak timeout (índice ainda não aplicado):", msg);
+      throw new Error("timeout na consulta - índice em propagação, tente Recarregar em 1-2 min após `supabase db push`");
     }
     throw error;
   }
@@ -184,6 +184,7 @@ export default function DiagnosticoDadosPage() {
   const { role, loading: authLoading } = useAuth();
   const [metrics, setMetrics] = useState<Metrics>(initial);
   const [orfaos, setOrfaos] = useState<OrfaosBreakdown | null>(null);
+  const [orfaosError, setOrfaosError] = useState<string | null>(null);
   const [scoreDiag, setScoreDiag] = useState<ScoreDiag | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -192,6 +193,7 @@ export default function DiagnosticoDadosPage() {
   async function run() {
     setLoading(true);
     setError(null);
+    setOrfaosError(null);
     const tasks = {
       total: countExact("licitacoes"),
       pncp: countExact("licitacoes", (q) => q.eq("fonte", "PNCP")),
@@ -209,6 +211,7 @@ export default function DiagnosticoDadosPage() {
     const results = await Promise.allSettled(Object.values(tasks));
     const out: Record<string, any> = {};
     const errs: string[] = [];
+    let orfaosTimeoutMsg: string | null = null;
     results.forEach((r, i) => {
       const k = keys[i];
       if (r.status === "fulfilled") {
@@ -216,7 +219,13 @@ export default function DiagnosticoDadosPage() {
       } else {
         out[k] = null;
         const msg = (r.reason as any)?.message ?? String(r.reason);
-        errs.push(`${k}: ${msg}`);
+        // orfaosBreak timeout não bloqueia a página — mostra no card 5 com instrução específica
+        if (k === "orfaosBreak" && msg.includes("timeout na consulta")) {
+          orfaosTimeoutMsg = msg;
+          console.warn(`[diagnostico] ${k} timeout (fallback):`, msg);
+        } else {
+          errs.push(`${k}: ${msg}`);
+        }
         console.error(`[diagnostico] ${k} falhou:`, r.reason);
       }
     });
@@ -235,6 +244,7 @@ export default function DiagnosticoDadosPage() {
       empenhosMultiContrato: out.empMulti ?? 0,
     });
     setOrfaos(out.orfaosBreak ?? null);
+    setOrfaosError(orfaosTimeoutMsg);
     setScoreDiag(out.scoreDiag ?? null);
     setRanAt(new Date());
     setError(errs.length ? errs.join(" • ") : null);
@@ -354,6 +364,15 @@ export default function DiagnosticoDadosPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6 text-sm">
+          {orfaosError && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 flex items-center justify-between gap-3">
+              <span>⚠️ {orfaosError} — execute <span className="font-mono">supabase db push</span> para aplicar o índice (20260827000001) e aguarde 1-2 min.</span>
+              <Button size="sm" variant="outline" onClick={run} disabled={loading} className="shrink-0">
+                {loading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
+                Tentar novamente
+              </Button>
+            </div>
+          )}
           <p className="text-xs text-muted-foreground">
             Universo: <span className="font-mono">valor_homologado &gt; 0</span> e nenhum vencedor em <span className="font-mono">licitacao_vencedores</span> (via <span className="font-mono">licitacao_itens</span>). Apenas leitura.
           </p>
