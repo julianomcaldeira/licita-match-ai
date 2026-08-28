@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Env - never commit secrets (anon is public but keep local overrides out)
+.env
+.env.local
+.supabase
+supabase/.temp
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

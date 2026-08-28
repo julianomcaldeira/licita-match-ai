@@ -1,46 +1,55 @@
 project_id = "eiksdfobghixofsxskke"
 
-[functions.ingest-pncp]
+[functions.health-probe]
 verify_jwt = false
+
+[functions.ingest-pncp]
+verify_jwt = true
 
 [functions.match-ia]
-verify_jwt = false
+verify_jwt = true
 
 [functions.auto-analysis]
-verify_jwt = false
+verify_jwt = true
 
 [functions.analyze-objeto]
-verify_jwt = false
+verify_jwt = true
 
 [functions.ingest-contratos]
-verify_jwt = false
+verify_jwt = true
 
 [functions.market-analysis]
-verify_jwt = false
+verify_jwt = true
 
 [functions.ingest-ceis-cnep]
-verify_jwt = false
+verify_jwt = true
 
 [functions.ingest-querido-diario]
-verify_jwt = false
+verify_jwt = true
 
 [functions.pipeline-orchestrator]
-verify_jwt = false
+verify_jwt = true
 
 [functions.start-ingestion-pipeline]
-verify_jwt = false
+verify_jwt = true
 
 [functions.cancel-ingestion-pipeline]
-verify_jwt = false
+verify_jwt = true
 
 [functions.ingestion-watchdog]
-verify_jwt = false
+verify_jwt = true
 
 [functions.internal-cron-dispatcher]
 verify_jwt = false
 
 [functions.ingest-pncp-dadosabertos]
-verify_jwt = false
+verify_jwt = true
 
 [functions.calculate-orgao-score]
+verify_jwt = true
+
+[functions.pncp-fill-gaps]
+verify_jwt = true
+
+[functions.public-api]
 verify_jwt = false

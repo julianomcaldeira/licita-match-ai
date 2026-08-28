@@ -1,15 +1,36 @@
 // Internal dispatcher for pg_cron jobs.
-// pg_cron calls this with the project's anon key (verify_jwt=false here).
-// This function then re-invokes target functions WITH service_role key,
-// which the target functions accept as "internal-pipeline" identity.
-// This keeps service_role out of pg_cron job definitions while still
-// allowing scheduled internal jobs to bypass the admin-only auth gate.
+// Hardened: requires service_role or admin_central JWT. pg_cron now stores only anon for public health, but dispatcher validates caller.
+// pg_cron jobs that need service_role must be created with service_role key (not anon) OR via authenticated admin.
+// This keeps service_role out of job definitions when possible, but blocks anonymous abuse (limit 3000, parallel 40).
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
+
+async function requireServiceOrAdmin(req: Request): Promise<{ ok: true } | { ok: false; status: number; msg: string }> {
+  const auth = req.headers.get("authorization") || "";
+  const token = auth.replace(/^Bearer\s+/i, "").trim();
+  if (!token) return { ok: false, status: 401, msg: "missing_token" };
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  if (serviceKey && token === serviceKey) return { ok: true };
+  // Check admin_central via anon+JWT
+  try {
+    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || "", {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    });
+    const { data: claims } = await supabase.auth.getClaims(token);
+    const uid = (claims as any)?.claims?.sub;
+    if (!uid) return { ok: false, status: 401, msg: "invalid_token" };
+    const admin = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey);
+    const { data: roles } = await admin.from("user_roles").select("role").eq("user_id", uid).eq("role", "admin_central").limit(1);
+    if (roles?.length) return { ok: true };
+  } catch (_) { /* fallthrough */ }
+  return { ok: false, status: 403, msg: "forbidden_admin_only" };
+}
 
 const ALLOWED_TARGETS = new Set([
   "ingest-contratos",
@@ -31,6 +52,18 @@ Deno.serve(async (req) => {
     body = await req.json();
   } catch {
     /* ignore */
+  }
+
+  // Health probe is public (read-only, no side effects) via anon; all other dispatches require service_role/admin
+  const isHealthProbe = String(body.target || "") === "pncp-fill-gaps" && String(body.payload?.mode || "") === "health";
+  if (!isHealthProbe) {
+    const authRes = await requireServiceOrAdmin(req);
+    if (!authRes.ok) {
+      return new Response(JSON.stringify({ error: authRes.msg }), {
+        status: authRes.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
   }
 
   const target = String(body.target || "");
