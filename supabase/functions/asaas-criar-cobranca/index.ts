@@ -8,6 +8,8 @@ const corsHeaders = {
 
 const ASAAS_BASE_URL = Deno.env.get("ASAAS_BASE_URL") ?? "https://sandbox.asaas.com/api/v3";
 
+class AsaasError extends Error {}
+
 async function asaasFetch(path: string, init: RequestInit = {}) {
   const apiKey = Deno.env.get("ASAAS_API_KEY");
   if (!apiKey) throw new Error("ASAAS_API_KEY not configured");
@@ -20,17 +22,50 @@ async function asaasFetch(path: string, init: RequestInit = {}) {
     },
   });
   const body = await res.json();
-  if (!res.ok) throw new Error(`Asaas ${path} -> ${res.status}: ${JSON.stringify(body)}`);
+  if (!res.ok) throw new AsaasError(`Asaas ${path} -> ${res.status}: ${JSON.stringify(body)}`);
   return body;
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  const sb = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  );
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) {
+    return new Response(JSON.stringify({ error: "Não autorizado" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+  const callerClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: { user: caller } } = await callerClient.auth.getUser();
+  if (!caller) {
+    return new Response(JSON.stringify({ error: "Não autorizado" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const { data: roleData } = await callerClient
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", caller.id)
+    .eq("role", "admin_central")
+    .single();
+  if (!roleData) {
+    return new Response(JSON.stringify({ error: "Permissão negada" }), {
+      status: 403,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const sb = createClient(supabaseUrl, serviceRoleKey);
 
   try {
     const { empresaClienteId, planoId } = await req.json();
@@ -55,15 +90,25 @@ Deno.serve(async (req) => {
       .single();
     if (planoErr || !plano) throw new Error("Plano nao encontrado");
 
+    const cpfCnpj = (empresa.cnpj || "").replace(/\D/g, "");
+    if (!cpfCnpj) {
+      return new Response(JSON.stringify({ error: "Empresa sem CNPJ cadastrado — obrigatorio para gerar cobranca" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     let asaasCustomerId = empresa.asaas_customer_id as string | null;
-    if (!asaasCustomerId) {
+    if (asaasCustomerId) {
+      // Cliente ja existia no Asaas: mantem CNPJ/nome em dia (podem ter mudado desde a ultima cobranca)
+      await asaasFetch(`/customers/${asaasCustomerId}`, {
+        method: "POST",
+        body: JSON.stringify({ name: empresa.nome, cpfCnpj }),
+      });
+    } else {
       const customer = await asaasFetch("/customers", {
         method: "POST",
-        body: JSON.stringify({
-          name: empresa.nome,
-          cpfCnpj: (empresa.cnpj || "").replace(/\D/g, "") || undefined,
-          externalReference: empresa.id,
-        }),
+        body: JSON.stringify({ name: empresa.nome, cpfCnpj, externalReference: empresa.id }),
       });
       asaasCustomerId = customer.id;
       await sb.from("empresas_clientes").update({ asaas_customer_id: asaasCustomerId }).eq("id", empresa.id);
@@ -104,8 +149,9 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
+    const status = err instanceof AsaasError ? 400 : 500;
     return new Response(JSON.stringify({ error: String(err instanceof Error ? err.message : err) }), {
-      status: 500,
+      status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
