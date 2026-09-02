@@ -1,0 +1,734 @@
+// AUTOGERADO por gen-schema.js a partir da introspecção real do banco.
+// Fonte: extracao-ipesquisei/schema_publico_colunas.csv (Lovable Cloud, projeto iPesquisei).
+// Revisar antes de rodar migrate — alguns tipos/defaults podem precisar de ajuste manual
+// (marcados com /* udt=... */ quando o tipo não foi reconhecido).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model ai_query_cache {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cache_key String
+  question String
+  filters Json @default("{}")
+  response Json
+  model_used String?
+  hits Int @default(0)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  expires_at DateTime @db.Timestamptz(6)
+
+  @@map("ai_query_cache")
+}
+
+model ai_usage_log {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  function_name String
+  model String?
+  user_id String? @db.Uuid
+  status String
+  cached Boolean @default(false)
+  prompt_tokens Int?
+  completion_tokens Int?
+  total_tokens Int?
+  duration_ms Int?
+  error_message String?
+  metadata Json @default("{}")
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("ai_usage_log")
+}
+
+model api_keys {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  client_name String
+  is_active Boolean @default(true)
+  last_used_at DateTime? @db.Timestamptz(6)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+  api_key_hash String
+  api_key_prefix String
+  empresa_cliente_id String? @db.Uuid
+
+  @@map("api_keys")
+}
+
+model assinaturas {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  empresa_cliente_id String @db.Uuid
+  plano_id String @db.Uuid
+  status String
+  inicio DateTime @default(now()) @db.Timestamptz(6)
+  fim_periodo_atual DateTime? @db.Timestamptz(6)
+  cancelar_em DateTime? @db.Timestamptz(6)
+  provedor String?
+  provedor_assinatura_id String?
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("assinaturas")
+}
+
+model auditoria_ingestao {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  executed_at DateTime @default(now()) @db.Timestamptz(6)
+  total_licitacoes BigInt
+  total_homologadas BigInt
+  total_com_itens BigInt
+  total_com_vencedores BigInt
+  homologadas_sem_itens BigInt
+  homologadas_sem_vencedores BigInt
+  itens_sem_vencedores BigInt
+  total_contratos BigInt
+  contratos_sem_licitacao BigInt
+  total_vencedores BigInt
+  pct_cobertura_homologadas Decimal @default(0) @db.Decimal
+  pct_cobertura_vencedores Decimal @default(0) @db.Decimal
+  inconsistencias Json @default("[]")
+  severity String
+  duration_ms Int?
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("auditoria_ingestao")
+}
+
+model cliente_cnpjs {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  empresa_id String @db.Uuid
+  cnpj String
+  rotulo String?
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("cliente_cnpjs")
+}
+
+model cliente_exclusoes {
+  empresa_cliente_id String @db.Uuid
+  licitacao_id String @db.Uuid
+  motivo String?
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([empresa_cliente_id, licitacao_id])
+  @@map("cliente_exclusoes")
+}
+
+model cliente_participacoes {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  empresa_cliente_id String @db.Uuid
+  licitacao_id String @db.Uuid
+  proposta_centavos BigInt?
+  resultado String?
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  participou Boolean @default(true)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("cliente_participacoes")
+}
+
+model cliente_vinculos {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  empresa_id String @db.Uuid
+  tipo String
+  referencia_id String @db.Uuid
+  licitacao_id String? @db.Uuid
+  cnpj_match String
+  data_evento DateTime? @db.Date
+  valor Decimal? @db.Decimal
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("cliente_vinculos")
+}
+
+model contratos {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cnpj_orgao String
+  numero_contrato String
+  orgao_nome String?
+  orgao_codigo String?
+  fornecedor_nome String?
+  fornecedor_cnpj String?
+  objeto String?
+  valor_inicial Decimal? @db.Decimal
+  valor_final Decimal? @db.Decimal
+  data_assinatura DateTime? @db.Date
+  data_vigencia_inicio DateTime? @db.Date
+  data_vigencia_fim DateTime? @db.Date
+  data_publicacao DateTime? @db.Date
+  situacao String?
+  categoria String?
+  modalidade_compra String?
+  numero_licitacao String?
+  licitacao_id String? @db.Uuid
+  raw_json Json?
+  fonte String
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+  data_efetiva DateTime? @db.Date
+
+  @@map("contratos")
+}
+
+model contratos_dia_queue {
+  dia DateTime @id @db.Date
+  status String
+  attempts Int @default(0)
+  contratos Int @default(0)
+  last_error String?
+  claimed_at DateTime? @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+  pagina Int @default(1)
+  next_attempt_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("contratos_dia_queue")
+}
+
+model creditos_movimentos {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  empresa_cliente_id String @db.Uuid
+  tipo String
+  creditos Decimal @db.Decimal
+  referencia String?
+  metadados Json?
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("creditos_movimentos")
+}
+
+model cron_autoscale_state {
+  target String @id
+  limit_per_run Int @default(400)
+  parallelism Int @default(10)
+  min_limit Int @default(100)
+  max_limit Int @default(2000)
+  min_parallel Int @default(3)
+  max_parallel Int @default(25)
+  budget_ms Int @default(120000)
+  last_decision_at DateTime? @db.Timestamptz(6)
+  last_reason String?
+  last_metrics Json?
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("cron_autoscale_state")
+}
+
+model dashboard_validation_runs {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  run_id String @db.Uuid
+  executed_at DateTime @default(now()) @db.Timestamptz(6)
+  periodo String
+  date_from DateTime? @db.Date
+  date_to DateTime? @db.Date
+  metric String
+  expected Decimal? @db.Decimal
+  actual Decimal? @db.Decimal
+  diff Decimal? @db.Decimal
+  status String
+  detail String?
+
+  @@map("dashboard_validation_runs")
+}
+
+model diarios_oficiais {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  territory_id String
+  territory_name String?
+  state_code String?
+  publication_date DateTime @db.Date
+  url String?
+  excerpt String?
+  query_matched String?
+  is_extra_edition Boolean? @default(false)
+  txt_url String?
+  fonte String
+  raw_json Json?
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("diarios_oficiais")
+}
+
+model empenhos {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cnpj_orgao String
+  codigo_siafi_orgao String?
+  numero_empenho String
+  numero_documento String?
+  contrato_id String? @db.Uuid
+  licitacao_id String? @db.Uuid
+  fornecedor_cnpj String?
+  fornecedor_nome String?
+  orgao_nome String?
+  data_emissao DateTime? @db.Date
+  valor_empenhado Decimal? @db.Decimal
+  valor_liquidado Decimal? @db.Decimal
+  valor_pago Decimal? @db.Decimal
+  observacao String?
+  fonte String
+  raw_json Json?
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("empenhos")
+}
+
+model empresas_clientes {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nome String
+  cnpj String?
+  descricao_atividade String?
+  segmentos String[]
+  palavras_chave String[]
+  prompt_personalizado String?
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("empresas_clientes")
+}
+
+model empresas_sancionadas {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id_origem String
+  cnpj_cpf String?
+  nome String
+  tipo_cadastro String
+  tipo_sancao String?
+  orgao_sancionador String?
+  uf_orgao String?
+  data_inicio DateTime? @db.Date
+  data_fim DateTime? @db.Date
+  fundamentacao_legal String?
+  fonte String
+  raw_json Json?
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("empresas_sancionadas")
+}
+
+model indice_startgi_historico {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  mes_referencia String
+  indice_startgi Decimal? @db.Decimal
+  valor_total_brl Decimal? @db.Decimal
+  volume_contratos Int?
+  variacao_mom Decimal? @db.Decimal
+  variacao_yoy Decimal? @db.Decimal
+  breakdown_modalidade Json?
+  breakdown_esfera Json?
+  breakdown_segmento Json?
+  destaque_segmento String?
+  destaque_variacao Decimal? @db.Decimal
+  dados_parciais Boolean?
+  gerado_por String? @db.Uuid
+  gerado_em DateTime @default(now()) @db.Timestamptz(6)
+  top_orgao_nome String?
+  top_orgao_valor Decimal? @db.Decimal
+  top_fornecedor_nome String?
+  top_fornecedor_valor Decimal? @db.Decimal
+  top_modalidade String?
+  top_modalidade_share Decimal? @db.Decimal
+  maior_contrato_valor Decimal? @db.Decimal
+  maior_contrato_objeto String?
+  ticket_medio Decimal? @db.Decimal
+  orgaos_unicos Int?
+  fornecedores_unicos Int?
+  segmentos_detalhe Json?
+  valor_total_brl_anterior Decimal? @db.Decimal
+
+  @@map("indice_startgi_historico")
+}
+
+model indice_startgi_mensal {
+  mes_referencia String @id
+  indice_startgi Decimal? @db.Decimal
+  valor_total_brl Decimal @default(0) @db.Decimal
+  volume_contratos Int @default(0)
+  variacao_mom Decimal? @db.Decimal
+  variacao_yoy Decimal? @db.Decimal
+  breakdown_modalidade Json @default("{}")
+  breakdown_esfera Json @default("{}")
+  breakdown_segmento Json @default("{}")
+  destaque_segmento String?
+  destaque_variacao Decimal? @db.Decimal
+  dados_parciais Boolean @default(false)
+  ultima_atualizacao DateTime @default(now()) @db.Timestamptz(6)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+  top_orgao_nome String?
+  top_orgao_valor Decimal? @db.Decimal
+  top_fornecedor_nome String?
+  top_fornecedor_valor Decimal? @db.Decimal
+  top_modalidade String?
+  top_modalidade_share Decimal? @db.Decimal
+  maior_contrato_valor Decimal? @db.Decimal
+  maior_contrato_objeto String?
+  ticket_medio Decimal? @db.Decimal
+  orgaos_unicos Int?
+  fornecedores_unicos Int?
+  segmentos_detalhe Json @default("[]")
+  valor_total_brl_anterior Decimal? @db.Decimal
+  outliers_excluidos Int @default(0)
+  valor_outliers Decimal @default(0) @db.Decimal
+  teto_outlier Decimal? @db.Decimal
+
+  @@map("indice_startgi_mensal")
+}
+
+model ingestao_alertas {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tipo String
+  severidade String
+  titulo String
+  detalhes Json @default("{}")
+  resolvido_em DateTime? @db.Timestamptz(6)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("ingestao_alertas")
+}
+
+model ingestao_health_daily {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dia DateTime @db.Date
+  pct_cobertura Decimal @default(0) @db.Decimal
+  total_no_sistema BigInt
+  faltando_total BigInt
+  ingeridas_24h BigInt
+  velocidade_dia Decimal @default(0) @db.Decimal
+  eta_dias Decimal? @db.Decimal
+  erros_24h Int @default(0)
+  fila_parada Boolean @default(false)
+  severidade String
+  problemas Json @default("[]")
+  email_enviado Boolean @default(false)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("ingestao_health_daily")
+}
+
+model ingestao_logs {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fonte String
+  endpoint String
+  data_inicio DateTime? @db.Timestamptz(6)
+  data_fim DateTime? @db.Timestamptz(6)
+  registros_processados Int? @default(0)
+  status String
+  erro String?
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+  detalhes Json @default("{}")
+
+  @@map("ingestao_logs")
+}
+
+model ingestion_jobs {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  status String
+  current_phase String?
+  phases_total Int @default(5)
+  phases_completed Int @default(0)
+  phase_progress_current Int @default(0)
+  phase_progress_total Int @default(0)
+  phase_label String?
+  total_records_processed Int @default(0)
+  state Json @default("{}")
+  error_message String?
+  started_at DateTime? @db.Timestamptz(6)
+  finished_at DateTime? @db.Timestamptz(6)
+  last_tick_at DateTime? @db.Timestamptz(6)
+  created_by String? @db.Uuid
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+  watchdog_last_progress Int?
+  watchdog_last_phase String?
+  watchdog_last_check_at DateTime? @db.Timestamptz(6)
+  watchdog_restart_count Int @default(0)
+  watchdog_parent_job String? @db.Uuid
+
+  @@map("ingestion_jobs")
+}
+
+model itens_backfill_queue {
+  licitacao_id String @id @db.Uuid
+  numero_controle_pncp String
+  data_publicacao DateTime? @db.Date
+  status String
+  attempts Int @default(0)
+  claimed_at DateTime? @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("itens_backfill_queue")
+}
+
+model itens_queue_seed_state {
+  id String @id
+  last_id String? @db.Uuid
+  done Boolean @default(false)
+  scanned BigInt
+  enqueued BigInt
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("itens_queue_seed_state")
+}
+
+model licitacao_itens {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  licitacao_id String @db.Uuid
+  numero_item Int?
+  descricao String
+  quantidade Decimal? @db.Decimal
+  unidade String?
+  valor_unitario_estimado Decimal? @db.Decimal
+  valor_unitario_final Decimal? @db.Decimal
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("licitacao_itens")
+}
+
+model licitacao_vencedores {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  item_id String @db.Uuid
+  cnpj String?
+  razao_social String?
+  valor_final Decimal? @db.Decimal
+  percentual_desconto Decimal? @db.Decimal
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("licitacao_vencedores")
+}
+
+model licitacoes {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id_origem String
+  fonte String
+  orgao String
+  modalidade String?
+  objeto String
+  data_publicacao DateTime? @db.Date
+  data_resultado DateTime? @db.Date
+  valor_estimado Decimal? @db.Decimal
+  valor_homologado Decimal? @db.Decimal
+  situacao String?
+  numero_controle_pncp String?
+  uf String?
+  municipio String?
+  raw_json Json?
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("licitacoes")
+}
+
+model mv_refresh_state {
+  mv_name String @id
+  last_refresh_at DateTime @default(now()) @db.Timestamptz(6)
+  last_seen_max DateTime? @db.Timestamptz(6)
+  refresh_count Int @default(0)
+  last_duration_ms Int?
+
+  @@map("mv_refresh_state")
+}
+
+model oportunidades {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  licitacao_id String @db.Uuid
+  empresa_id String @db.Uuid
+  score_aderencia Int @default(0)
+  justificativa_tecnica String?
+  nivel_risco String?
+  tipo_oportunidade String?
+  motivo_recomendacao String?
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("oportunidades")
+}
+
+model orgao_siafi_cache {
+  cnpj String @id
+  codigo_siafi String?
+  found Boolean @default(false)
+  lookup_count Int @default(1)
+  last_checked_at DateTime @default(now()) @db.Timestamptz(6)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("orgao_siafi_cache")
+}
+
+model orgaos_score {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cnpj_orgao String
+  nome_orgao String
+  uf String?
+  total_empenhado Decimal? @default(0) @db.Decimal
+  total_liquidado Decimal? @default(0) @db.Decimal
+  total_pago Decimal? @default(0) @db.Decimal
+  qtd_pagamentos Int? @default(0)
+  pct_pago_sobre_empenhado Decimal? @default(0) @db.Decimal
+  receita_corrente_liquida Decimal? @db.Decimal
+  divida_consolidada_liquida Decimal? @db.Decimal
+  pct_divida_rcl Decimal? @db.Decimal
+  qtd_contratos_analisados Int? @default(0)
+  atraso_medio_dias Decimal? @default(0) @db.Decimal
+  pct_contratos_em_dia Decimal? @default(0) @db.Decimal
+  score_numerico Int @default(0)
+  score_classificacao String
+  score_pagamento Int? @default(0)
+  score_fiscal Int? @default(0)
+  score_execucao Int? @default(0)
+  fontes_utilizadas String[]
+  observacoes String?
+  ano_referencia Int
+  calculado_em DateTime @default(now()) @db.Timestamptz(6)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("orgaos_score")
+}
+
+model planos {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  codigo String
+  nome String
+  preco_centavos Int @default(0)
+  ciclo String
+  max_cnpjs Int
+  max_usuarios Int
+  creditos_ia_mes Decimal @default(0) @db.Decimal
+  features String[]
+  self_service Boolean @default(false)
+  ativo Boolean @default(true)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("planos")
+}
+
+model pncp_circuit {
+  source String @id
+  state String
+  failures Int @default(0)
+  successes Int @default(0)
+  trips Int @default(0)
+  last_reason String?
+  open_until DateTime? @db.Timestamptz(6)
+  last_opened_at DateTime? @db.Timestamptz(6)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("pncp_circuit")
+}
+
+model pncp_endpoint_metrics {
+  bucket DateTime @db.Timestamptz(6)
+  endpoint String
+  function_name String
+  requests Int @default(0)
+  errors Int @default(0)
+  aborts Int @default(0)
+  retries Int @default(0)
+  http_429 Int @default(0)
+  http_4xx Int @default(0)
+  http_5xx Int @default(0)
+  latency_ms_sum BigInt
+  latency_ms_max Int @default(0)
+  last_error String?
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([bucket, endpoint, function_name])
+  @@map("pncp_endpoint_metrics")
+}
+
+model pncp_gap_queue {
+  cnpj String
+  ano Int
+  seq Int
+  status String
+  attempts Int @default(0)
+  last_error String?
+  claimed_at DateTime? @db.Timestamptz(6)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+  mat_checked_at DateTime? @db.Timestamptz(6)
+
+  @@id([cnpj, ano, seq])
+  @@map("pncp_gap_queue")
+}
+
+model pncp_raw {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tipo String
+  chave_origem String
+  payload Json
+  coletado_em DateTime @default(now()) @db.Timestamptz(6)
+  processado Boolean @default(false)
+
+  @@map("pncp_raw")
+}
+
+model pncp_reconcile_state {
+  id String @id
+  last_cnpj String
+  last_ano Int @default(0)
+  last_seq Int @default(0)
+  cycle Int @default(1)
+  scanned_cycle BigInt
+  reconciled_cycle BigInt
+  last_run_at DateTime? @db.Timestamptz(6)
+  last_duration_ms Int?
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("pncp_reconcile_state")
+}
+
+model profiles {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id String @db.Uuid
+  display_name String?
+  email String?
+  avatar_url String?
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("profiles")
+}
+
+model sync_status {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  api_source String
+  modalidade Int
+  last_date_processed String
+  total_synced Int? @default(0)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("sync_status")
+}
+
+model user_roles {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id String @db.Uuid
+  role String /* udt=app_role */
+  empresa_id String? @db.Uuid
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("user_roles")
+}
+
+model uso_eventos {
+  id BigInt @id
+  empresa_cliente_id String? @db.Uuid
+  user_id String? @db.Uuid
+  evento String
+  contexto Json?
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("uso_eventos")
+}
+
