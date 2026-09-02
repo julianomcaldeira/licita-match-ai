@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { motion } from "framer-motion";
+import { formatCnpj } from "@/lib/utils";
 
 const PAGE_SIZE = 50;
 
@@ -132,15 +133,16 @@ export default function SancionadasPage() {
         <h2 className="font-display text-sm font-semibold text-foreground mb-3">Verificação Rápida de CNPJ</h2>
         <div className="flex gap-2 max-w-lg">
           <Input
-            placeholder="Digite o CNPJ para verificar..."
+            placeholder="00.000.000/0000-00"
+            inputMode="numeric"
             value={cnpjCheck}
             onChange={(e) => {
-              setCnpjCheck(e.target.value);
+              setCnpjCheck(formatCnpj(e.target.value));
               setCheckResult(null);
             }}
             onKeyDown={(e) => e.key === "Enter" && handleCheck()}
             className="font-mono"
-            maxLength={20}
+            maxLength={18}
           />
           <Button onClick={handleCheck} disabled={cnpjCheck.replace(/\D/g, "").length < 8}>
             Verificar

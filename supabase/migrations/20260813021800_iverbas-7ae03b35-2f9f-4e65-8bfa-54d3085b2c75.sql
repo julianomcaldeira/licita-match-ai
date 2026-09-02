@@ -1,0 +1,1 @@
+ALTER TABLE public.processing_logs ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'success';

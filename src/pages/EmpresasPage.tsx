@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Building2, Zap, Plus, Loader2, X, Pencil, RefreshCw, Trophy, FileText, ArrowRight } from "lucide-react";
+import { Building2, Zap, Plus, Loader2, X, Pencil, RefreshCw, Trophy, FileText, ArrowRight, CreditCard } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { formatCnpj } from "@/lib/utils";
 
 interface EmpresaForm {
   nome: string;
@@ -43,6 +44,37 @@ export default function EmpresasPage() {
       if (error) throw error;
       return data;
     },
+  });
+
+  const { data: planos } = useQuery({
+    queryKey: ["planos-ativos"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("planos")
+        .select("id, nome, preco_centavos")
+        .eq("ativo", true)
+        .order("preco_centavos");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const cobrancaMutation = useMutation({
+    mutationFn: async ({ empresaId, planoId }: { empresaId: string; planoId: string }) => {
+      const { data, error } = await supabase.functions.invoke("asaas-criar-cobranca", {
+        body: { empresaClienteId: empresaId, planoId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data: any) => {
+      toast.success(
+        `Cobrança gerada (${data.status}) — abrindo fatura...`,
+      );
+      window.open(data.invoiceUrl, "_blank");
+    },
+    onError: (e: any) => toast.error(e.message),
   });
 
   const { data: vinculosByEmpresa } = useQuery({
@@ -174,7 +206,14 @@ export default function EmpresasPage() {
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-foreground">CNPJ</label>
-              <input value={form.cnpj} onChange={(e) => setForm({ ...form, cnpj: e.target.value })} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+              <input
+                value={form.cnpj}
+                onChange={(e) => setForm({ ...form, cnpj: formatCnpj(e.target.value) })}
+                placeholder="00.000.000/0000-00"
+                inputMode="numeric"
+                maxLength={18}
+                className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
             </div>
           </div>
           <div>
@@ -297,6 +336,19 @@ export default function EmpresasPage() {
                     ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     : <RefreshCw className="h-3.5 w-3.5" />}
                   Reprocessar vínculos
+                </button>
+              )}
+              {isAdmin && planos && planos.length > 0 && (
+                <button
+                  onClick={() => cobrancaMutation.mutate({ empresaId: emp.id, planoId: planos[0].id })}
+                  disabled={cobrancaMutation.isPending}
+                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium text-foreground hover:bg-muted transition disabled:opacity-50"
+                  title={`Gerar cobrança de teste (${planos[0].nome})`}
+                >
+                  {cobrancaMutation.isPending && cobrancaMutation.variables?.empresaId === emp.id
+                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    : <CreditCard className="h-3.5 w-3.5" />}
+                  Assinar {planos[0].nome} (teste)
                 </button>
               )}
             </motion.div>

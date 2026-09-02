@@ -82,5 +82,13 @@ UPDATE public.cron_autoscale_state
        min_limit = GREATEST(min_limit, 200)
  WHERE target IN ('gaps','reprocess-winners');
 
-SELECT cron.alter_job(69, schedule := '*/2 * * * *');
-SELECT cron.alter_job(70, schedule := '*/5 * * * *');
+DO $alterjob$ BEGIN
+  IF EXISTS (SELECT 1 FROM cron.job WHERE jobid = 69) THEN
+    PERFORM cron.alter_job(69, schedule := '*/2 * * * *');
+  END IF;
+END $alterjob$;
+DO $alterjob$ BEGIN
+  IF EXISTS (SELECT 1 FROM cron.job WHERE jobid = 70) THEN
+    PERFORM cron.alter_job(70, schedule := '*/5 * * * *');
+  END IF;
+END $alterjob$;

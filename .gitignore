@@ -11,6 +11,10 @@ node_modules
 dist
 dist-ssr
 *.local
+.env
+.playwright-mcp/
+supabase/.temp/
+supabase/.branches/
 
 # Env - never commit secrets (anon is public but keep local overrides out)
 .env
