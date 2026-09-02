@@ -44,3 +44,6 @@ verify_jwt = false
 
 [functions.calculate-orgao-score]
 verify_jwt = false
+
+[functions.send-transactional-email]
+verify_jwt = false
