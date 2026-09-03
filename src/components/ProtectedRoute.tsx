@@ -1,9 +1,10 @@
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
 
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, role, empresaId } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -15,6 +16,12 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
 
   if (!user) {
     return <Navigate to="/auth" replace />;
+  }
+
+  const precisaCompletarCadastro =
+    role && role !== "admin_central" && !empresaId && location.pathname !== "/completar-cadastro";
+  if (precisaCompletarCadastro) {
+    return <Navigate to="/completar-cadastro" replace />;
   }
 
   return <>{children}</>;
