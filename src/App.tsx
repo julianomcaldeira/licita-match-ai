@@ -8,6 +8,7 @@ import { LanguageProvider } from "@/i18n/LanguageContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AppLayout from "@/components/layout/AppLayout";
 import AuthPage from "@/pages/AuthPage";
+import CompletarCadastroPage from "@/pages/CompletarCadastroPage";
 import Dashboard from "@/pages/Dashboard";
 import LicitacoesPage from "@/pages/LicitacoesPage";
 import EmpresasPage from "@/pages/EmpresasPage";
@@ -64,6 +65,7 @@ const App = () => (
               <Route path="/" element={<LandingPage />} />
               <Route path="/landing" element={<LandingPage />} />
               <Route path="/auth" element={<AuthPage />} />
+              <Route path="/completar-cadastro" element={<ProtectedRoute><CompletarCadastroPage /></ProtectedRoute>} />
               <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/licitacoes" element={<LicitacoesPage />} />
