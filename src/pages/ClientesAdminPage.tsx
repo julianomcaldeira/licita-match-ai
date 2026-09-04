@@ -7,8 +7,26 @@ import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { ArrowDown, ArrowUp, ArrowUpDown, Users, Building2, Loader2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Users, Building2, Loader2, DollarSign } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+type PlanoMrr = { plano_codigo: string; plano_nome: string; mrr_centavos: number; quantidade: number };
+
+type Financeiro = {
+  mrr_total_centavos: number;
+  mrr_por_plano: PlanoMrr[];
+  ativos_total: number;
+  novas_assinaturas_mes: number;
+  canceladas_mes: number;
+  churn_logo_pct: number;
+  churn_receita_pct: number;
+  inadimplentes_qtd: number;
+  inadimplentes_mrr_centavos: number;
+};
+
+function fmtBRL(centavos: number) {
+  return (centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
 
 type Row = {
   empresa_id: string;
@@ -83,6 +101,8 @@ export default function ClientesAdminPage() {
   const { role, loading: authLoading } = useAuth();
   const [rows, setRows] = useState<Row[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [fin, setFin] = useState<Financeiro | null>(null);
+  const [finErr, setFinErr] = useState<string | null>(null);
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({
     key: "nome", dir: "asc",
   });
@@ -93,6 +113,15 @@ export default function ClientesAdminPage() {
       const { data, error } = await supabase.rpc("admin_clientes_overview" as any);
       if (error) setErr(error.message);
       else setRows((data as any) ?? []);
+    })();
+  }, [role]);
+
+  useEffect(() => {
+    if (role !== "admin_central") return;
+    (async () => {
+      const { data, error } = await supabase.rpc("admin_financeiro_overview" as any).single();
+      if (error) setFinErr(error.message);
+      else setFin(data as any);
     })();
   }, [role]);
 
@@ -275,6 +304,91 @@ export default function ClientesAdminPage() {
               })}
             </TableBody>
           </Table>
+        </CardContent>
+      </Card>
+
+      {/* SEÇÃO 3 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <DollarSign className="h-4 w-4 text-primary" /> Financeiro
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Novos/cancelados do mês usam a última atualização de status como referência —
+            não há histórico de eventos de assinatura. Receita de créditos e NFS-e ficam de
+            fora: dependem da tabela de pagamentos, que ainda não existe.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {finErr && (
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+              {finErr}
+            </div>
+          )}
+          {!fin && !finErr ? (
+            <div className="flex items-center gap-2 text-muted-foreground py-8 justify-center">
+              <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
+            </div>
+          ) : fin ? (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="rounded-lg border border-border p-4">
+                  <p className="text-xs text-muted-foreground">MRR total</p>
+                  <p className="text-2xl font-bold tabular-nums">{fmtBRL(fin.mrr_total_centavos)}</p>
+                  <p className="text-xs text-muted-foreground">{fin.ativos_total} assinaturas ativas</p>
+                </div>
+                <div className="rounded-lg border border-border p-4">
+                  <p className="text-xs text-muted-foreground">Novos vs. cancelados (mês)</p>
+                  <p className="text-2xl font-bold tabular-nums">
+                    <span className="text-emerald-600">+{fin.novas_assinaturas_mes}</span>
+                    {" / "}
+                    <span className="text-red-600">-{fin.canceladas_mes}</span>
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border p-4">
+                  <p className="text-xs text-muted-foreground">Churn (logo / receita)</p>
+                  <p className="text-2xl font-bold tabular-nums">
+                    {fin.churn_logo_pct}% <span className="text-muted-foreground text-base">/ {fin.churn_receita_pct}%</span>
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border p-4">
+                  <p className="text-xs text-muted-foreground">Inadimplência</p>
+                  <p className="text-2xl font-bold tabular-nums">{fin.inadimplentes_qtd}</p>
+                  <p className="text-xs text-muted-foreground">{fmtBRL(fin.inadimplentes_mrr_centavos)} em risco</p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-sm font-medium mb-2">MRR por plano</p>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Plano</TableHead>
+                      <TableHead className="text-right">Assinaturas</TableHead>
+                      <TableHead className="text-right">MRR</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {fin.mrr_por_plano.length === 0 ? (
+                      <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-6">Nenhuma assinatura ativa.</TableCell></TableRow>
+                    ) : fin.mrr_por_plano.map((p) => (
+                      <TableRow key={p.plano_codigo}>
+                        <TableCell className="font-medium">{p.plano_nome}</TableCell>
+                        <TableCell className="text-right tabular-nums">{p.quantidade}</TableCell>
+                        <TableCell className="text-right tabular-nums">{fmtBRL(p.mrr_centavos)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
+                <b>CAC (custo por aquisição de cliente):</b> indisponível — não existe fonte de
+                dado de gasto de marketing no sistema. Precisa de uma tabela de investimento
+                por canal/período antes de calcular isso.
+              </div>
+            </>
+          ) : null}
         </CardContent>
       </Card>
     </div>
