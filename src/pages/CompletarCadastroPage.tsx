@@ -10,7 +10,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   cnpj_invalido: "CNPJ inválido.",
   cpf_invalido: "CPF inválido.",
   usuario_ja_possui_empresa: "Esta conta já está vinculada a uma empresa.",
-  trial_ja_utilizado: "Este CPF ou CNPJ já utilizou o teste grátis antes.",
+  trial_ja_utilizado: "Este CNPJ já utilizou o teste grátis antes.",
   empresa_ja_possui_assinatura: "Esta empresa já possui uma assinatura cadastrada.",
   plano_self_service_nao_encontrado: "Plano de teste indisponível no momento. Fale com o suporte.",
 };
@@ -100,7 +100,7 @@ export default function CompletarCadastroPage() {
               required
             />
             <p className="mt-1 text-xs text-muted-foreground">
-              Usado apenas para evitar reativações indevidas do teste grátis.
+              Usado apenas como dado cadastral.
             </p>
           </div>
           <button
